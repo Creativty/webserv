@@ -1,0 +1,10 @@
+# Intermediary files
+*.d
+*.o
+
+# Editor specific files
+tags
+.vscode/
+
+*.toml
+webserv
