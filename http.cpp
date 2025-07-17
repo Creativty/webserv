@@ -6,9 +6,14 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/17 17:21:41 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/17 18:56:25 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/07/17 19:36:15 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
+
+/* REFERENCES:
+* - https://www.rfc-editor.org/rfc/rfc1945
+* - https://github.com/laytan/odin-http
+*/
 
 #include "webserv.hpp"
 #include <map>

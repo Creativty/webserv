@@ -6,9 +6,13 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/11 16:08:32 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/17 17:21:20 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/07/17 19:36:36 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
+
+/* REFERENCES:
+ * - https://toml.io/en/v1.0.0
+ */
 
 /* DISCLAIMER:
  * Our current TOML subset, does not support UTF8, and heavily limits the
