@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/11 16:08:32 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/15 17:29:12 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/07/17 15:58:22 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -138,7 +138,7 @@ toml::Tokens	toml::lex(const char *source) {
 		} else if (peek >= 'a' && peek <= 'z') { // Identifier
 			kind = toml::TOKEN_IDENTIFIER;
 			len = 1;
-			while (source[i + len] && source[i + len] >= 'a' && source[i + len] <= 'z')
+			while (source[i + len] && ((source[i + len] >= 'a' && source[i + len] <= 'z') || (len > 1 && source[i + len] == '_')))
 				len++;
 		}
 		tokens.elems.push_back(Token(&source[i], len, kind, line, column));
@@ -275,24 +275,23 @@ static bool parse_instance_entry(toml::Tokens& tokens, toml::Config& config, boo
 
 	(void)config;
 	if (accept(tokens, &ident, toml::TOKEN_IDENTIFIER)) {
-		if (!accept(tokens, &token, toml::TOKEN_ASSIGN)) return (*err = true, error_expect(toml::TOKEN_ASSIGN, token)); // error: expected = after key
+		if (!accept(tokens, &token, toml::TOKEN_ASSIGN)) return (*err = true, error_expect(toml::TOKEN_ASSIGN, token));
 		// TODO(XENOBAS): Check for duplicate entries
-		if (ident.text == "port") {
-			toml::Token	value; if (!accept(tokens, &value, toml::TOKEN_NUMBER)) return (*err = true, error_expect(toml::TOKEN_NUMBER, token)); // error: expected number for `port` key
-			std::cout << "port " << value << std::endl;
+		if (ident.text == "port" ) {
+			toml::Token	value; if (!accept(tokens, &value, toml::TOKEN_NUMBER)) return (*err = true, error_expect(toml::TOKEN_NUMBER, value));
 			// TODO(XENOBAS): Shove it into config as a parsed integer between [0..65535]
+		} else if (ident.text == "max_clients" ) {
+			toml::Token	value; if (!accept(tokens, &value, toml::TOKEN_NUMBER)) return (*err = true, error_expect(toml::TOKEN_NUMBER, value));
+			// TODO(XENOBAS): Decide on what to use as a signifier of unlimited cliens
+		} else if (ident.text == "timeout" ) {
+			toml::Token	value; if (!accept(tokens, &value, toml::TOKEN_NUMBER)) return (*err = true, error_expect(toml::TOKEN_NUMBER, value));
+			// TODO(XENOBAS): Decide on what to use as a signifier of unlimited cliens
 		} else if (ident.text == "name") {
-			toml::Token	value; if (!accept(tokens, &value, toml::TOKEN_STRING)) return (*err = true, error_expect(toml::TOKEN_STRING, token)); // error: expected string for `name`
-			std::cout << "name " << value << std::endl;
+			toml::Token	value; if (!accept(tokens, &value, toml::TOKEN_STRING)) return (*err = true, error_expect(toml::TOKEN_STRING, value));
 			// TODO(XENOBAS): Shove it into config as a parsed string
 		} else if (ident.text == "host") {
-			std::vector<toml::Token>	table;
-			if (!parse_table(tokens, table, toml::TOKEN_NUMBER)) return (*err = true, false);
-			std::cout << "host { " << std::endl;
-			for (size_t i = 0; i < table.size(); i++)
-				std::cout << table[i] << std::endl;
-			std::cout << "} " << std::endl;
-			// TODO(XENOBAS): Shove it into config as a parse array of length 4 of numbers between [0..255]
+			toml::Token	value; if (!accept(tokens, &value, toml::TOKEN_STRING)) return (*err = true, error_expect(toml::TOKEN_STRING, value));
+			// TODO(XENOBAS): Shove it into config as a parsed array of length 4 of numbers between [0..255]
 		} else return (*err = true, error_expect("<key>", ident)); // error: unrecognized key
 		accept(tokens, toml::TOKEN_COMMENT);
 		if (!accept(tokens, &token, toml::TOKEN_EOL)) return (*err = true, error_expect(toml::TOKEN_EOL, token)); // error: expected eol delimiter
