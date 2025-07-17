@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+	</head>
+	<body>
+		<a href="/1">Resource 1</a> <!-- GET /1 HTTP/1.1 -->
+		<a href="/2">Resource 2</a> <!-- GET /2 HTTP/1.1 -->
+		<a href="/3">Resource 3</a> <!-- GET /3 HTTP/1.1 -->
+		<form method="POST" action="/endpoint">
+			<input type="text" name="data" placeholder="Write data here to POST it..." required />
+			<button type="submit">POST</button>
+		</form>
+		<form method="GET" action="/endpoint">
+			<input type="text" name="data" placeholder="Write data here to GET it..." required />
+			<button type="submit">GET</button>
+		</form>
+		<form method="DELETE" action="/endpoint">
+			<input type="text" name="data" placeholder="Write data here to DELETE it..." required />
+			<button type="submit">POST</button>
+		</form>
+		<form method="POST" action="/json" json>
+			<input type="text" name="data" placeholder="Write data here to POST(json) it..." required />
+			<textarea style="display: none;" readonly>
+				UNIMPLEMENTED IN THE CLIENT SIDE
+			</textarea>
+			<button type="submit">POST</button>
+		</form>
+		<!-- TODO(XENOBAS): Complete this JSON tester implementation, could be used with CGI or something like that.
+		<script>
+		document.addEventListener("DOMContentLoaded", () => {
+			const form = document.querySelector("form[json]");
+			if (!form) return ;
+			form.addEventListener("submit", (event) => {
+				event.preventDefault();
+				const data = new FormData(form);
+				fetch(form.action, {
+					method: form.method,
+					body: json,
+				});
+			});
+		});
+		</script>
+		-->
+	</body>
+</html>

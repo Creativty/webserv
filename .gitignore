@@ -7,4 +7,5 @@ tags
 .vscode/
 
 *.toml
+http
 webserv
