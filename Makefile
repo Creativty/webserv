@@ -6,7 +6,7 @@
 #    By: aindjare <marvin@42.fr>                    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/07/11 15:57:44 by aindjare          #+#    #+#              #
-#    Updated: 2025/07/11 15:58:33 by aindjare         ###   ########.fr        #
+#    Updated: 2025/07/19 15:31:22 by aindjare         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -28,10 +28,13 @@ fclean: clean
 
 re: fclean all
 
+flags:
+	@echo $(CXXFLAGS)
+
 $(NAME): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 -include $(DEPS)
 
-.PHONY: all clean fclean re
+.PHONY: all clean fclean re flags
 .SECONDARY: $(OBJS) $(DEPS)

@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/17 17:21:41 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/17 19:36:15 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/07/19 19:26:00 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,24 +22,16 @@
 #include <iostream>
 
 namespace http {
-	enum HTTP_Method {
-		HTTP_METHOD_INVALID,
-		HTTP_METHOD_GET,
-		HTTP_METHOD_POST,
-		HTTP_METHOD_HEAD,
-		HTTP_METHOD_DELETE,
-	};
+enum HTTP_Method {
+	HTTP_METHOD_INVALID,
+	HTTP_METHOD_GET,
+	HTTP_METHOD_POST,
+	HTTP_METHOD_HEAD,
+	HTTP_METHOD_DELETE,
+};
 
-	HTTP_Method	parse_method(const std::string& text) {
-		if (text == "GET") return (HTTP_METHOD_GET);
-		if (text == "POST") return (HTTP_METHOD_POST);
-		if (text == "HEAD") return (HTTP_METHOD_HEAD);
-		if (text == "DELETE") return (HTTP_METHOD_DELETE);
-		return (HTTP_METHOD_INVALID);
-	}
-	
-	std::ostream&	operator<<(std::ostream& stream, const HTTP_Method& method) {
-		switch (method) {
+std::ostream&	operator<<(std::ostream& stream, const HTTP_Method& method) {
+	switch (method) {
 		case HTTP_METHOD_GET:
 			return (stream << "GET");
 		case HTTP_METHOD_POST:
@@ -52,36 +44,51 @@ namespace http {
 			return (stream << "INVALID");
 		default:
 			return (stream << "ESPECIALLYINVALID");
-		}
 	}
+}
 
-	struct Request {
-		HTTP_Method							method;
-		std::string							uri;
-		std::string							version;
+HTTP_Method	parse_method(const std::string& text) {
+	if (text == "GET") return (HTTP_METHOD_GET);
+	if (text == "POST") return (HTTP_METHOD_POST);
+	if (text == "HEAD") return (HTTP_METHOD_HEAD);
+	if (text == "DELETE") return (HTTP_METHOD_DELETE);
+	return (HTTP_METHOD_INVALID);
+}
 
-		std::map<std::string, std::string>	headers;
-		std::string							body;
-	};
+struct Request {
+	HTTP_Method							method;
+	std::string							uri;
+	std::string							version;
 
-	struct Token {
-		int			line, column;
-		std::string	text;
-	};
+	std::map<std::string, std::string>	headers;
+	std::string							body;
+};
 
-	enum Parse_Error {
-		PARSE_ERROR_NONE,
-		PARSE_ERROR_NOT_DELIMITED,
-		PARSE_ERROR_SUCCESSIVE_SPACE,
-		PARSE_ERROR_NOT_ENOUGH_FIELDS,
-		PARSE_ERROR_UNSUPPORTED_METHOD,
-		PARSE_ERROR_UNSUPPORTED_VERSION,
-	};
+struct Token {
+	int			line, column;
+	std::string	text;
+};
 
-	std::ostream&	operator<<(std::ostream& stream, const Parse_Error& error) {
-		switch (error) {
+enum Parse_Error {
+	PARSE_ERROR_NONE,
+	PARSE_ERROR_NOT_DELIMITED,
+	PARSE_ERROR_SUCCESSIVE_SPACE,
+	PARSE_ERROR_NOT_ENOUGH_FIELDS,
+	PARSE_ERROR_HEADER_MISSING_KEY,
+	PARSE_ERROR_UNSUPPORTED_METHOD,
+	PARSE_ERROR_UNSUPPORTED_VERSION,
+	PARSE_ERROR_HEADER_ENTRY_INVALID_VALUE,
+	PARSE_ERROR_HEADER_ENTRY_DELIMITER,
+	PARSE_ERROR_HEADER_ENTRY_INCOMPLETE,
+	PARSE_ERROR_HEADER_SECTION_DELIMITER,
+};
+
+std::ostream&	operator<<(std::ostream& stream, const Parse_Error& error) {
+	switch (error) {
 		case PARSE_ERROR_NONE:
 			return (stream << "Parse_Error{ Success }");
+		case PARSE_ERROR_HEADER_MISSING_KEY:
+			return (stream << "Parse_Error{ Header entry has no field name }");
 		case PARSE_ERROR_NOT_DELIMITED:
 			return (stream << "Parse_Error{ Could not find \"\\r\\n\" }");
 		case PARSE_ERROR_NOT_ENOUGH_FIELDS:
@@ -92,39 +99,144 @@ namespace http {
 			return (stream << "Parse_Error{ Unsupported version }");
 		case PARSE_ERROR_UNSUPPORTED_METHOD:
 			return (stream << "Parse_Error{ Unsupported method }");
+		case PARSE_ERROR_HEADER_SECTION_DELIMITER:
+			return (stream << "Parse_Error{ Headers section is not delimited with \"\\r\\n\" }");
+		case PARSE_ERROR_HEADER_ENTRY_INVALID_VALUE:
+			return (stream << "Parse_Error{ Invalid character, most likely a CTL }");
+		case PARSE_ERROR_HEADER_ENTRY_DELIMITER:
+			return (stream << "Parse_Error{ Header entry is not delimited with \"\\r\\n\" }");
+		case PARSE_ERROR_HEADER_ENTRY_INCOMPLETE:
+			return (stream << "Parse_Error{ Header entry is missing ':' }");
 		default:
 			return (stream << "Parse_Error{ Unknown " << error << " }");
+	}
+}
+
+Parse_Error	parse_request_line(Request& request, const std::string& msg) {
+	size_t	offset = 0, next_space = 0;
+	if (msg.find("  ") != std::string::npos) return (PARSE_ERROR_SUCCESSIVE_SPACE);
+
+	if ((next_space = msg.find(' ', next_space)) == std::string::npos) return (PARSE_ERROR_NOT_ENOUGH_FIELDS);
+	std::string	method = msg.substr(offset, next_space);
+	request.method = parse_method(method);
+	if (request.method == HTTP_METHOD_INVALID) return (PARSE_ERROR_UNSUPPORTED_METHOD);
+
+	offset = next_space + 1;
+	if ((next_space = msg.find(' ', offset)) == std::string::npos) return (PARSE_ERROR_NOT_ENOUGH_FIELDS);
+	request.uri = msg.substr(offset, next_space - offset);
+
+	offset = next_space + 1;
+	if ((next_space = msg.find("\r\n", offset)) == std::string::npos) return (PARSE_ERROR_NOT_DELIMITED);
+	request.version = msg.substr(offset, next_space - offset);
+	if (request.version != "HTTP/1.0") return (PARSE_ERROR_UNSUPPORTED_VERSION);
+
+	return (PARSE_ERROR_NONE);
+}
+
+static bool	is_char(char c) {
+	return (c >= 0 && c <= 127);
+}
+
+static bool is_tspecial(char c) {
+	// tspecials      = '(' | ')' | '<' | '>' | '@' | ',' | ';' | ':' | '\' | '"' | '/' | '[' | ']' | '?' | '=' | '{' | '}' | SP | HT
+	static const char SET[] = { '(',  ')',  '<',  '>',  '@', ',',  ';',  ':',  '\\',  '"',  '/',  '[',  ']',  '?',  '=',  '{',  '}',  ' ',  '\t' };
+	for (size_t i = 0; i < sizeof(SET) / sizeof(SET[0]); i++)
+		if (SET[i] == c)
+			return (true);
+	return (false);
+}
+
+static bool	is_ctl(char c) {
+	// CTL            = <any US-ASCII control character (octets 0 - 31) and DEL (127)>
+	return (c == 127 || (c >= 0 && c <= 31));
+}
+
+Parse_Error	parse_request_headers(Request& request, const std::string& msg) {
+	(void)request;
+	std::string	rest = msg;
+	for (size_t begin = 0; !msg.substr(begin).empty();) {
+		rest = msg.substr(begin);
+		if (rest.find("\r\n") == 0) break ;
+		std::string	name;
+		{ // field-name
+			size_t count = 0;
+			const std::string& substr = msg.substr(begin);
+			while (count < substr.size()) {
+				if (!is_char(substr[count])) break ;
+				if (is_tspecial(substr[count])) break ;
+				if (is_ctl(substr[count])) break ;
+				count++;
+			}
+			if (count < 1) return (PARSE_ERROR_HEADER_MISSING_KEY);
+			name = msg.substr(begin, count);
+			begin += count;
 		}
+		{ // ':'
+			const std::string& substr = msg.substr(begin);
+			if (substr.size() < 1 || substr[0] != ':') return (PARSE_ERROR_HEADER_ENTRY_INCOMPLETE);
+			begin++;
+		}
+		std::string	value;
+		{ // [ field-value ]
+			size_t	count  = msg.substr(begin).find("\r\n");
+			if (count == std::string::npos) return (PARSE_ERROR_HEADER_ENTRY_DELIMITER);
+			value = msg.substr(begin, count);
+			{ // internal validation
+				size_t	i = 0;
+				while (i < value.size()) {
+					// field-content  = <the OCTETs making up the field-value and consisting of either *<any OCTET except CTLs, but including LWS> or combinations of 1*<any CHAR except CTLs>, tspecials>
+					if (value[i] == '"') { // quoted-string  = ( '"' *<any CHAR except '"' and CTLs, but including LWS> '"' )
+						size_t j = i++;
+						while (i < value.size()) {
+							if (!is_char(value[i])) break ;
+							if (is_ctl(value[i]) && value[i] != ' ' && value[i] != '\t') break ;
+							if (value[i] == '"') break ;
+							i++;
+						}
+
+						size_t count = i - j;
+						if (count <= 1 || value[i] != '"') i = j;
+						else {
+							i++;
+							continue ;
+						}
+					}
+					if (is_ctl(value[i])) return (PARSE_ERROR_HEADER_ENTRY_INVALID_VALUE);
+					i++;
+				}
+			}
+			begin += count;
+		}
+		{ // CRLF
+			if (msg.substr(begin).find("\r\n") != 0) return (PARSE_ERROR_HEADER_ENTRY_DELIMITER);
+			begin += 2;
+		}
+		request.headers[name] = value;
 	}
-
-	Parse_Error	parse_request_line(Request& request, const std::string& msg) {
-		size_t	offset = 0, next_space = 0;
-		if (msg.find("  ") != std::string::npos) return (PARSE_ERROR_SUCCESSIVE_SPACE);
-
-		if ((next_space = msg.find(' ', next_space)) == std::string::npos) return (PARSE_ERROR_NOT_ENOUGH_FIELDS);
-		std::string	method = msg.substr(offset, next_space);
-		request.method = parse_method(method);
-		if (request.method == HTTP_METHOD_INVALID) return (PARSE_ERROR_UNSUPPORTED_METHOD);
-
-		offset = next_space + 1;
-		if ((next_space = msg.find(' ', offset)) == std::string::npos) return (PARSE_ERROR_NOT_ENOUGH_FIELDS);
-		request.uri = msg.substr(offset, next_space - offset);
-
-		offset = next_space + 1;
-		if ((next_space = msg.find("\r\n", offset)) == std::string::npos) return (PARSE_ERROR_NOT_DELIMITED);
-		request.version = msg.substr(offset, next_space - offset);
-		if (request.version != "HTTP/1.0") return (PARSE_ERROR_UNSUPPORTED_VERSION);
-
+	if (rest == "\r\n")
 		return (PARSE_ERROR_NONE);
-	}
+	return (PARSE_ERROR_HEADER_SECTION_DELIMITER);
+}
 };
 
 #ifdef HTTP_MAIN
 int	main(void) {
 	http::Request		request;
-	http::Parse_Error	err = http::parse_request_line(request, "GET /path?version HTTP/1.0\r\n");
+	http::Parse_Error	err_l = http::parse_request_line(request, "GET /path?version HTTP/1.0\r\n");
+	http::Parse_Error	err_h = parse_request_headers(request, 
+												 "Content-Type: application/json\r\n"
+												 "Transfer-Encoding: chunked\r\n"
+												 "Empty: \r\n"
+												 "\r\n");
+	std::cout << "Headers:" << std::endl;
+	for (std::map<std::string, std::string>::iterator iter = request.headers.begin(); iter != request.headers.end(); iter++) {
+		const std::string	key = iter->first;
+		const std::string	val = iter->second;
+		std::cout << '\t' <<  key << ":\t" << val << std::endl;
+	}
 
-	std::cout << "ERROR: " << err << std::endl;
+	std::cout << "ERROR Line    : " << err_l << std::endl;
+	std::cout << "ERROR Headers : " << err_h << std::endl;
 	return (0);
 }
 #endif
