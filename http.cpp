@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   http.cpp                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
+/*   By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/17 17:21:41 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/19 19:26:00 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/07/20 11:36:04 by sennakhl         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,19 +16,6 @@
 */
 
 #include "webserv.hpp"
-#include <map>
-#include <string>
-#include <ostream>
-#include <iostream>
-
-namespace http {
-enum HTTP_Method {
-	HTTP_METHOD_INVALID,
-	HTTP_METHOD_GET,
-	HTTP_METHOD_POST,
-	HTTP_METHOD_HEAD,
-	HTTP_METHOD_DELETE,
-};
 
 std::ostream&	operator<<(std::ostream& stream, const HTTP_Method& method) {
 	switch (method) {
@@ -54,34 +41,6 @@ HTTP_Method	parse_method(const std::string& text) {
 	if (text == "DELETE") return (HTTP_METHOD_DELETE);
 	return (HTTP_METHOD_INVALID);
 }
-
-struct Request {
-	HTTP_Method							method;
-	std::string							uri;
-	std::string							version;
-
-	std::map<std::string, std::string>	headers;
-	std::string							body;
-};
-
-struct Token {
-	int			line, column;
-	std::string	text;
-};
-
-enum Parse_Error {
-	PARSE_ERROR_NONE,
-	PARSE_ERROR_NOT_DELIMITED,
-	PARSE_ERROR_SUCCESSIVE_SPACE,
-	PARSE_ERROR_NOT_ENOUGH_FIELDS,
-	PARSE_ERROR_HEADER_MISSING_KEY,
-	PARSE_ERROR_UNSUPPORTED_METHOD,
-	PARSE_ERROR_UNSUPPORTED_VERSION,
-	PARSE_ERROR_HEADER_ENTRY_INVALID_VALUE,
-	PARSE_ERROR_HEADER_ENTRY_DELIMITER,
-	PARSE_ERROR_HEADER_ENTRY_INCOMPLETE,
-	PARSE_ERROR_HEADER_SECTION_DELIMITER,
-};
 
 std::ostream&	operator<<(std::ostream& stream, const Parse_Error& error) {
 	switch (error) {
@@ -156,6 +115,7 @@ Parse_Error	parse_request_headers(Request& request, const std::string& msg) {
 	std::string	rest = msg;
 	for (size_t begin = 0; !msg.substr(begin).empty();) {
 		rest = msg.substr(begin);
+		std::cout << "parse-request_headers : \n\t\t rest: <<" <<rest <<">>" << std::endl; 
 		if (rest.find("\r\n") == 0) break ;
 		std::string	name;
 		{ // field-name
@@ -217,7 +177,6 @@ Parse_Error	parse_request_headers(Request& request, const std::string& msg) {
 		return (PARSE_ERROR_NONE);
 	return (PARSE_ERROR_HEADER_SECTION_DELIMITER);
 }
-};
 
 #ifdef HTTP_MAIN
 int	main(void) {

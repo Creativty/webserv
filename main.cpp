@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   main.cpp                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
+/*   By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/11 16:03:49 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/17 16:47:47 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/07/20 09:39:58 by sennakhl         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -44,5 +44,6 @@ int	main(void) {
 	// 	std::cout << tokens.elems[i] << std::endl;
 	toml::Configs	configs = toml::parse(tokens);
 	(void)configs;
+	server();
 	return (0);
 }
