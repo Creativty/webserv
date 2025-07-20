@@ -57,7 +57,7 @@ int server() {
         toml::Tokens tokens = toml::lex(buffer);
 
         Request request;
-        parse_request_headers(request, buffer);
+        parse_headers(request, buffer);
         std::cout << "method : " << request.method << std::endl
                 << "uri : " << request.uri << std::endl
                 << "version : " << request.version << std::endl
@@ -99,15 +99,15 @@ int server() {
     "<a href=\"/1\">Resource 1</a><br>"
     "<a href=\"/2\">Resource 2</a><br>"
     "<a href=\"/3\">Resource 3</a><br>"
-    "<form method=\"POST\" action=\"/endpoint\">"
+    "<form method=\"POST\" action=\"/POST\">"
         "<input type=\"text\" name=\"data\" placeholder=\"Write data here to POST it...\" required />"
         "<button type=\"submit\">POST</button>"
     "</form>"
-    "<form method=\"GET\" action=\"/endpoint\">"
+    "<form method=\"GET\" action=\"/GET\">"
         "<input type=\"text\" name=\"data\" placeholder=\"Write data here to GET it...\" required />"
         "<button type=\"submit\">GET</button>"
     "</form>"
-    "<form method=\"DELETE\" action=\"/endpoint\">"
+    "<form method=\"DELETE\" action=\"/DELETE\">"
         "<input type=\"text\" name=\"data\" placeholder=\"Write data here to DELETE it...\" required />"
         "<button type=\"submit\">DELETE</button>"
     "</form>"

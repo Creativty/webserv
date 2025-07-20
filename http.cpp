@@ -6,7 +6,7 @@
 /*   By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/17 17:21:41 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/20 11:36:04 by sennakhl         ###   ########.fr       */
+/*   Updated: 2025/07/20 16:19:55 by sennakhl         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -115,7 +115,6 @@ Parse_Error	parse_request_headers(Request& request, const std::string& msg) {
 	std::string	rest = msg;
 	for (size_t begin = 0; !msg.substr(begin).empty();) {
 		rest = msg.substr(begin);
-		std::cout << "parse-request_headers : \n\t\t rest: <<" <<rest <<">>" << std::endl; 
 		if (rest.find("\r\n") == 0) break ;
 		std::string	name;
 		{ // field-name
@@ -178,15 +177,9 @@ Parse_Error	parse_request_headers(Request& request, const std::string& msg) {
 	return (PARSE_ERROR_HEADER_SECTION_DELIMITER);
 }
 
-#ifdef HTTP_MAIN
-int	main(void) {
-	http::Request		request;
-	http::Parse_Error	err_l = http::parse_request_line(request, "GET /path?version HTTP/1.0\r\n");
-	http::Parse_Error	err_h = parse_request_headers(request, 
-												 "Content-Type: application/json\r\n"
-												 "Transfer-Encoding: chunked\r\n"
-												 "Empty: \r\n"
-												 "\r\n");
+
+int	parse_headers(Request& request, std::string msg) {
+	Parse_Error	err_l = parse_request_line(request, msg);
 	std::cout << "Headers:" << std::endl;
 	for (std::map<std::string, std::string>::iterator iter = request.headers.begin(); iter != request.headers.end(); iter++) {
 		const std::string	key = iter->first;
@@ -195,7 +188,6 @@ int	main(void) {
 	}
 
 	std::cout << "ERROR Line    : " << err_l << std::endl;
-	std::cout << "ERROR Headers : " << err_h << std::endl;
 	return (0);
 }
-#endif
+// #endif

@@ -6,7 +6,7 @@
 /*   By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/11 16:01:16 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/20 10:55:18 by sennakhl         ###   ########.fr       */
+/*   Updated: 2025/07/20 16:09:56 by sennakhl         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -108,6 +108,6 @@ namespace toml {
 std::ostream&	operator<<(std::ostream& stream, const toml::Token& token);
 std::ostream&	operator<<(std::ostream& stream, const toml::Token_Kind& kind);
 
+int	parse_headers(Request& request, std::string msg);
 int server();
-Parse_Error	parse_request_headers(Request& request, const std::string& msg);
 #endif // webserv_HPP
