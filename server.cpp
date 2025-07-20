@@ -20,6 +20,10 @@ int server() {
         std::cerr << "Socket creation failed" << std::endl;
         return 2;
     }
+	{
+		const int reuseaddr = 1;
+		setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(int));
+	}
 
     std::memset((char*)&address, 0, sizeof(address));
     address.sin_family = AF_INET;
@@ -44,7 +48,7 @@ int server() {
             return EXIT_FAILURE;
         }
 
-        char buffer[1024];
+        char buffer[1024 * 1024];
         std::memset(buffer, 0, sizeof(buffer));
         ssize_t valread = ::read(new_socket, buffer, sizeof(buffer));
 
@@ -54,14 +58,25 @@ int server() {
             std::cout << "No bytes are there to read" << std::endl;
         }
 
-        toml::Tokens tokens = toml::lex(buffer);
-
         Request request;
-        parse_headers(request, buffer);
-        std::cout << "method : " << request.method << std::endl
-                << "uri : " << request.uri << std::endl
-                << "version : " << request.version << std::endl
-                << "body : "<< request.body << std::endl;
+		std::string	message(buffer, valread);
+		Parse_Error	parse_request(const std::string& msg, Request& request);
+		Parse_Error error = parse_request(message, request);
+		if (error == PARSE_ERROR_NONE) {
+			std::cout << "Version: " << request.version << '\n';
+			std::cout << "Method:  " << request.method << '\n';
+			std::cout << "URI:     " << request.uri << '\n';
+			std::cout << "Body:    " << request.body << '\n';
+			std::cout << "Headers: " << '\n';
+			for (std::map<std::string, std::string>::iterator iter = request.headers.begin(); iter != request.headers.end(); iter++) {
+				std::string	name = iter->first, value = iter->second;
+				std::cout << '\t' << name << ":" << value << std::endl;
+			}
+		} else {
+			std::cout << "Could not parse request because of " << error << std::endl;
+			// std::cout << buffer << std::endl;
+		}
+
 
         std::string http_response =
     "HTTP/1.1 200 OK\r\n"
@@ -124,6 +139,8 @@ int server() {
 
         ::write(new_socket, http_response.c_str(), http_response.size());
         ::close(new_socket);
+		if (request.uri == "/shutdown")
+			break ;
     }
 
     return 0;

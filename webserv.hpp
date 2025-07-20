@@ -12,14 +12,12 @@
 
 #ifndef   webserv_HPP
 #define   webserv_HPP
+#include  <map>
 #include  <vector>
-// #include  <string>
-// #include  <ostream>
+#include  <string>
 #include  <cstdlib>
-#include <map>
-#include <string>
-#include <ostream>
-#include <iostream>
+#include  <ostream>
+#include  <iostream>
 #define   cast
 #define   nullptr NULL
 
@@ -107,7 +105,8 @@ namespace toml {
 
 std::ostream&	operator<<(std::ostream& stream, const toml::Token& token);
 std::ostream&	operator<<(std::ostream& stream, const toml::Token_Kind& kind);
+std::ostream&	operator<<(std::ostream& stream, const HTTP_Method& method);
+std::ostream&	operator<<(std::ostream& stream, const Parse_Error& error);
 
-int	parse_headers(Request& request, std::string msg);
 int server();
 #endif // webserv_HPP

@@ -87,12 +87,12 @@ Parse_Error	parse_request_line(Request& request, const std::string& msg) {
 	offset = next_space + 1;
 	if ((next_space = msg.find("\r\n", offset)) == std::string::npos) return (PARSE_ERROR_NOT_DELIMITED);
 	request.version = msg.substr(offset, next_space - offset);
-	if (request.version != "HTTP/1.0") return (PARSE_ERROR_UNSUPPORTED_VERSION);
+	if (request.version != "HTTP/1.0" && request.version != "HTTP/1.1") return (PARSE_ERROR_UNSUPPORTED_VERSION);
 
 	return (PARSE_ERROR_NONE);
 }
 
-static bool	is_char(char c) {
+static bool	is_char(int c) {
 	return (c >= 0 && c <= 127);
 }
 
@@ -177,17 +177,34 @@ Parse_Error	parse_request_headers(Request& request, const std::string& msg) {
 	return (PARSE_ERROR_HEADER_SECTION_DELIMITER);
 }
 
+Parse_Error	parse_request(const std::string& msg, Request& request) {
+	size_t		count = 0, offset = 0;
+	Parse_Error error;
+	std::string	substr;
 
-int	parse_headers(Request& request, std::string msg) {
-	Parse_Error	err_l = parse_request_line(request, msg);
-	std::cout << "Headers:" << std::endl;
-	for (std::map<std::string, std::string>::iterator iter = request.headers.begin(); iter != request.headers.end(); iter++) {
-		const std::string	key = iter->first;
-		const std::string	val = iter->second;
-		std::cout << '\t' <<  key << ":\t" << val << std::endl;
-	}
+	count = msg.find("\r\n");
+	if (count == std::string::npos) return (PARSE_ERROR_NOT_DELIMITED);
+	else count = (count + 2) - offset;
+	substr = msg.substr(offset, count);
+	error = parse_request_line(request, substr); if (error != PARSE_ERROR_NONE) return (error);
+	offset += count;
 
-	std::cout << "ERROR Line    : " << err_l << std::endl;
+	count = msg.find("\r\n\r\n", offset);
+	if (count == std::string::npos) return (PARSE_ERROR_NOT_DELIMITED);
+	else count = (count + 4) - offset;
+	substr = msg.substr(offset, count); // std::cout << substr << std::endl;
+	error = parse_request_headers(request, substr); if (error != PARSE_ERROR_NONE) return (error);
+	offset += count;
+
+	// TODO(XENOBAS): Understand application/x-www-form-urlencoded
+	// TODO(XENOBAS): Content-Length
+	std::cout << "Offset: " << offset << ", Length: " << msg.size() << std::endl;
+	request.body = msg.substr(offset);
+	return (PARSE_ERROR_NONE);
+}
+
+#ifdef TEST_HTTP_MAIN
+int	main(void) {
 	return (0);
 }
-// #endif
+#endif
