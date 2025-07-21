@@ -59,7 +59,7 @@ int server() {
         }
 
         Request request;
-		std::string	message(buffer, valread);
+		std::string	message(buffer, cast(size_t)valread);
 		Parse_Error	parse_request(const std::string& msg, Request& request);
 		Parse_Error error = parse_request(message, request);
 		if (error == PARSE_ERROR_NONE) {
