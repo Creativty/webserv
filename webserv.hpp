@@ -6,7 +6,7 @@
 /*   By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/11 16:01:16 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/20 16:09:56 by sennakhl         ###   ########.fr       */
+/*   Updated: 2025/07/21 17:46:17 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,40 +21,39 @@
 #define   cast
 #define   nullptr NULL
 
-enum HTTP_Method {
-	HTTP_METHOD_INVALID,
-	HTTP_METHOD_GET,
-	HTTP_METHOD_POST,
-	HTTP_METHOD_HEAD,
-	HTTP_METHOD_DELETE,
-};
+namespace http {
+	enum HTTP_Method {
+		HTTP_METHOD_INVALID,
+		HTTP_METHOD_GET,
+		HTTP_METHOD_POST,
+		HTTP_METHOD_HEAD,
+		HTTP_METHOD_DELETE,
+	};
 
-struct Request {
-	HTTP_Method							method;
-	std::string							uri;
-	std::string							version;
+	struct Request {
+		HTTP_Method							method;
+		std::string							uri;
+		std::string							version;
 
-	std::map<std::string, std::string>	headers;
-	std::string							body;
-};
+		std::map<std::string, std::string>	headers;
+		std::string							body;
+	};
 
-struct Token {
-	int			line, column;
-	std::string	text;
-};
+	enum Parse_Error {
+		PARSE_ERROR_NONE,
+		PARSE_ERROR_NOT_DELIMITED,
+		PARSE_ERROR_SUCCESSIVE_SPACE,
+		PARSE_ERROR_NOT_ENOUGH_FIELDS,
+		PARSE_ERROR_HEADER_MISSING_KEY,
+		PARSE_ERROR_UNSUPPORTED_METHOD,
+		PARSE_ERROR_UNSUPPORTED_VERSION,
+		PARSE_ERROR_HEADER_ENTRY_INVALID_VALUE,
+		PARSE_ERROR_HEADER_ENTRY_DELIMITER,
+		PARSE_ERROR_HEADER_ENTRY_INCOMPLETE,
+		PARSE_ERROR_HEADER_SECTION_DELIMITER,
+	};
 
-enum Parse_Error {
-	PARSE_ERROR_NONE,
-	PARSE_ERROR_NOT_DELIMITED,
-	PARSE_ERROR_SUCCESSIVE_SPACE,
-	PARSE_ERROR_NOT_ENOUGH_FIELDS,
-	PARSE_ERROR_HEADER_MISSING_KEY,
-	PARSE_ERROR_UNSUPPORTED_METHOD,
-	PARSE_ERROR_UNSUPPORTED_VERSION,
-	PARSE_ERROR_HEADER_ENTRY_INVALID_VALUE,
-	PARSE_ERROR_HEADER_ENTRY_DELIMITER,
-	PARSE_ERROR_HEADER_ENTRY_INCOMPLETE,
-	PARSE_ERROR_HEADER_SECTION_DELIMITER,
+	Parse_Error	parse_request(const std::string& msg, Request& request);
 };
 
 namespace toml {
@@ -105,8 +104,8 @@ namespace toml {
 
 std::ostream&	operator<<(std::ostream& stream, const toml::Token& token);
 std::ostream&	operator<<(std::ostream& stream, const toml::Token_Kind& kind);
-std::ostream&	operator<<(std::ostream& stream, const HTTP_Method& method);
-std::ostream&	operator<<(std::ostream& stream, const Parse_Error& error);
+std::ostream&	operator<<(std::ostream& stream, const http::HTTP_Method& method);
+std::ostream&	operator<<(std::ostream& stream, const http::Parse_Error& error);
 
 int server();
 #endif // webserv_HPP

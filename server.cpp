@@ -58,11 +58,10 @@ int server() {
             std::cout << "No bytes are there to read" << std::endl;
         }
 
-        Request request;
 		std::string	message(buffer, cast(size_t)valread);
-		Parse_Error	parse_request(const std::string& msg, Request& request);
-		Parse_Error error = parse_request(message, request);
-		if (error == PARSE_ERROR_NONE) {
+		http::Request request;
+		http::Parse_Error error = http::parse_request(message, request);
+		if (error == http::PARSE_ERROR_NONE) {
 			std::cout << "Version: " << request.version << '\n';
 			std::cout << "Method:  " << request.method << '\n';
 			std::cout << "URI:     " << request.uri << '\n';
