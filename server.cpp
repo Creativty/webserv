@@ -12,8 +12,13 @@
 
 #define PORT 8080
 
+/* TODO(XENOBAS):
+ * - "HTTP/1.0 501 Not Implemented"
+ * - "HTTP/1.0 505 HTTP Version Not Supported"
+ */
+
 void	http_respond_html(int fd, const std::string &data) {
-	std::string	response_line = "HTTP/1.1 200 OK\r\n";
+	std::string	response_line = "HTTP/1.0 200 OK\r\n";
 	std::string	headers = "Content-Type: text/html\r\n"
 							"\r\n";
 	::write(fd, response_line.c_str(), response_line.size());
