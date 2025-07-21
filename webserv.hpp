@@ -6,7 +6,7 @@
 /*   By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/11 16:01:16 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/21 17:46:17 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/07/21 17:51:32 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -101,6 +101,8 @@ namespace toml {
 	Tokens	lex(const char *source);
 	Configs	parse(Tokens& tokens);
 };
+
+std::string		read_entire_file(const std::string& path, bool *ok);
 
 std::ostream&	operator<<(std::ostream& stream, const toml::Token& token);
 std::ostream&	operator<<(std::ostream& stream, const toml::Token_Kind& kind);

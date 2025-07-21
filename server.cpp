@@ -1,3 +1,4 @@
+#include <cassert>
 #include <iostream>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -10,6 +11,15 @@
 
 
 #define PORT 8080
+
+void	http_respond_html(int fd, const std::string &data) {
+	std::string	response_line = "HTTP/1.1 200 OK\r\n";
+	std::string	headers = "Content-Type: text/html\r\n"
+							"\r\n";
+	::write(fd, response_line.c_str(), response_line.size());
+	::write(fd, headers.c_str(), headers.size());
+	::write(fd, data.c_str(), data.size());
+}
 
 int server() {
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -39,6 +49,10 @@ int server() {
         perror("In listen");
         return EXIT_FAILURE;
     }
+
+	bool				file_html_ok;
+	const std::string	file_html = read_entire_file("pages/index.html", &file_html_ok);
+	assert(file_html_ok && "could not load template html file");
 
     while (true) {
         std::cout << "\n+++++++ Waiting for new connection ++++++++\n\n";
@@ -76,67 +90,8 @@ int server() {
 			// std::cout << buffer << std::endl;
 		}
 
-
-        std::string http_response =
-    "HTTP/1.1 200 OK\r\n"
-    "Content-Type: text/html\r\n\r\n"
-    "<!DOCTYPE html>"
-    "<html lang=\"en\">"
-    "<head>"
-    "<meta charset=\"UTF-8\">"
-    "<style>"
-    "  body {"
-    "    background-color: #121212;"
-    "    color: #ffffff;"
-    "    font-family: Arial, sans-serif;"
-    "  }"
-    "  a, button {"
-    "    color: #ffffff;"
-    "    background-color: #333333;"
-    "    padding: 8px 12px;"
-    "    border: none;"
-    "    border-radius: 5px;"
-    "    text-decoration: none;"
-    "    display: inline-block;"
-    "    margin: 5px;"
-    "  }"
-    "  input, textarea {"
-    "    background-color: #1e1e1e;"
-    "    color: #ffffff;"
-    "    border: 1px solid #555;"
-    "    padding: 6px;"
-    "  }"
-    "</style>"
-
-    "</head>"
-    "<body>"
-    "<a href=\"/1\">Resource 1</a><br>"
-    "<a href=\"/2\">Resource 2</a><br>"
-    "<a href=\"/3\">Resource 3</a><br>"
-    "<form method=\"POST\" action=\"/POST\">"
-        "<input type=\"text\" name=\"data\" placeholder=\"Write data here to POST it...\" required />"
-        "<button type=\"submit\">POST</button>"
-    "</form>"
-    "<form method=\"GET\" action=\"/GET\">"
-        "<input type=\"text\" name=\"data\" placeholder=\"Write data here to GET it...\" required />"
-        "<button type=\"submit\">GET</button>"
-    "</form>"
-    "<form method=\"DELETE\" action=\"/DELETE\">"
-        "<input type=\"text\" name=\"data\" placeholder=\"Write data here to DELETE it...\" required />"
-        "<button type=\"submit\">DELETE</button>"
-    "</form>"
-    "<form method=\"POST\" action=\"/json\">"
-        "<input type=\"text\" name=\"data\" placeholder=\"Write data here to POST(json) it...\" required />"
-        "<textarea style=\"display: none;\" readonly>"
-            "UNIMPLEMENTED IN THE CLIENT SIDE"
-        "</textarea>"
-        "<button type=\"submit\">POST JSON</button>"
-    "</form>"
-    "</body>"
-    "</html>";
-
-
-        ::write(new_socket, http_response.c_str(), http_response.size());
+        // ::write(new_socket, file_html.c_str(), file_html.size());
+		http_respond_html(new_socket, file_html);
         ::close(new_socket);
 		if (request.uri == "/shutdown")
 			break ;
