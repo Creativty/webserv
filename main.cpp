@@ -6,7 +6,7 @@
 /*   By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/11 16:03:49 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/20 09:39:58 by sennakhl         ###   ########.fr       */
+/*   Updated: 2025/07/23 14:39:51 by sennakhl         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,13 +19,17 @@ std::string	read_entire_file(const std::string& path, bool *ok) {
 	if (ok != nullptr)
 		*ok = false;
 	std::ifstream		file(path.c_str());
-	if (file.fail())
+	if (file.fail()){
+		std::cout << "ERROR: cannot open " << path << std::endl;
 		return ("");
+	}
 
 	std::ostringstream	stream;
 	file >> stream.rdbuf();
-	if (file.fail() && !file.eof())
+	if (file.fail() && !file.eof()){
+		std::cout << "ERROR: cannot open " << path << std::endl;
 		return ("");
+	}
 	if (ok != nullptr)
 		*ok = true;
 	return (stream.str());
