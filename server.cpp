@@ -58,6 +58,25 @@ std::string url_decode(const std::string &str) {
     return decoded;
 }
 
+int methods(std::string uri, int new_socket){
+    std::string data;
+    bool file_ok;
+
+    if (uri.find("/favicon.ico") == 0) return(1);
+    if (uri.find("/POST?data=") == 0) return(1);//TODO
+    if (uri.find("/DELETE?data=") == 0) return(1);//TODO
+    if (uri.find("/GET?data=") == 0){
+        data = uri.substr(10);
+        std::string res_file = read_entire_file(url_decode(data), &file_ok);
+        if (res_file.length()){
+            assert(file_ok && "could not load template html file");            
+            http_respond_html(new_socket, "200 OK", getContentType(data), res_file);
+        }
+        close(new_socket);
+        return(1);
+    }
+    return(0);
+}
 
 int server() {
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -113,35 +132,12 @@ int server() {
 		std::string	message(buffer, cast(size_t)valread);
 		http::Request request;
 		http::Parse_Error error = http::parse_request(message, request);
-		// if (error == http::PARSE_ERROR_NONE) {
-		// 	std::cout << "Version: " << request.version << '\n';
-		// 	std::cout << "Method:  " << request.method << '\n';
-		// 	std::cout << "URI:     " << request.uri << '\n';
-		// 	std::cout << "Body:    " << request.body << '\n';
-		// 	std::cout << "Headers: " << '\n';
-		// 	for (std::map<std::string, std::string>::iterator iter = request.headers.begin(); iter != request.headers.end(); iter++) {
-		// 		std::string	name = iter->first, value = iter->second;
-		// 		std::cout << '\t' << name << ":" << value << std::endl;
-		// 	}
-		// } 
         if (error != http::PARSE_ERROR_NONE) {
 			std::cout << "Could not parse request because of " << error << std::endl;
 			// std::cout << buffer << std::endl;
 		}
 
-        std::string data;
-        if (request.uri.find("/favicon.ico") == 0) continue;
-        if (request.uri.find("/POST?data=") == 0) continue;//TODO
-        if (request.uri.find("/GET?data=") == 0){
-            data = request.uri.substr(10);
-            std::string res_file = read_entire_file(url_decode(data), &file_html_ok);
-            if (res_file.length()){
-                assert(file_html_ok && "could not load template html file");            
-                http_respond_html(new_socket, "200 OK", getContentType(data), res_file);
-            }
-            close(new_socket);
-            continue;
-        }
+        if (methods(request.uri, new_socket)) continue;
 
         std::cout << "request.uri = " << request.uri << std::endl;
 		http_respond_html(new_socket,"200 OK", "text/html", file_html);
