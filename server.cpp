@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include "webserv.hpp"
 #include <fstream>
-// #include <string>
 
 #define PORT 8080
 
@@ -35,14 +34,16 @@ std::string getContentType(const std::string& filename) {
     if (filename.find(".png")  != std::string::npos) return "image/png";
     if (filename.find(".jpg")  != std::string::npos) return "image/jpeg";
     if (filename.find(".gif")  != std::string::npos) return "image/gif";
-    return "text/plain"; // default
+    if (filename.find(".mp4")  != std::string::npos) return "video/mp4";
+    if (filename.find(".mp3")  != std::string::npos) return "audio/mp3";
+    return "text/plain";
 }
 
 std::string url_decode(const std::string &str) {
     std::string decoded;
     char ch;
     int ii;
-    for (std::string::size_type i = 0; i < str.length(); i++) {
+    for (size_t i = 0; i < str.length(); i++) {
         if (str[i] == '%') {
 
             sscanf(str.substr(i + 1, 2).c_str(), "%x", &ii);
@@ -59,18 +60,33 @@ std::string url_decode(const std::string &str) {
 }
 
 int methods(std::string uri, int new_socket){
-    std::string data;
+    std::string path;
     bool file_ok;
 
     if (uri.find("/favicon.ico") == 0) return(1);
     if (uri.find("/POST?data=") == 0) return(1);//TODO
-    if (uri.find("/DELETE?data=") == 0) return(1);//TODO
+    if (uri.find("/DELETE?data=") == 0){
+        path = url_decode(uri.substr(13));
+        if (access(path.c_str(), F_OK)){
+            http_respond_html(new_socket, "404 Not Found", "text/pain", "");
+            close(new_socket);
+            std::cout << "ERROR: cannot open " << path << std::endl;
+            return(1);
+        }else{
+            if (remove(path.c_str())){
+                http_respond_html(new_socket, "403 Forbidden", "text/pain", "");
+                close(new_socket);
+                return(1);
+            }
+            return(0);
+        }
+    }
     if (uri.find("/GET?data=") == 0){
-        data = uri.substr(10);
-        std::string res_file = read_entire_file(url_decode(data), &file_ok);
+        path = url_decode(uri.substr(10));
+        std::string res_file = read_entire_file(path, &file_ok);
         if (res_file.length()){
             assert(file_ok && "could not load template html file");            
-            http_respond_html(new_socket, "200 OK", getContentType(data), res_file);
+            http_respond_html(new_socket, "200 OK", getContentType(path), res_file);
         }
         close(new_socket);
         return(1);
@@ -134,16 +150,16 @@ int server() {
 		http::Parse_Error error = http::parse_request(message, request);
         if (error != http::PARSE_ERROR_NONE) {
 			std::cout << "Could not parse request because of " << error << std::endl;
-			// std::cout << buffer << std::endl;
 		}
 
         if (methods(request.uri, new_socket)) continue;
 
-        std::cout << "request.uri = " << request.uri << std::endl;
 		http_respond_html(new_socket,"200 OK", "text/html", file_html);
         ::close(new_socket);
-		if (request.uri == "/shutdown")
+		if (request.uri == "/shutdown") {
+            std::cout << "\x1b\x5b\x48\x1b\x5b\x32\x4a\x1b\x5b\x33\x4a" << std::endl;
 			break ;
+        }
     }
     close(server_fd);
 
