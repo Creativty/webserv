@@ -6,7 +6,7 @@
 /*   By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/11 16:01:16 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/27 14:17:27 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/07/27 14:50:45 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,13 +30,15 @@ namespace http {
 		HTTP_METHOD_DELETE,
 	};
 
-	struct Request {
-		HTTP_Method							method;
-		std::string							uri;
-		std::string							version;
+	typedef	std::map<std::string, std::string>	Headers_Map;
 
-		std::map<std::string, std::string>	headers;
-		std::string							body;
+	struct Request {
+		HTTP_Method	method;
+		std::string	uri;
+		std::string	version;
+
+		Headers_Map	headers;
+		std::string	body;
 	};
 
 	enum Parse_Error {
@@ -54,6 +56,8 @@ namespace http {
 	};
 
 	Parse_Error	parse_request(const std::string& msg, Request& request);
+	std::string	query_header(std::string name, const Request& request);
+
 };
 
 namespace toml {

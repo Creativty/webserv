@@ -6,7 +6,7 @@
 /*   By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/17 17:21:41 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/27 14:24:25 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/07/27 14:49:54 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,25 +17,32 @@
 
 #include "webserv.hpp"
 
-static bool	is_char(int c) {
-	return (c >= 0 && c <= 127);
-}
-
-static bool is_tspecial(char c) {
-	// tspecials      = '(' | ')' | '<' | '>' | '@' | ',' | ';' | ':' | '\' | '"' | '/' | '[' | ']' | '?' | '=' | '{' | '}' | SP | HT
-	static const char SET[] = { '(',  ')',  '<',  '>',  '@', ',',  ';',  ':',  '\\',  '"',  '/',  '[',  ']',  '?',  '=',  '{',  '}',  ' ',  '\t' };
-	for (size_t i = 0; i < sizeof(SET) / sizeof(SET[0]); i++)
-		if (SET[i] == c)
-			return (true);
-	return (false);
-}
-
-static bool	is_ctl(char c) {
-	// CTL            = <any US-ASCII control character (octets 0 - 31) and DEL (127)>
-	return (c == 127 || (c >= 0 && c <= 31));
-}
-
 namespace http {
+	static bool	is_char(int c) {
+		return (c >= 0 && c <= 127);
+	}
+
+	static bool is_tspecial(char c) {
+		// tspecials      = '(' | ')' | '<' | '>' | '@' | ',' | ';' | ':' | '\' | '"' | '/' | '[' | ']' | '?' | '=' | '{' | '}' | SP | HT
+		static const char SET[] = { '(',  ')',  '<',  '>',  '@', ',',  ';',  ':',  '\\',  '"',  '/',  '[',  ']',  '?',  '=',  '{',  '}',  ' ',  '\t' };
+		for (size_t i = 0; i < sizeof(SET) / sizeof(SET[0]); i++)
+			if (SET[i] == c)
+				return (true);
+		return (false);
+	}
+
+	static bool	is_ctl(char c) {
+		// CTL            = <any US-ASCII control character (octets 0 - 31) and DEL (127)>
+		return (c == 127 || (c >= 0 && c <= 31));
+	}
+
+	static void	string_lower_in_place(std::string& str) {
+		for (size_t i = 0; i < str.size(); i++) {
+			if (str[i] >= 'A' && str[i] <= 'Z')
+				str[i] = (str[i] - ('A' - 'a'));
+		}
+	}
+
 	HTTP_Method	parse_method(const std::string& text) {
 		if (text == "GET") return (HTTP_METHOD_GET);
 		if (text == "POST") return (HTTP_METHOD_POST);
@@ -66,7 +73,6 @@ namespace http {
 	}
 
 	Parse_Error	parse_request_headers(Request& request, const std::string& msg) {
-		(void)request;
 		std::string	rest = msg;
 		for (size_t begin = 0; !msg.substr(begin).empty();) {
 			rest = msg.substr(begin);
@@ -83,6 +89,7 @@ namespace http {
 				}
 				if (count < 1) return (PARSE_ERROR_HEADER_MISSING_KEY);
 				name = msg.substr(begin, count);
+				string_lower_in_place(name); // field names are case-insensitive
 				begin += count;
 			}
 			{ // ':'
@@ -157,6 +164,21 @@ namespace http {
 		request.body = msg.substr(offset);
 		return (PARSE_ERROR_NONE);
 	}
+
+	Parse_Error	parse_request_chunk(const std::string& msg, Request& request) {
+		(void)msg;
+		(void)request;
+		return (PARSE_ERROR_NONE);
+	}
+
+	std::string	query_header(std::string name, const Request& request) {
+		string_lower_in_place(name); // field names are case-insensitive
+
+		Headers_Map::const_iterator header = request.headers.find(name);
+		if (header != request.headers.end())
+			return (header->second);
+		return ("");
+	}
 };
 
 std::ostream&	operator<<(std::ostream& stream, const http::HTTP_Method& method) {
@@ -206,7 +228,7 @@ std::ostream&	operator<<(std::ostream& stream, const http::Parse_Error& error) {
 }
 
 #ifdef TEST_HTTP
-int	main(void) {
+int	main(int argc, const char **argv) {
 	return (0);
 }
 #endif
