@@ -6,7 +6,7 @@
 /*   By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/11 16:03:49 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/23 14:39:51 by sennakhl         ###   ########.fr       */
+/*   Updated: 2025/07/27 14:15:42 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -35,6 +35,7 @@ std::string	read_entire_file(const std::string& path, bool *ok) {
 	return (stream.str());
 }
 
+#ifndef TEST
 int	main(void) {
 	bool		source_ok;
 	std::string	source = read_entire_file("config.toml", &source_ok);
@@ -51,3 +52,4 @@ int	main(void) {
 	server();
 	return (0);
 }
+#endif

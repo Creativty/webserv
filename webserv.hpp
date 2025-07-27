@@ -6,7 +6,7 @@
 /*   By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/11 16:01:16 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/21 17:51:32 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/07/27 14:17:27 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -103,6 +103,7 @@ namespace toml {
 };
 
 std::string		read_entire_file(const std::string& path, bool *ok);
+std::string		decode_uri_path(const std::string& src);
 
 std::ostream&	operator<<(std::ostream& stream, const toml::Token& token);
 std::ostream&	operator<<(std::ostream& stream, const toml::Token_Kind& kind);

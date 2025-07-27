@@ -70,7 +70,7 @@ int methods(std::string uri, int new_socket){
         if (access(path.c_str(), F_OK)){
             http_respond_html(new_socket, "404 Not Found", "text/pain", "");
             close(new_socket);
-            std::cout << "ERROR: cannot open " << path << std::endl;
+            std::cerr << "ERROR: cannot open " << path << std::endl;
             return(1);
         }else{
             if (remove(path.c_str())){

@@ -6,7 +6,7 @@
 /*   By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/17 17:21:41 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/21 17:45:35 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/07/27 14:24:25 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -205,7 +205,7 @@ std::ostream&	operator<<(std::ostream& stream, const http::Parse_Error& error) {
 	}
 }
 
-#ifdef TEST_HTTP_MAIN
+#ifdef TEST_HTTP
 int	main(void) {
 	return (0);
 }
