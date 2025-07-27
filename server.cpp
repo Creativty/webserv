@@ -94,6 +94,15 @@ int methods(std::string uri, int new_socket){
 	return(0);
 }
 
+/* TODO(XENOBAS): 
+ * - We need a better way of error handling, Either we bow down to exceptions (hate it) or we just hand roll our own.
+ * - int server(), can be inlined into the main function directly...
+ * - server initialisation needs to be its own function since we will be having multiple servers setup...
+ * - Improve the current logging, we would like to have it more robust like what's been done with HARL, in the CPP Modules.
+ * - HTTP_Writer interface for safely constructing responses.
+ * - CGI is still not even considered in the current architecture.
+ * - Event loop of the server is currently in chaos.
+ */
 int server() {
 	int server_fd = socket(AF_INET, SOCK_STREAM, 0);
 	struct sockaddr_in address;
