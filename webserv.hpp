@@ -6,7 +6,7 @@
 /*   By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/11 16:01:16 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/27 14:50:45 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/07/27 15:20:21 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,12 +37,14 @@ namespace http {
 		std::string	uri;
 		std::string	version;
 
+		bool		chunked;
 		Headers_Map	headers;
 		std::string	body;
 	};
 
 	enum Parse_Error {
 		PARSE_ERROR_NONE,
+		PARSE_ERROR_NOT_CHUNKED,
 		PARSE_ERROR_NOT_DELIMITED,
 		PARSE_ERROR_SUCCESSIVE_SPACE,
 		PARSE_ERROR_NOT_ENOUGH_FIELDS,

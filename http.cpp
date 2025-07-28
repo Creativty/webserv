@@ -6,7 +6,7 @@
 /*   By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/17 17:21:41 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/27 14:49:54 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/07/27 15:27:24 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -134,8 +134,11 @@ namespace http {
 			}
 			request.headers[name] = value;
 		}
-		if (rest == "\r\n")
+		if (rest == "\r\n") {
+			if (query_header("Transfer-Encoding", request) == "chunked")
+				request.chunked = true;
 			return (PARSE_ERROR_NONE);
+		}
 		return (PARSE_ERROR_HEADER_SECTION_DELIMITER);
 	}
 
@@ -154,20 +157,18 @@ namespace http {
 		count = msg.find("\r\n\r\n", offset);
 		if (count == std::string::npos) return (PARSE_ERROR_NOT_DELIMITED);
 		else count = (count + 4) - offset;
-		substr = msg.substr(offset, count); // std::cout << substr << std::endl;
+		substr = msg.substr(offset, count);
 		error = parse_request_headers(request, substr); if (error != PARSE_ERROR_NONE) return (error);
 		offset += count;
 
-		// TODO(XENOBAS): Understand application/x-www-form-urlencoded
-		// TODO(XENOBAS): Content-Length
-		std::cout << "Offset: " << offset << ", Length: " << msg.size() << std::endl;
 		request.body = msg.substr(offset);
 		return (PARSE_ERROR_NONE);
 	}
 
 	Parse_Error	parse_request_chunk(const std::string& msg, Request& request) {
+		if (!request.chunked)
+			return (PARSE_ERROR_NOT_CHUNKED);
 		(void)msg;
-		(void)request;
 		return (PARSE_ERROR_NONE);
 	}
 
@@ -202,6 +203,8 @@ std::ostream&	operator<<(std::ostream& stream, const http::Parse_Error& error) {
 	switch (error) {
 		case http::PARSE_ERROR_NONE:
 			return (stream << "Parse_Error{ Success }");
+		case http::PARSE_ERROR_NOT_CHUNKED:
+			return (stream << "Parse_Error{ Tried to parse into a non chunked request }");
 		case http::PARSE_ERROR_HEADER_MISSING_KEY:
 			return (stream << "Parse_Error{ Header entry has no field name }");
 		case http::PARSE_ERROR_NOT_DELIMITED:
