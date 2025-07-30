@@ -6,7 +6,7 @@
 #    By: aindjare <marvin@42.fr>                    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/07/11 15:57:44 by aindjare          #+#    #+#              #
-#    Updated: 2025/07/27 14:25:52 by aindjare         ###   ########.fr        #
+#    Updated: 2025/07/30 17:36:17 by aindjare         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -16,7 +16,7 @@ OBJS		:=	$(SRCS:.cpp=.o)
 DEPS		:=	$(OBJS:.o=.d)
 
 CXX			:=	c++
-CXXFLAGS	:=	-Wall -Wextra -Werror -Wconversion -std=c++98 -g -MMD -MP
+CXXFLAGS	:=	-Wall -Wextra -Werror -Wconversion -Wswitch-enum -std=c++98 -g -MMD -MP
 
 all: $(NAME)
 
