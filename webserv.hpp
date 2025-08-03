@@ -6,7 +6,7 @@
 /*   By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/11 16:01:16 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/27 15:20:21 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/08/03 09:46:10 by sennakhl         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,6 +18,7 @@
 #include  <cstdlib>
 #include  <ostream>
 #include  <iostream>
+#include <sys/epoll.h>
 #define   cast
 #define   nullptr NULL
 
@@ -101,12 +102,23 @@ namespace toml {
 	};
 
 	struct Config {
+		u_int16_t		port;
+		size_t		max_num_client;
+		std::string host;
+		std::string	upload_dir;
 	};
 	typedef std::vector<Config>	Configs;
 
 	Tokens	lex(const char *source);
 	Configs	parse(Tokens& tokens);
 };
+
+struct server{
+	int					fd;
+	struct epoll_event	ev;
+	toml::Config		config;
+};
+
 
 std::string		read_entire_file(const std::string& path, bool *ok);
 std::string		decode_uri_path(const std::string& src);
@@ -117,4 +129,4 @@ std::ostream&	operator<<(std::ostream& stream, const http::HTTP_Method& method);
 std::ostream&	operator<<(std::ostream& stream, const http::Parse_Error& error);
 
 int server();
-#endif // webserv_HPP
+#endif

@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include "webserv.hpp"
 #include <fstream>
-#include <sys/epoll.h>
 #include <fcntl.h>
 
 #define PORT 8080
@@ -143,54 +142,15 @@ int methods(http::Request request, int new_socket){
     return(0);
 }
 
-/* TODO(XENOBAS): 
- * - We need a better way of error handling, Either we bow down to exceptions (hate it) or we just hand roll our own.
- * - int server(), can be inlined into the main function directly...
- * - server initialisation needs to be its own function since we will be having multiple servers setup...
- * - Improve the current logging, we would like to have it more robust like what's been done with HARL, in the CPP Modules.
- * - HTTP_Writer interface for safely constructing responses.
- * - CGI is still not even considered in the current architecture.
- * - Event loop of the server is currently in chaos.
- */
-int server() {
-	int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-	struct sockaddr_in address;
-	int addrlen = sizeof(address);
-	int epfd = epoll_create1(0);
 
-	if (server_fd < 0) {
-		std::cerr << "Socket creation failed" << std::endl;
-		return 2;
-	}
-	{
-		const int reuseaddr = 1;
-		setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(int));
-	}
-	fcntl(server_fd, F_SETFL, O_NONBLOCK);
-	std::memset((char*)&address, 0, sizeof(address));
-	address.sin_family = AF_INET;
-	address.sin_addr.s_addr = htonl(INADDR_ANY);
-	address.sin_port = htons(PORT);
+bool	is_first_connection(int fd, struct server *servers){
+	for (int i = 0; i < 3; i++)
+		if (fd == servers[i].fd) return 1;
+	return 0;
+}
 
-	if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
-		perror("bind failed");
-		return 2;
-	}
 
-	if (listen(server_fd, SOMAXCONN) < 0) {
-		perror("In listen");
-		return EXIT_FAILURE;
-	}
-
-	bool				file_html_ok;
-	const std::string	file_html = read_entire_file("pages/index.html", &file_html_ok);
-	assert(file_html_ok && "could not load template html file");
-
-	struct epoll_event ev;
-	ev.events = EPOLLIN;
-	ev.data.fd = server_fd;
-	epoll_ctl(epfd, EPOLL_CTL_ADD, server_fd, &ev);
-
+int handle_requests(struct server *servers, int epfd, sockaddr_in address, size_t addrlen){
 	while (true) {
 		struct epoll_event events[100];
 		int nfds = epoll_wait(epfd, events, 100, -1);
@@ -199,12 +159,16 @@ int server() {
 			continue;
 		}
 
+		bool				file_html_ok;
+		const std::string	file_html = read_entire_file("pages/index.html", &file_html_ok);
+		assert(file_html_ok && "could not load template html file");
 
 		for (int i = 0; i < nfds; i++){
 			int fd = events[i].data.fd;
 
-			if (fd == server_fd){
-				int new_socket = accept(server_fd, (struct sockaddr*)&address, (socklen_t*)&addrlen);
+			if (is_first_connection(fd, servers)){
+				int new_socket = accept(fd, (struct sockaddr*)&address, (socklen_t*)&addrlen);
+				std::cout << "new_socket " << new_socket << std::endl;
 				if (new_socket < 0) {
 					perror("In accept");
 					return EXIT_FAILURE;
@@ -237,7 +201,6 @@ int server() {
 					}
 
 					std::cout << "->uri: " << request.uri << std::endl;
-					if (request.uri == "/5") sleep(5);
 					if (methods(request, fd)){
 							epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
 							close(fd);
@@ -246,18 +209,106 @@ int server() {
 					http_respond_html(fd,"200 OK", "text/html", file_html);
 					epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
 					::close(fd);
-					if (request.uri == "/shutdown") {
-						std::cout << "\x1b\x5b\x48\x1b\x5b\x32\x4a\x1b\x5b\x33\x4a" << std::endl;
-						break ;
-					}
 				} else {
-					// std::cout << "No bytes are there to read" << std::endl;
+					std::cout << "No bytes are there to read" << std::endl;
 				}		
 			}
 		}
 	}
-	epoll_ctl(epfd, EPOLL_CTL_DEL, server_fd, nullptr);
-	close(server_fd);
+	return (1);
+}
+
+
+
+/* TODO(XENOBAS): 
+ * - We need a better way of error handling, Either we bow down to exceptions (hate it) or we just hand roll our own.
+ * - int server(), can be inlined into the main function directly...
+ * - server initialisation needs to be its own function since we will be having multiple servers setup...
+ * - Improve the current logging, we would like to have it more robust like what's been done with HARL, in the CPP Modules.
+ * - HTTP_Writer interface for safely constructing responses.
+ * - CGI is still not even considered in the current architecture.
+ * - Event loop of the server is currently in chaos.
+ */
+
+int	setup_servers(struct server *server, int num_server, toml::Config *config){
+	for (int i = 0; i < num_server; i++){
+		server[i].fd = socket(AF_INET, SOCK_STREAM, 0);
+		server[i].config = config[i];
+		struct sockaddr_in address;
+		size_t addrlen = sizeof(address);
+		
+		if (server[i].fd < 0) {
+			std::cerr << "Socket creation failed" << std::endl;
+			return 2;
+		}
+		{
+			const int reuseaddr = 1;
+			setsockopt(server[i].fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(int));
+		}
+		fcntl(server[i].fd, F_SETFL, O_NONBLOCK);
+		std::memset((char*)&address, 0, addrlen);
+		address.sin_family = AF_INET;
+		address.sin_addr.s_addr = htonl(INADDR_ANY);
+		address.sin_port = htons(server[i].config.port);
+		
+		if (bind(server[i].fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
+			perror("bind failed");
+			return 2;
+		}
+		
+		if (listen(server[i].fd, SOMAXCONN) < 0) {
+			perror("In listen");
+			return EXIT_FAILURE;
+		}
+	}
+	return(1);
+}
+
+
+void setup_config(toml::Config *config){
+	config[0].port = 8080;
+	config[0].host = "127.0.0.1";
+	config[0].upload_dir = "upload";
+
+	config[1].port = 8081;
+	config[1].host = "127.0.0.1";
+	config[1].upload_dir = "upload1";
+
+	config[2].port = 8082;
+	config[2].host = "127.0.0.1";
+	config[2].upload_dir = "upload2";
+}
+
+int server() {
+	int	n_ser = 3;
+	struct server servers[n_ser];
+	int epfd = epoll_create1(0);
+	//TODO: check is epoll failed to create
+
+
+	//TODO: for test
+	struct toml::Config config[n_ser];
+	setup_config(config);
+
+
+	setup_servers(servers, n_ser, config);
+
+
+	//TODO: remove this
+	struct sockaddr_in address;
+	size_t addrlen = sizeof(address);
+	
+
+	for(int i = 0; i < 3; i++){
+		struct epoll_event ev;
+		ev.events = EPOLLIN;
+		ev.data.fd = servers[i].fd;
+		epoll_ctl(epfd, EPOLL_CTL_ADD, servers[i].fd, &ev);
+	}
+
+	handle_requests(servers, epfd, address, addrlen);
+
+	close(servers[0].fd);
 
 	return 0;
 }
