@@ -1,0 +1,17 @@
+[[server]]
+host = "127.0.0.1"
+port = 8080
+# max_clients = 100
+# timeout = 30
+
+# [paths]
+# root = "/var/www/html"
+# index_file = "index.html"
+
+# [logging]
+# level = "info"
+# file = "/var/log/server.log"
+
+# [security]
+# enable_ssl = false
+# allowed_hosts = ["*"]

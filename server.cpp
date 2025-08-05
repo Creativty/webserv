@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include "webserv.hpp"
 #include <fstream>
-#include <fcntl.h>
+// #include <fcntl.h>
 
 #define PORT 8080
 
@@ -22,10 +22,10 @@ void	http_respond_html(int fd, std::string status, std::string type, const std::
 	std::string	response_line = "HTTP/1.0 " + status + "\r\n";
 	std::string	headers = "Content-Type: " + type + "\r\n"
 		"\r\n";
-	::write(fd, response_line.c_str(), response_line.size());
-	::write(fd, headers.c_str(), headers.size());
+	::send(fd, response_line.c_str(), response_line.size(), MSG_DONTWAIT);
+	::send(fd, headers.c_str(), headers.size(), MSG_DONTWAIT);
 	if (data.size())
-		::write(fd, data.c_str(), data.size());
+		::send(fd, data.c_str(), data.size(), MSG_DONTWAIT);
 }
 
 std::string getContentType(const std::string& filename) {
@@ -102,16 +102,16 @@ std::string url_decode(const std::string &str) {
 	return decoded;
 }
 
-int methods(http::Request request, int new_socket){
+int methods(http::Request request, int new_socket, struct server server){
     std::string path;
     bool file_ok;
 
     if (request.uri.find("/favicon.ico") == 0) return(1);
     if (request.method == http::HTTP_METHOD_POST){
         path = url_decode(request.body.substr(5));
-        // std::cout << "=================post data: '" << path << "'" << std::endl;
-        // std::cout << "=================header: '" << request.headers["name"] << "'" << std::endl;
-
+		std::string dir = server.config.upload_dir;
+		
+		
     }
     if (request.uri.find("/DELETE?data=") == 0){
         path = url_decode(request.uri.substr(13));
@@ -150,6 +150,12 @@ bool	is_first_connection(int fd, struct server *servers){
 }
 
 
+struct server get_server(struct server *servers, int port){
+	int i = 0;
+	while (servers[i].config.port != port) i++;
+	return (servers[i]);
+}
+
 int handle_requests(struct server *servers, int epfd, sockaddr_in address, size_t addrlen){
 	while (true) {
 		struct epoll_event events[100];
@@ -173,7 +179,7 @@ int handle_requests(struct server *servers, int epfd, sockaddr_in address, size_
 					perror("In accept");
 					return EXIT_FAILURE;
 				}
-				fcntl(new_socket, F_SETFL, O_NONBLOCK);
+				// fcntl(new_socket, F_SETFL, O_NONBLOCK);
 
 				struct epoll_event client_ev;
 				client_ev.events = EPOLLIN;
@@ -188,7 +194,17 @@ int handle_requests(struct server *servers, int epfd, sockaddr_in address, size_
 			else{
 				char buffer[1024 * 1024];
 				std::memset(buffer, 0, sizeof(buffer));
-				ssize_t valread = ::read(fd, buffer, sizeof(buffer));
+				ssize_t valread = recv(fd, buffer, sizeof(buffer), MSG_DONTWAIT);
+
+				// int new_socket = accept(...);
+
+				sockaddr_in local_addr;
+				socklen_t len = sizeof(local_addr);
+				getsockname(fd, (sockaddr*)&local_addr, &len);
+				int port = ntohs(local_addr.sin_port);
+
+				std::cout << "Client came through port " << port << std::endl;
+
 				
 
 				if (valread > 0) {
@@ -201,7 +217,7 @@ int handle_requests(struct server *servers, int epfd, sockaddr_in address, size_
 					}
 
 					std::cout << "->uri: " << request.uri << std::endl;
-					if (methods(request, fd)){
+					if (methods(request, fd, get_server(servers, port))){
 							epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
 							close(fd);
 							continue;
@@ -232,7 +248,7 @@ int handle_requests(struct server *servers, int epfd, sockaddr_in address, size_
 
 int	setup_servers(struct server *server, int num_server, toml::Config *config){
 	for (int i = 0; i < num_server; i++){
-		server[i].fd = socket(AF_INET, SOCK_STREAM, 0);
+		server[i].fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
 		server[i].config = config[i];
 		struct sockaddr_in address;
 		size_t addrlen = sizeof(address);
@@ -245,7 +261,6 @@ int	setup_servers(struct server *server, int num_server, toml::Config *config){
 			const int reuseaddr = 1;
 			setsockopt(server[i].fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(int));
 		}
-		fcntl(server[i].fd, F_SETFL, O_NONBLOCK);
 		std::memset((char*)&address, 0, addrlen);
 		address.sin_family = AF_INET;
 		address.sin_addr.s_addr = htonl(INADDR_ANY);
