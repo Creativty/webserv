@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/08/05 21:52:08 by xenobas           #+#    #+#             */
-/*   Updated: 2025/08/08 22:05:40 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/08/10 17:20:22 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -33,6 +33,7 @@ static std::string	toml_load_file(string_view& path, bool *err) {
 	return (*err = false, stream.close(), scontents.str());
 }
 
+TOML_Table	*toml_parse(TOML_Tokens& tokens);
 TOML_Table	*toml_from_file(string_view& path) {
 	bool		err    = false;
 	std::string	contents = toml_load_file(path, &err);
@@ -40,13 +41,20 @@ TOML_Table	*toml_from_file(string_view& path) {
 
 	string_view	source(contents);
 	TOML_Tokens	tokens = toml_scan(source, path);
+
+	bool		scan_error = false;
 	for (u64 i = 0; i < tokens.size(); i++) {
-		std::cout << tokens[i].line << ": " << tokens[i].tag << ' ' << string_view_fmt() << tokens[i].lexeme << std::endl;
-		if (tokens[i].error != TOML_TOKEN_ERROR_NONE) {
-			std::cerr << "\tError: " << tokens[i].error << std::endl;
+		if (tokens[i].error != TOML_TOKEN_ERROR_NONE || tokens[i].tag == TOML_TOKEN_INVALID) {
+			scan_error = true;
+			std::cerr << tokens[i].line << ": " << tokens[i].tag << ' ' << string_view_fmt() << tokens[i].lexeme << std::endl;
+			if (tokens[i].tag == TOML_TOKEN_INVALID)
+				std::cerr << "\tError: Invalid token" << std::endl;
+			else
+				std::cerr << "\tError: " << tokens[i].error << std::endl;
 		}
 	}
-	return (nullptr);
+	if (scan_error) return (nullptr);
+	return (toml_parse(tokens));
 }
 
 static bool	is_digit_decimal(char ch) {
@@ -227,6 +235,44 @@ TOML_Tokens	toml_scan(string_view& source, string_view& path) {
 	}
 	tokens.push_back(TOML_Token(TOML_TOKEN_EOF, "", scanner.line));
 	return (tokens);
+}
+
+struct TOML_Parser {
+	i64				current;
+	TOML_Tokens&	tokens;
+	TOML_Parser(TOML_Tokens& tokens);
+
+	bool		done(void) const;
+	TOML_Token	peek(void) const;
+	TOML_Token	next(void);
+};
+
+TOML_Parser::TOML_Parser(TOML_Tokens& tokens): current(0l), tokens(tokens) { }
+bool		TOML_Parser::done(void) const {
+	if (cast(u64)current >= tokens.size()) return (true);
+	if (tokens[current].tag == TOML_TOKEN_EOF) return (true);
+	if (tokens[current].tag == TOML_TOKEN_INVALID) return (true);
+	return (false);
+}
+TOML_Token	TOML_Parser::peek(void) const {
+	if (done())
+		return (TOML_Token());
+	return (tokens[current]);
+}
+TOML_Token	TOML_Parser::next(void) {
+	if (done())
+		return (TOML_Token());
+	return (tokens[current++]);
+}
+
+TOML_Table	*toml_parse(TOML_Tokens& tokens) {
+	TOML_Parser	parser(tokens);
+
+	TOML_Table	*table = new TOML_Table; // NOTE(XENOBAS): This table is the global scope, in other table is a sub table.
+	while (!parser.done()) {
+		parser.next();
+	}
+	return (table);
 }
 
 bool		TOML_Scanner::done(void) const {
