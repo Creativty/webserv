@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include "webserv.hpp"
 #include <fstream>
+#include <sys/stat.h>
 // #include <fcntl.h>
 
 #define PORT 8080
@@ -27,6 +28,57 @@ void	http_respond_html(int fd, std::string status, std::string type, const std::
 	if (data.size())
 		::send(fd, data.c_str(), data.size(), MSG_DONTWAIT);
 }
+
+std::string getFileExtension(const std::string& type) {
+    if (type == " text/html")                	return ".html";
+    if (type == " text/css")                 	return ".css";
+    if (type == " application/javascript")   	return ".js";
+    if (type == " application/json")         	return ".json";
+    if (type == " application/xml")          	return ".xml";
+    if (type == " application/pdf")          	return ".pdf";
+ 
+    // Images	 
+    if (type == " image/png")                	return ".png";
+    if (type == " image/jpeg")               	return ".jpg";
+    if (type == " image/gif")                	return ".gif";
+    if (type == " image/bmp")                	return ".bmp";
+    if (type == " image/x-icon")             	return ".ico";
+    if (type == " image/svg+xml")            	return ".svg";
+    if (type == " image/webp")               	return ".webp";
+ 
+    // Audio	 
+    if (type == " audio/mpeg")               	return ".mp3";
+    if (type == " audio/wav")                	return ".wav";
+    if (type == " audio/ogg")                	return ".ogg";
+ 
+    // Video	 
+    if (type == " video/mp4")                	return ".mp4";
+    if (type == " video/webm")               	return ".webm";
+    if (type == " video/x-msvideo")          	return ".avi";
+    if (type == " video/quicktime")          	return ".mov";
+    if (type == " video/x-matroska")         	return ".mkv";
+ 
+    // Fonts	 
+    if (type == " font/ttf")                 	return ".ttf";
+    if (type == " font/otf")                 	return ".otf";
+    if (type == " font/woff")                	return ".woff";
+    if (type == " font/woff2")               	return ".woff2";
+ 
+    // Archives	 
+    if (type == " application/zip")          	return ".zip";
+    if (type == " application/vnd.rar")      	return ".rar";
+    if (type == " application/x-7z-compressed")	return ".7z";
+    if (type == " application/x-tar")        	return ".tar";
+    if (type == " application/gzip")         	return ".gz";
+ 
+    // Scripts /  Code	
+    if (type == " application/x-httpd-php")  	return ".php";
+    if (type == " text/x-python")            	return ".py";
+    if (type == " text/x-c++src")            	return ".cpp";
+    if (type == " text/x-csrc")              	return ".c";
+    if (type == " application/x-sh")         	return ".sh";
+    return ""; 
+} 
 
 std::string getContentType(const std::string& filename) {
     if (filename.find(".html") != std::string::npos) return "text/html";
@@ -102,6 +154,17 @@ std::string url_decode(const std::string &str) {
 	return decoded;
 }
 
+bool dirExists(std::string dir){
+	struct stat st;
+	if (stat(dir.c_str(), &st) == -1){
+		if (mkdir(dir.c_str(), 0755) == -1){
+			std::cerr << "mkdir failed: " << strerror(errno) << std::endl;
+			return false;
+		}
+	}
+	return true;
+}
+
 int methods(http::Request request, int new_socket, struct server server){
     std::string path;
     bool file_ok;
@@ -110,8 +173,13 @@ int methods(http::Request request, int new_socket, struct server server){
     if (request.method == http::HTTP_METHOD_POST){
         path = url_decode(request.body.substr(5));
 		std::string dir = server.config.upload_dir;
-		
-		
+
+		//TODO: remove space from content-type in getFileExtension 
+		std::string extention = getFileExtension(request.headers["content-type"]);
+
+		if (dirExists(dir)){
+			std::cout << "directory of uploads exists \n";
+		}
     }
     if (request.uri.find("/DELETE?data=") == 0){
         path = url_decode(request.uri.substr(13));
@@ -216,7 +284,6 @@ int handle_requests(struct server *servers, int epfd, sockaddr_in address, size_
 						//TODO
 					}
 
-					std::cout << "->uri: " << request.uri << std::endl;
 					if (methods(request, fd, get_server(servers, port))){
 							epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
 							close(fd);
