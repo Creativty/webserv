@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/08/05 21:53:06 by xenobas           #+#    #+#             */
-/*   Updated: 2025/08/08 22:57:31 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/08/10 18:48:59 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,39 +19,6 @@
 #include <ostream>
 #include "core.hpp"
 #include "string_view.hpp"
-
-struct TOML_Value;
-
-typedef	bool								TOML_Boolean;
-typedef i64									TOML_Integer;
-typedef f64									TOML_Float;
-typedef std::string							TOML_String;
-typedef std::deque<TOML_Value>				TOML_List;
-typedef std::map<string_view, TOML_Value>	TOML_Table;
-
-enum	TOML_Tag {
-	TOML_TAG_INVALID,
-	TOML_TAG_BOOLEAN,
-	TOML_TAG_INTEGER,
-	TOML_TAG_FLOAT,
-	TOML_TAG_STRING,
-	TOML_TAG_TABLE,
-	TOML_TAG_DICTIONARY,
-};
-
-union	TOML_Data {
-	TOML_Boolean	boolean;
-	TOML_Integer	i64;
-	TOML_Float		f64;
-	TOML_String*	string;
-	TOML_List*		list;
-	TOML_Table*		table;
-};
-
-struct	TOML_Value {
-	TOML_Tag	tag;
-	TOML_Data	data;
-};
 
 struct TOML_Scanner {
 	string_view&					source;
@@ -111,6 +78,48 @@ struct TOML_Token {
 typedef std::deque<TOML_Token>	TOML_Tokens;
 
 TOML_Tokens	toml_scan(string_view& source, string_view& path);
+
+struct TOML_Value;
+
+typedef	bool								TOML_Boolean;
+typedef i64									TOML_Integer;
+typedef f64									TOML_Float;
+typedef std::string							TOML_String;
+typedef std::deque<TOML_Value>				TOML_List;
+typedef std::map<string_view, TOML_Value>	TOML_Table;
+
+enum	TOML_Tag {
+	TOML_TAG_INVALID,
+	TOML_TAG_BOOLEAN,
+	TOML_TAG_INTEGER,
+	TOML_TAG_FLOAT,
+	TOML_TAG_STRING,
+	TOML_TAG_LIST,
+	TOML_TAG_TABLE,
+};
+
+union	TOML_Data {
+	TOML_Boolean	boolean;
+	TOML_Integer	i64;
+	TOML_Float		f64;
+	TOML_String*	string;
+	TOML_List*		list;
+	TOML_Table*		table;
+};
+
+struct	TOML_Value {
+	TOML_Tag	tag;
+	TOML_Data	data;
+	TOML_Token	token;
+
+	TOML_Value(void);
+	TOML_Value(TOML_Boolean value, TOML_Token token);
+	TOML_Value(TOML_Integer value, TOML_Token token);
+	TOML_Value(TOML_Float value, TOML_Token token);
+	TOML_Value(TOML_String* value, TOML_Token token);
+	TOML_Value(TOML_List* value, TOML_Token token);
+	TOML_Value(TOML_Table* value, TOML_Token token);
+};
 
 TOML_Table	*toml_from_file(string_view& path);
 

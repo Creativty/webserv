@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/08/05 21:52:08 by xenobas           #+#    #+#             */
-/*   Updated: 2025/08/10 17:20:22 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/08/10 18:55:28 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -239,30 +239,121 @@ TOML_Tokens	toml_scan(string_view& source, string_view& path) {
 
 struct TOML_Parser {
 	i64				current;
+	i32				errors;
 	TOML_Tokens&	tokens;
 	TOML_Parser(TOML_Tokens& tokens);
 
 	bool		done(void) const;
 	TOML_Token	peek(void) const;
 	TOML_Token	next(void);
+
+	void		skip_unsemantic(void);
+	void		skip_until_newline(void);
 };
 
-TOML_Parser::TOML_Parser(TOML_Tokens& tokens): current(0l), tokens(tokens) { }
+TOML_Parser::TOML_Parser(TOML_Tokens& tokens): current(0l), errors(0), tokens(tokens) { }
 bool		TOML_Parser::done(void) const {
 	if (cast(u64)current >= tokens.size()) return (true);
-	if (tokens[current].tag == TOML_TOKEN_EOF) return (true);
-	if (tokens[current].tag == TOML_TOKEN_INVALID) return (true);
+	if (tokens[cast(u64)current].tag == TOML_TOKEN_EOF) return (true);
+	if (tokens[cast(u64)current].tag == TOML_TOKEN_INVALID) return (true);
 	return (false);
 }
 TOML_Token	TOML_Parser::peek(void) const {
 	if (done())
 		return (TOML_Token());
-	return (tokens[current]);
+	return (tokens[cast(u64)current]);
 }
 TOML_Token	TOML_Parser::next(void) {
 	if (done())
 		return (TOML_Token());
-	return (tokens[current++]);
+	return (tokens[cast(u64)current++]);
+}
+
+void		TOML_Parser::skip_unsemantic(void) {
+	while (true) {
+		TOML_Token	token = peek();
+		if (token.tag != TOML_TOKEN_NEWLINE && token.tag != TOML_TOKEN_COMMENT)
+			break ;
+		next();
+	}
+}
+void		TOML_Parser::skip_until_newline(void) {
+	while (true) {
+		TOML_Token	token = peek();
+		if (token.tag == TOML_TOKEN_NEWLINE || token.tag == TOML_TOKEN_EOF || token.tag == TOML_TOKEN_INVALID)
+			break ;
+		next();
+	}
+}
+
+TOML_Value::TOML_Value(void) {
+	this->tag = TOML_TAG_INVALID;
+	this->token = TOML_Token();
+	this->data.string = nullptr;
+}
+TOML_Value::TOML_Value(TOML_Boolean value, TOML_Token token) {
+	this->tag = TOML_TAG_BOOLEAN;
+	this->token = token;
+	this->data.boolean = value;
+}
+TOML_Value::TOML_Value(TOML_Integer value, TOML_Token token) {
+	this->tag = TOML_TAG_INTEGER;
+	this->token = token;
+	this->data.i64 = value;
+}
+TOML_Value::TOML_Value(TOML_Float value, TOML_Token token) {
+	this->tag = TOML_TAG_FLOAT;
+	this->token = token;
+	this->data.f64 = value;
+}
+TOML_Value::TOML_Value(TOML_String* value, TOML_Token token) {
+	this->tag = TOML_TAG_STRING;
+	this->token = token;
+	this->data.string = value;
+}
+TOML_Value::TOML_Value(TOML_List* value, TOML_Token token) {
+	this->tag = TOML_TAG_LIST;
+	this->token = token;
+	this->data.list = value;
+}
+TOML_Value::TOML_Value(TOML_Table* value, TOML_Token token) {
+	this->tag = TOML_TAG_TABLE;
+	this->token = token;
+	this->data.table = value;
+}
+
+TOML_Value	toml_parse_value(TOML_Parser& parser) {
+	(void)parser;
+	TOML_Token	token = parser.next();
+	if (token.tag == TOML_TOKEN_INTEGER)
+		return (TOML_Value(cast(i64)0l, token));
+	else if (token.tag == TOML_TOKEN_FLOAT)
+		return (TOML_Value(cast(f64)0.0, token));
+	else if (token.tag == TOML_TOKEN_SQUARE_OPEN)
+		return (toml_parse_list(parser));
+	else if (token.tag == TOML_TOKEN_CURLY_OPEN)
+		return (toml_parse_table(parser));
+	return (TOML_Value());
+}
+
+void		toml_parse_stuff(TOML_Parser& parser, TOML_Table* parent) {
+	(void)parent;
+	parser.skip_unsemantic();
+	TOML_Token	token = parser.next();
+	if (token.tag == TOML_TOKEN_EOF || token.tag == TOML_TOKEN_INVALID)
+		return ;
+	if (token.tag == TOML_TOKEN_IDENT) {
+		TOML_Token	key = token;
+		TOML_Token	equals = parser.next();
+		if (equals.tag != TOML_TOKEN_EQUALS) {
+			std::cerr << "TOML: Syntax Error: Expected \"=\", Got " << string_view_fmt() << equals.lexeme << " instead." << std::endl;
+			std::cerr << "\tKey: " << string_view_fmt() << key.lexeme << std::endl;
+			parser.errors++;
+			parser.skip_until_newline();
+			return ;
+		}
+		TOML_Value	value = toml_parse_value(parser);
+	}
 }
 
 TOML_Table	*toml_parse(TOML_Tokens& tokens) {
@@ -270,6 +361,7 @@ TOML_Table	*toml_parse(TOML_Tokens& tokens) {
 
 	TOML_Table	*table = new TOML_Table; // NOTE(XENOBAS): This table is the global scope, in other table is a sub table.
 	while (!parser.done()) {
+		toml_parse_stuff(parser, table);
 		parser.next();
 	}
 	return (table);
@@ -286,11 +378,11 @@ string_view	TOML_Scanner::lexeme(void) const {
 char		TOML_Scanner::peek(void) {
 	if (current >= source.len)
 		return ('\0');
-	return (source[current]);
+	return (source[cast(u64)current]);
 }
 
 char		TOML_Scanner::next(void) {
-	char	c = source[current];
+	char	c = source[cast(u64)current];
 	if (c != '\0')
 		current++;
 	if (c == '\n')
