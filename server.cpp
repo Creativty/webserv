@@ -10,9 +10,12 @@
 #include "webserv.hpp"
 #include <fstream>
 #include <sys/stat.h>
-// #include <fcntl.h>
+#include <fcntl.h>
+#include <ctime>
+#include <sstream>
+#include <limits.h>
 
-#define PORT 8080
+
 
 /* TODO(XENOBAS):
  * - "HTTP/1.0 501 Not Implemented"
@@ -165,6 +168,19 @@ bool dirExists(std::string dir){
 	return true;
 }
 
+std::string generateRandomFileName(std::string ext){
+    static bool seeded = false;
+    if (!seeded) {
+        std::srand(static_cast<unsigned int>(std::time(0)));
+        seeded = true;
+    }
+
+    int r = std::rand();
+    std::ostringstream oss;
+    oss << "upload_" << r << ext;
+    return oss.str();
+}
+
 int methods(http::Request request, int new_socket, struct server server){
     std::string path;
     bool file_ok;
@@ -174,11 +190,32 @@ int methods(http::Request request, int new_socket, struct server server){
         path = url_decode(request.body.substr(5));
 		std::string dir = server.config.upload_dir;
 
-		//TODO: remove space from content-type in getFileExtension 
-		std::string extention = getFileExtension(request.headers["content-type"]);
+		//TODO: remove space from content-type in getFileExtension
+		std::string ext = getFileExtension(request.headers["content-type"]);
 
 		if (dirExists(dir)){
 			std::cout << "directory of uploads exists \n";
+
+			char oldDir[PATH_MAX];
+			getcwd(oldDir, sizeof(oldDir));
+			std::cout << "oldDir: " << oldDir << std::endl;
+
+			if (chdir(dir.c_str()) == -1)
+				perror("chdir");
+			else{
+
+				std::string fileName = generateRandomFileName(ext);
+				int fd = open(fileName.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+				
+				if (!fd)
+					perror("open file");
+				
+				std::cout << "file name: " << fileName << std::endl;
+				write(fd, request.body.c_str(), request.body.length());
+				close(fd);
+
+				chdir(oldDir);
+			} 
 		}
     }
     if (request.uri.find("/DELETE?data=") == 0){
