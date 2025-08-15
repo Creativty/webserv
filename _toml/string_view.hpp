@@ -22,6 +22,7 @@ struct string_view {
 
 	bool operator==(const string_view& other) const;
 	bool operator!=(const string_view& other) const;
+	bool operator<(const string_view& other) const;
 
 	string_view	slice(u64 offset, u64 count) const;
 	std::string	string(void) const;

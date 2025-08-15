@@ -52,6 +52,16 @@ bool string_view::operator==(const string_view& other) const {
 bool string_view::operator!=(const string_view& other) const {
 	return (!(*this == other));
 }
+bool string_view::operator<(const string_view& other) const {
+	for (size_t i = 0; i < len; i++) {
+		if ((*this)[i] == other[i])
+			continue ;
+		if ((*this)[i] < other[i])
+			return (true);
+		return (false);
+	}
+	return (len < other.len);
+}
 
 std::ostream&	operator<<(std::ostream& stream, string_view sv) {
 	if (stream_literal) {

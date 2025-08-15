@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/08/05 21:52:08 by xenobas           #+#    #+#             */
-/*   Updated: 2025/08/10 18:55:28 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/08/10 23:00:03 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -323,20 +323,28 @@ TOML_Value::TOML_Value(TOML_Table* value, TOML_Token token) {
 }
 
 TOML_Value	toml_parse_value(TOML_Parser& parser) {
-	(void)parser;
 	TOML_Token	token = parser.next();
-	if (token.tag == TOML_TOKEN_INTEGER)
-		return (TOML_Value(cast(i64)0l, token));
-	else if (token.tag == TOML_TOKEN_FLOAT)
-		return (TOML_Value(cast(f64)0.0, token));
+	if (token.tag == TOML_TOKEN_INTEGER) {
+		i64	value;
+
+		std::istringstream	stream(token.lexeme.string());
+		stream >> value;
+		return (TOML_Value(value, token));
+	} else if (token.tag == TOML_TOKEN_FLOAT) {
+		f64	value;
+		std::istringstream	stream(token.lexeme.string());
+		stream >> value;
+		return (TOML_Value(value, token));
+	}/* else if (token.tag == TOML_TOKEN_STRING)
+		return (toml_parse_string(token));
 	else if (token.tag == TOML_TOKEN_SQUARE_OPEN)
 		return (toml_parse_list(parser));
 	else if (token.tag == TOML_TOKEN_CURLY_OPEN)
-		return (toml_parse_table(parser));
+		return (toml_parse_table(parser)); */
 	return (TOML_Value());
 }
 
-void		toml_parse_stuff(TOML_Parser& parser, TOML_Table* parent) {
+void		toml_parse_stuff(TOML_Parser& parser, TOML_Table& parent) {
 	(void)parent;
 	parser.skip_unsemantic();
 	TOML_Token	token = parser.next();
@@ -352,7 +360,7 @@ void		toml_parse_stuff(TOML_Parser& parser, TOML_Table* parent) {
 			parser.skip_until_newline();
 			return ;
 		}
-		TOML_Value	value = toml_parse_value(parser);
+		parent[key.lexeme] = toml_parse_value(parser);
 	}
 }
 
@@ -360,9 +368,15 @@ TOML_Table	*toml_parse(TOML_Tokens& tokens) {
 	TOML_Parser	parser(tokens);
 
 	TOML_Table	*table = new TOML_Table; // NOTE(XENOBAS): This table is the global scope, in other table is a sub table.
+	if (table == nullptr) return (nullptr);
 	while (!parser.done()) {
-		toml_parse_stuff(parser, table);
+		toml_parse_stuff(parser, *table);
 		parser.next();
+	}
+	for (TOML_Table::iterator iter = table->begin(); iter != table->end(); iter++) {
+		string_view	view = iter->first;
+		// TOML_Value	value = iter->second;
+		std::cout << view << std::endl;
 	}
 	return (table);
 }
