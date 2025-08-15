@@ -101,6 +101,21 @@ string_view	string_view::slice(u64 offset, u64 count) const {
 	return (string_view(&data[offset], count));
 }
 
+string_view	string_view::drop(u64 count) const {
+	if (count >= len) return (string_view());
+	return (string_view(&data[count], len - count));
+}
+
+bool		string_view::starts_with(const char *str) const {
+	u64	other_len = cstr_len(str);
+	if (str == nullptr || other_len > len)
+		return (false);
+	for (u64 i = 0; i < other_len; i++)
+		if (data[i] != str[i])
+			return (false);
+	return (true);
+}
+
 std::string	string_view::string(void) const {
 	std::string	str(data, len);
 	return (str);
