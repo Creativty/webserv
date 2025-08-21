@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/08/05 21:53:06 by xenobas           #+#    #+#             */
-/*   Updated: 2025/08/10 18:48:59 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/08/15 16:20:29 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -113,12 +113,29 @@ struct	TOML_Value {
 	TOML_Token	token;
 
 	TOML_Value(void);
+	TOML_Value(TOML_Token token);
 	TOML_Value(TOML_Boolean value, TOML_Token token);
 	TOML_Value(TOML_Integer value, TOML_Token token);
 	TOML_Value(TOML_Float value, TOML_Token token);
 	TOML_Value(TOML_String* value, TOML_Token token);
 	TOML_Value(TOML_List* value, TOML_Token token);
 	TOML_Value(TOML_Table* value, TOML_Token token);
+};
+
+std::ostream&	operator<<(std::ostream& stream, const TOML_Value& value);
+
+struct TOML_Parser {
+	i64				current;
+	i32				errors;
+	TOML_Tokens&	tokens;
+	TOML_Parser(TOML_Tokens& tokens);
+
+	bool		done(void) const;
+	TOML_Token	peek(void) const;
+	TOML_Token	next(void);
+
+	void		skip_unsemantic(void);
+	void		skip_until_newline(void);
 };
 
 TOML_Table	*toml_from_file(string_view& path);

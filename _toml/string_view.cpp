@@ -77,6 +77,12 @@ std::ostream&	operator<<(std::ostream& stream, string_view sv) {
 				stream << "\\v";
 			else if (sv[i] == '\r')
 				stream << "\\r";
+			else if (sv[i] == '`')
+				stream << "\\`";
+			else if (sv[i] == '\"')
+				stream << "\\\"";
+			else if (sv[i] == '\'')
+				stream << "\\'";
 			else
 				stream << sv[i];
 		}

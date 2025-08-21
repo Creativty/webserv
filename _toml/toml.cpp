@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/08/05 21:52:08 by xenobas           #+#    #+#             */
-/*   Updated: 2025/08/10 23:00:03 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/08/15 16:21:24 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -158,22 +158,22 @@ TOML_Token	toml_scan_token(TOML_Scanner& scanner) {
 	} else if (is_digit_decimal(ch) || ch == '+' || ch == '-') {
 		TOML_Token_Tag	tag = TOML_TOKEN_INTEGER;
 		if (ch == '+' || ch == '-') {
-			if (!is_digit_decimal(scanner.peek()))
+			if (!is_digit_decimal((ch = scanner.next())))
 				return (toml_scan_error(scanner, tag, line, TOML_TOKEN_ERROR_NUMBER_MISSING));
 		}
 		if (ch == '0' && scanner.peek() == 'x') { // Hexadecimal
 			scanner.next();
 			if (!toml_scan_number(scanner, is_digit_hexadecimal))
 				return (toml_scan_error(scanner, tag, line, TOML_TOKEN_ERROR_NUMBER_MISSING));
-		} else if (ch == '0' && scanner.peek() == 'o') {
+		} else if (ch == '0' && scanner.peek() == 'o') { // Octal
 			scanner.next();
 			if (!toml_scan_number(scanner, is_digit_octal))
 				return (toml_scan_error(scanner, tag, line, TOML_TOKEN_ERROR_NUMBER_MISSING));
-		} else if (ch == '0' && scanner.peek() == 'b') {
+		} else if (ch == '0' && scanner.peek() == 'b') { // Binary
 			scanner.next();
 			if (!toml_scan_number(scanner, is_digit_binary))
 				return (toml_scan_error(scanner, tag, line, TOML_TOKEN_ERROR_NUMBER_MISSING));
-		} else {
+		} else { // Decimal
 			if (!toml_scan_number(scanner, is_digit_decimal))
 				return (toml_scan_error(scanner, tag, line, TOML_TOKEN_ERROR_NUMBER_MISSING));
 			if (scanner.peek() == '.') {
@@ -193,10 +193,10 @@ TOML_Token	toml_scan_token(TOML_Scanner& scanner) {
 					return (toml_scan_error(scanner, tag, line, TOML_TOKEN_ERROR_NUMBER_MISSING));
 			}
 		} 
-		string_view	lexeme = scanner.lexeme();
-		return (TOML_Token(tag, lexeme, line));
+		return (TOML_Token(tag, scanner.lexeme(), line));
 	} else if (ch == '"') {
 		char	last_ch = scanner.peek();
+		bool	escaped = false;
 		while (scanner.peek()) {
 			char	ch = scanner.peek();
 			if (scanner.peek() == '\n') {
@@ -204,8 +204,12 @@ TOML_Token	toml_scan_token(TOML_Scanner& scanner) {
 					scanner.current--;
 				break ;
 			}
-			if (ch == '"')
+			if (ch == '\\' && !escaped)
+				escaped = true;
+			else if (ch == '"' && !escaped)
 				break ;
+			else
+				escaped = false;
 			last_ch = ch;
 			scanner.next();
 		}
@@ -236,20 +240,6 @@ TOML_Tokens	toml_scan(string_view& source, string_view& path) {
 	tokens.push_back(TOML_Token(TOML_TOKEN_EOF, "", scanner.line));
 	return (tokens);
 }
-
-struct TOML_Parser {
-	i64				current;
-	i32				errors;
-	TOML_Tokens&	tokens;
-	TOML_Parser(TOML_Tokens& tokens);
-
-	bool		done(void) const;
-	TOML_Token	peek(void) const;
-	TOML_Token	next(void);
-
-	void		skip_unsemantic(void);
-	void		skip_until_newline(void);
-};
 
 TOML_Parser::TOML_Parser(TOML_Tokens& tokens): current(0l), errors(0), tokens(tokens) { }
 bool		TOML_Parser::done(void) const {
@@ -291,6 +281,11 @@ TOML_Value::TOML_Value(void) {
 	this->token = TOML_Token();
 	this->data.string = nullptr;
 }
+TOML_Value::TOML_Value(TOML_Token token) {
+	this->tag = TOML_TAG_INVALID;
+	this->token = token;
+	this->data.string = nullptr;
+}
 TOML_Value::TOML_Value(TOML_Boolean value, TOML_Token token) {
 	this->tag = TOML_TAG_BOOLEAN;
 	this->token = token;
@@ -322,26 +317,170 @@ TOML_Value::TOML_Value(TOML_Table* value, TOML_Token token) {
 	this->data.table = value;
 }
 
+i64			integer_from_hex(char ch) {
+	if (ch >= '0' && ch <= '9')
+		return (cast(i64)(ch - '0'));
+	if (ch >= 'a' && ch <= 'f')
+		return (cast(i64)(ch - 'a') + 10l);
+	if (ch >= 'A' && ch <= 'F')
+		return (cast(i64)(ch - 'A') + 10l);
+	return (0l);
+}
+
+i64			integer_from_octal(char ch) {
+	if (ch >= '0' && ch <= '7')
+		return (cast(i64)(ch - '0'));
+	return (0l);
+}
+
+i64			integer_from_binary(char ch) {
+	if (ch >= '0' && ch <= '1')
+		return (cast(i64)(ch - '0'));
+	return (0l);
+}
+
+i64			integer_from_decimal(char ch) {
+	if (ch >= '0' && ch <= '9')
+		return (cast(i64)(ch - '0'));
+	return (0l);
+}
+
+TOML_Value	toml_parse_integer(TOML_Token token) {
+	string_view	view = token.lexeme;
+
+	i64	sign   = 1;
+	i64	number = 0;
+	if (view.starts_with("+") || view.starts_with("-")) {
+		if (view.starts_with("-"))
+			sign = -1;
+		view = view.drop(1);
+	}
+	if (view.starts_with("0x")) {
+		view = view.drop(2);
+		while (view.len > 0) {
+			number = (number * 16l) + integer_from_hex(view[0]);
+			view = view.drop(1);
+		}
+	} else if (view.starts_with("0o")) {
+		view = view.drop(2);
+		while (view.len > 0) {
+			number = (number * 8l) + integer_from_octal(view[0]);
+			view = view.drop(1);
+		}
+	} else if (view.starts_with("0b")) {
+		view = view.drop(2);
+		while (view.len > 0) {
+			number = (number * 2l) + integer_from_binary(view[0]);
+			view = view.drop(1);
+		}
+	} else {
+		while (view.len > 0) {
+			number = (number * 10l) + integer_from_decimal(view[0]);
+			view = view.drop(1);
+		}
+	}
+	if (sign == -1)
+		return (TOML_Value(-number, token));
+	return (TOML_Value(number, token));
+}
+
+TOML_Value	toml_parse_float(TOML_Token token) {
+	string_view	view       = token.lexeme;
+	i64			sign       = 1;
+	f64			number     = 0.0;
+	f64			fractional = 0.0;
+	f64			exponent   = 1.0;
+	bool		exp_desc   = false;
+	
+	char		ch;
+	if (view.starts_with("+") || view.starts_with("-")) {
+		if (view[0] == '-')
+			sign = -1;
+		view = view.drop(1);
+	}
+	while (view.len > 0) {
+		ch = view[0];
+		if (!is_digit_decimal(ch))
+			break ;
+		number = (number * 10.0) + cast(f64)integer_from_decimal(ch);
+		view = view.drop(1);
+	}
+	if (ch == '.') {
+		view = view.drop(1);
+		f64	factor = 0.1;
+		while (view.len > 0) {
+			ch = view[0];
+			if (!is_digit_decimal(ch))
+				break ;
+			view = view.drop(1);
+			fractional += cast(f64)integer_from_decimal(ch) * factor;
+			factor *= 0.1;
+		}
+	}
+	if (ch == 'e' || ch == 'E') {
+		view = view.drop(1);
+		if (view.starts_with("+") || view.starts_with("-")) {
+			exp_desc = (view[0] == '-');
+			view = view.drop(1);
+		}
+
+		i64	count = 0l;
+		f64	factor = (exp_desc) ? 0.1 : 10.0;
+		while (view.len > 0) {
+			ch = view[0];
+			if (!is_digit_decimal(ch))
+				break ;
+			view = view.drop(1);
+
+			count = (count * 10l) + integer_from_decimal(ch);
+		}
+		for (i64 i = 0; i < count; ++i)
+			exponent *= factor;
+	}
+	if (sign == -1)
+		return (TOML_Value(-(number + fractional) * exponent, token));
+	return (TOML_Value((number + fractional) * exponent, token));
+}
+
+TOML_Value	toml_parse_string(TOML_Token token) {
+	std::ostringstream	stream;
+	string_view			lexeme = token.lexeme;
+	bool				do_escape = false;
+
+	if (token.error != TOML_TOKEN_ERROR_NONE)
+		return (TOML_Value(new std::string(""), token));
+	for (u64 i = 1; i < lexeme.len - 1; ++i) {
+		char	ch = lexeme[i];
+		if (do_escape) {
+			if (ch == '\\') stream << '\\';
+			else if (ch == 'n') stream << '\n';
+			else if (ch == 'r') stream << '\r';
+			else if (ch == 'v') stream << '\v';
+			else if (ch == 't') stream << '\t';
+			else if (ch == 'a') stream << '\a';
+			else if (ch == 'b') stream << '\b';
+			else if (ch == 's') stream << ' ';
+			else stream << ch;
+		} else if (ch == '\\') do_escape = true;
+		else stream << ch;
+	}
+	TOML_String	*value = new std::string(stream.str());
+	return (TOML_Value(value, token));
+}
+
 TOML_Value	toml_parse_value(TOML_Parser& parser) {
 	TOML_Token	token = parser.next();
 	if (token.tag == TOML_TOKEN_INTEGER) {
-		i64	value;
-
-		std::istringstream	stream(token.lexeme.string());
-		stream >> value;
-		return (TOML_Value(value, token));
+		return (toml_parse_integer(token));
 	} else if (token.tag == TOML_TOKEN_FLOAT) {
-		f64	value;
-		std::istringstream	stream(token.lexeme.string());
-		stream >> value;
-		return (TOML_Value(value, token));
-	}/* else if (token.tag == TOML_TOKEN_STRING)
+		return (toml_parse_float(token));
+	} else if (token.tag == TOML_TOKEN_STRING) {
 		return (toml_parse_string(token));
-	else if (token.tag == TOML_TOKEN_SQUARE_OPEN)
+	} /*else if (token.tag == TOML_TOKEN_SQUARE_OPEN)
 		return (toml_parse_list(parser));
 	else if (token.tag == TOML_TOKEN_CURLY_OPEN)
 		return (toml_parse_table(parser)); */
-	return (TOML_Value());
+	return (TOML_Value(token));
 }
 
 void		toml_parse_stuff(TOML_Parser& parser, TOML_Table& parent) {
@@ -375,8 +514,8 @@ TOML_Table	*toml_parse(TOML_Tokens& tokens) {
 	}
 	for (TOML_Table::iterator iter = table->begin(); iter != table->end(); iter++) {
 		string_view	view = iter->first;
-		// TOML_Value	value = iter->second;
-		std::cout << view << std::endl;
+		TOML_Value	value = iter->second;
+		std::cout << view << " = " << value << std::endl;
 	}
 	return (table);
 }
@@ -456,4 +595,30 @@ std::ostream&	operator<<(std::ostream& stream, TOML_Token_Error error) {
 		default:
 			return (stream << "Unknown error");
 	}
+}
+
+std::ostream&	operator<<(std::ostream& stream, const TOML_Value& value) {
+	switch (value.tag) {
+		case TOML_TAG_INVALID:
+			stream << "TOML_Value{ Invalid, " << string_view_fmt() << value.token.lexeme << " }";
+		break;
+		case TOML_TAG_BOOLEAN:
+			stream << "TOML_Value{ Boolean, " << std::boolalpha << value.data.boolean << std::noboolalpha << " }";
+		break;
+		case TOML_TAG_INTEGER:
+			stream << "TOML_Value{ Integer, " << value.data.i64 << " }";
+		break;
+		case TOML_TAG_FLOAT:
+			stream << "TOML_Value{ Float, " << value.data.f64 << " }";
+		break;
+		case TOML_TAG_STRING: {
+			string_view	view = (value.data.string == nullptr) ? string_view("") : *value.data.string;
+			stream << "TOML_Value{ String, " << string_view_fmt() << view << " }";
+		} break;
+		case TOML_TAG_LIST:
+		case TOML_TAG_TABLE:
+		default:
+			stream << "TOML_Value{ Unreachable, " << string_view_fmt() << value.token.lexeme << " }";
+	}
+	return (stream);
 }
