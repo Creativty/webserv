@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/08/05 21:53:06 by xenobas           #+#    #+#             */
-/*   Updated: 2025/08/15 16:20:29 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/08/22 20:38:10 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -128,6 +128,7 @@ struct TOML_Parser {
 	i64				current;
 	i32				errors;
 	TOML_Tokens&	tokens;
+	TOML_Token		key;
 	TOML_Parser(TOML_Tokens& tokens);
 
 	bool		done(void) const;

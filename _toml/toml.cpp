@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/08/05 21:52:08 by xenobas           #+#    #+#             */
-/*   Updated: 2025/08/15 16:21:24 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/08/22 20:38:17 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -241,7 +241,7 @@ TOML_Tokens	toml_scan(string_view& source, string_view& path) {
 	return (tokens);
 }
 
-TOML_Parser::TOML_Parser(TOML_Tokens& tokens): current(0l), errors(0), tokens(tokens) { }
+TOML_Parser::TOML_Parser(TOML_Tokens& tokens): current(0l), errors(0), tokens(tokens), key() { }
 bool		TOML_Parser::done(void) const {
 	if (cast(u64)current >= tokens.size()) return (true);
 	if (tokens[cast(u64)current].tag == TOML_TOKEN_EOF) return (true);
@@ -317,7 +317,7 @@ TOML_Value::TOML_Value(TOML_Table* value, TOML_Token token) {
 	this->data.table = value;
 }
 
-i64			integer_from_hex(char ch) {
+static i64			integer_from_hex(char ch) {
 	if (ch >= '0' && ch <= '9')
 		return (cast(i64)(ch - '0'));
 	if (ch >= 'a' && ch <= 'f')
@@ -327,19 +327,19 @@ i64			integer_from_hex(char ch) {
 	return (0l);
 }
 
-i64			integer_from_octal(char ch) {
+static i64			integer_from_octal(char ch) {
 	if (ch >= '0' && ch <= '7')
 		return (cast(i64)(ch - '0'));
 	return (0l);
 }
 
-i64			integer_from_binary(char ch) {
+static i64			integer_from_binary(char ch) {
 	if (ch >= '0' && ch <= '1')
 		return (cast(i64)(ch - '0'));
 	return (0l);
 }
 
-i64			integer_from_decimal(char ch) {
+static i64			integer_from_decimal(char ch) {
 	if (ch >= '0' && ch <= '9')
 		return (cast(i64)(ch - '0'));
 	return (0l);
@@ -468,6 +468,35 @@ TOML_Value	toml_parse_string(TOML_Token token) {
 	return (TOML_Value(value, token));
 }
 
+TOML_Value	toml_parse_value(TOML_Parser& parser);
+
+TOML_Value	toml_parse_list(TOML_Parser& parser, TOML_Token begin) {
+	TOML_List	*list = new TOML_List();
+
+	bool	error = false;
+	while (!parser.done() && !error) {
+		TOML_Value	value = toml_parse_value(parser);
+		if (value.tag == TOML_TAG_INVALID) {
+			// TODO(XENOBAS): Report error
+			error = true;
+			break ;
+		}
+		list->push_back(value);
+
+		TOML_Token	comma_or_close = parser.peek();
+		if (comma_or_close.tag == TOML_TOKEN_COMMA) parser.next();
+		else if (comma_or_close.tag == TOML_TOKEN_SQUARE_CLOSE) break ;
+		else {
+			std::cerr << "TOML: Syntax Error: Expected \",\" or \"]\", Got " << string_view_fmt() << comma_or_close.lexeme << " instead." << std::endl;
+			std::cerr << "\tKey: " << string_view_fmt() << parser.key.lexeme << std::endl;
+			parser.errors++;
+			error = true;
+		}
+	}
+	if (error) parser.skip_until_newline();
+	return (TOML_Value(list, begin));
+}
+
 TOML_Value	toml_parse_value(TOML_Parser& parser) {
 	TOML_Token	token = parser.next();
 	if (token.tag == TOML_TOKEN_INTEGER) {
@@ -476,15 +505,14 @@ TOML_Value	toml_parse_value(TOML_Parser& parser) {
 		return (toml_parse_float(token));
 	} else if (token.tag == TOML_TOKEN_STRING) {
 		return (toml_parse_string(token));
-	} /*else if (token.tag == TOML_TOKEN_SQUARE_OPEN)
-		return (toml_parse_list(parser));
-	else if (token.tag == TOML_TOKEN_CURLY_OPEN)
+	} else if (token.tag == TOML_TOKEN_SQUARE_OPEN) {
+		return (toml_parse_list(parser, token));
+	} /* else if (token.tag == TOML_TOKEN_CURLY_OPEN)
 		return (toml_parse_table(parser)); */
 	return (TOML_Value(token));
 }
 
-void		toml_parse_stuff(TOML_Parser& parser, TOML_Table& parent) {
-	(void)parent;
+void		toml_parse_toplevel(TOML_Parser& parser, TOML_Table& parent) {
 	parser.skip_unsemantic();
 	TOML_Token	token = parser.next();
 	if (token.tag == TOML_TOKEN_EOF || token.tag == TOML_TOKEN_INVALID)
@@ -499,6 +527,7 @@ void		toml_parse_stuff(TOML_Parser& parser, TOML_Table& parent) {
 			parser.skip_until_newline();
 			return ;
 		}
+		parser.key = key;
 		parent[key.lexeme] = toml_parse_value(parser);
 	}
 }
@@ -509,7 +538,7 @@ TOML_Table	*toml_parse(TOML_Tokens& tokens) {
 	TOML_Table	*table = new TOML_Table; // NOTE(XENOBAS): This table is the global scope, in other table is a sub table.
 	if (table == nullptr) return (nullptr);
 	while (!parser.done()) {
-		toml_parse_stuff(parser, *table);
+		toml_parse_toplevel(parser, *table);
 		parser.next();
 	}
 	for (TOML_Table::iterator iter = table->begin(); iter != table->end(); iter++) {
@@ -615,7 +644,16 @@ std::ostream&	operator<<(std::ostream& stream, const TOML_Value& value) {
 			string_view	view = (value.data.string == nullptr) ? string_view("") : *value.data.string;
 			stream << "TOML_Value{ String, " << string_view_fmt() << view << " }";
 		} break;
-		case TOML_TAG_LIST:
+		case TOML_TAG_LIST: {
+			stream << "TOML_List{ ";
+			TOML_List	&list = *value.data.list;
+			for (u64 i = 0; i < list.size(); i++) {
+				stream << list[i];
+				if (i + 1 < list.size())
+					stream << ", ";
+			}
+			stream << " }";
+		} break ;
 		case TOML_TAG_TABLE:
 		default:
 			stream << "TOML_Value{ Unreachable, " << string_view_fmt() << value.token.lexeme << " }";
