@@ -6,7 +6,7 @@
 /*   By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/11 16:01:16 by aindjare          #+#    #+#             */
-/*   Updated: 2025/08/03 09:46:10 by sennakhl         ###   ########.fr       */
+/*   Updated: 2025/08/20 09:53:36 by sennakhl         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -106,6 +106,9 @@ namespace toml {
 		size_t		max_num_client;
 		std::string host;
 		std::string	upload_dir;
+		std::string	cgi_path;
+		std::string	cgi_interpreter;
+		std::string	cgi_extension;
 	};
 	typedef std::vector<Config>	Configs;
 

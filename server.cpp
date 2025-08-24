@@ -14,6 +14,7 @@
 #include <ctime>
 #include <sstream>
 #include <limits.h>
+#include <sys/wait.h>
 
 
 
@@ -182,16 +183,107 @@ std::string generateRandomFileName(std::string ext){
 }
 
 int methods(http::Request request, int new_socket, struct server server){
-    std::string path;
+    std::string path = url_decode(request.uri);
     bool file_ok;
 
     if (request.uri.find("/favicon.ico") == 0) return(1);
+
+
+
+
+
+
+
+
+
+	//CGI
+	if (path.find(server.config.cgi_path) == 0){
+		std::cout << "\n\ncgi test\n";
+		path = path.substr(1);
+		server.config.cgi_path = server.config.cgi_path.substr(1);
+		std::cout << path << std::endl;
+		if (dirExists(server.config.cgi_path)){
+			// std::string inFileName = generateRandomFileName(".in");
+			// int tmpFd = open(inFileName.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+			// if (tmpFd < 0)
+			// 	perror("open file");
+			// write(tmpFd, request.body.c_str(), request.body.length());
+			// close(tmpFd);
+			
+			// std::string outFileName = generateRandomFileName(".out");
+			// int outFd = open(outFileName.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0644);
+			// if (outFd < 0)
+			// 	perror("open file");
+
+			int inPipe[2], outPipe[2];
+			if (pipe(inPipe) == -1 || pipe(outPipe) == -1)
+				perror("pipe");
+						
+			int pid = fork();
+			if (pid < 0) return(perror("fork"), 1);
+			if (pid == 0){
+
+				close(inPipe[1]);
+				dup2(inPipe[0], STDIN_FILENO);
+				close(inPipe[0]);
+				
+				close(outPipe[0]);
+				dup2(outPipe[1], STDOUT_FILENO);
+				close(outPipe[1]);
+
+
+				
+				char *argv[] = {
+					(char*)server.config.cgi_interpreter.c_str(),
+				    (char*)path.c_str(),
+				    NULL
+				};
+				
+				execv(argv[0], argv);
+				perror("execv");
+				exit(1);
+			}
+			else {
+				close(inPipe[0]);
+				close(outPipe[1]);
+				if (request.method == http::HTTP_METHOD_POST){
+					write(inPipe[1], request.body.c_str(), request.body.length());
+				}
+				close(inPipe[1]);
+
+				char buffer[1024 * 1024];
+				std::memset(buffer, 0, sizeof(buffer));
+				ssize_t valread = read(outPipe[0], buffer, sizeof(buffer));
+				close(outPipe[0]);
+				
+				std::cout << "file content: \n" << buffer << std::endl;
+				if (valread > 0){         
+					http_respond_html(new_socket, "200 OK", "text/pain", buffer);
+				}
+
+			}
+		}
+		return 0;
+	}
+
+
+
+
+
+
+
+
     if (request.method == http::HTTP_METHOD_POST){
         path = url_decode(request.body.substr(5));
 		std::string dir = server.config.upload_dir;
 
 		//TODO: remove space from content-type in getFileExtension
 		std::string ext = getFileExtension(request.headers["content-type"]);
+
+		for (std::map<std::string, std::string>::iterator it = request.headers.begin();it != request.headers.end(); ++it) {
+        	std::cout << it->first << " => " << it->second << std::endl;
+    	}
+		std::cout << request.body<< std::endl;
 
 		if (dirExists(dir)){
 			std::cout << "directory of uploads exists \n";
@@ -206,8 +298,7 @@ int methods(http::Request request, int new_socket, struct server server){
 
 				std::string fileName = generateRandomFileName(ext);
 				int fd = open(fileName.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-				
-				if (!fd)
+				if (fd < 0)
 					perror("open file");
 				
 				std::cout << "file name: " << fileName << std::endl;
@@ -217,6 +308,7 @@ int methods(http::Request request, int new_socket, struct server server){
 				chdir(oldDir);
 			} 
 		}
+		return 0;
     }
     if (request.uri.find("/DELETE?data=") == 0){
         path = url_decode(request.uri.substr(13));
@@ -301,7 +393,8 @@ int handle_requests(struct server *servers, int epfd, sockaddr_in address, size_
 				std::memset(buffer, 0, sizeof(buffer));
 				ssize_t valread = recv(fd, buffer, sizeof(buffer), MSG_DONTWAIT);
 
-				// int new_socket = accept(...);
+				// std::cout << " the buffer :\n'" << buffer << "'\n";
+
 
 				sockaddr_in local_addr;
 				socklen_t len = sizeof(local_addr);
@@ -388,14 +481,23 @@ void setup_config(toml::Config *config){
 	config[0].port = 8080;
 	config[0].host = "127.0.0.1";
 	config[0].upload_dir = "upload";
-
+	config[0].cgi_path = "/../webserv/";
+	config[0].cgi_interpreter = "/usr/bin/python3";
+	config[0].cgi_extension = ".py";
+	
 	config[1].port = 8081;
 	config[1].host = "127.0.0.1";
 	config[1].upload_dir = "upload1";
-
+	config[1].cgi_path = "/../webserv/";
+	config[1].cgi_interpreter = "/usr/bin/python3";
+	config[1].cgi_extension = ".py";
+	
 	config[2].port = 8082;
 	config[2].host = "127.0.0.1";
 	config[2].upload_dir = "upload2";
+	config[2].cgi_path = "/../webserv/";
+	config[2].cgi_interpreter = "/usr/bin/python3";
+	config[2].cgi_extension = ".py";
 }
 
 int server() {
