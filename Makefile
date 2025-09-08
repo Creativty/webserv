@@ -5,8 +5,8 @@
 #                                                     +:+ +:+         +:+      #
 #    By: aindjare <marvin@42.fr>                    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
-#    Created: 2025/07/11 15:57:44 by aindjare          #+#    #+#              #
-#    Updated: 2025/07/30 17:36:17 by aindjare         ###   ########.fr        #
+#    Created: 2025/08/23 15:57:56 by aindjare          #+#    #+#              #
+#    Updated: 2025/09/08 15:48:04 by aindjare         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -28,13 +28,10 @@ fclean: clean
 
 re: fclean all
 
-flags:
-	@echo $(CXXFLAGS)
-
 $(NAME): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+	$(CXX) $(CXXFLAGS) -o $@	$^
 
 -include $(DEPS)
 
-.PHONY: all clean fclean re flags
+.PHONY: all clean fclean re
 .SECONDARY: $(OBJS) $(DEPS)
