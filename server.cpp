@@ -17,6 +17,9 @@
 #include <sys/wait.h>
 
 
+static std::map<int, int> cgi_map;
+
+
 
 /* TODO(XENOBAS):
  * - "HTTP/1.0 501 Not Implemented"
@@ -27,8 +30,10 @@ void	http_respond_html(int fd, std::string status, std::string type, const std::
 	std::string	response_line = "HTTP/1.0 " + status + "\r\n";
 	std::string	headers = "Content-Type: " + type + "\r\n"
 		"\r\n";
+	std::cout << "client_fd in http_respond: " << fd << std::endl;
 	::send(fd, response_line.c_str(), response_line.size(), MSG_DONTWAIT);
 	::send(fd, headers.c_str(), headers.size(), MSG_DONTWAIT);
+
 	if (data.size())
 		::send(fd, data.c_str(), data.size(), MSG_DONTWAIT);
 }
@@ -182,7 +187,7 @@ std::string generateRandomFileName(std::string ext){
     return oss.str();
 }
 
-int methods(http::Request request, int new_socket, struct server server){
+int methods(http::Request request, int new_socket, struct server server, int epfd){
     std::string path = url_decode(request.uri);
     bool file_ok;
 
@@ -222,6 +227,11 @@ int methods(http::Request request, int new_socket, struct server server){
 			int pid = fork();
 			if (pid < 0) return(perror("fork"), 1);
 			if (pid == 0){
+				if (request.method == http::HTTP_METHOD_POST){
+					//when i use send nothing writing in inPipe[1]
+					write(inPipe[1], request.body.c_str(), request.body.length());
+				}
+				close(inPipe[1]);
 
 				close(inPipe[1]);
 				dup2(inPipe[0], STDIN_FILENO);
@@ -246,24 +256,28 @@ int methods(http::Request request, int new_socket, struct server server){
 			else {
 				close(inPipe[0]);
 				close(outPipe[1]);
-				if (request.method == http::HTTP_METHOD_POST){
-					write(inPipe[1], request.body.c_str(), request.body.length());
-				}
 				close(inPipe[1]);
 
-				char buffer[1024 * 1024];
-				std::memset(buffer, 0, sizeof(buffer));
-				ssize_t valread = read(outPipe[0], buffer, sizeof(buffer));
-				close(outPipe[0]);
-				
-				std::cout << "file content: \n" << buffer << std::endl;
-				if (valread > 0){         
-					http_respond_html(new_socket, "200 OK", "text/pain", buffer);
-				}
+				struct epoll_event ev;
+				ev.events = EPOLLIN | EPOLLET;
+				ev.data.fd = outPipe[0];
+				epoll_ctl(epfd, EPOLL_CTL_ADD, outPipe[0], &ev);
+
+				cgi_map[outPipe[0]] = new_socket;
+
+				// char buffer[1024 * 1024];
+				// std::memset(buffer, 0, sizeof(buffer));
+				// ssize_t valread = recv(outPipe[0], buffer, sizeof(buffer), MSG_DONTWAIT);
+				// close(outPipe[0]);
+
+				// std::cout << "file content: \n" << buffer << std::endl;
+				// if (valread > 0){         
+				// 	http_respond_html(new_socket, "200 OK", "text/pain", buffer);
+				// }
 
 			}
 		}
-		return 0;
+		return 3;
 	}
 
 
@@ -388,7 +402,33 @@ int handle_requests(struct server *servers, int epfd, sockaddr_in address, size_
 				}
 
 			}
-			else{
+			else if(cgi_map.count(fd)){
+				int client_fd = cgi_map[fd];
+				char buffer[1024 * 1024];
+				std::memset(buffer, 0, sizeof(buffer));
+				ssize_t valread = read(fd, buffer, sizeof(buffer));
+
+				if (valread > 0){
+					std::cout << "client_fd: \n" << client_fd << std::endl;
+					std::cout << "fd: \n" << fd << std::endl;
+					std::cout << "file content: \n" << buffer << std::endl;
+					// std::string	response_line = "HTTP/1.0 200 OK\r\n";
+					// std::string	headers = "Content-Type: text/html\r\n"
+					// "\r\n";
+					// ::send(client_fd, response_line.c_str(), response_line.size(), MSG_DONTWAIT);
+					// ::send(client_fd, headers.c_str(), headers.size(), MSG_DONTWAIT);
+					::send(client_fd, buffer, sizeof(buffer), MSG_DONTWAIT);
+					// http_respond_html(client_fd, "200 OK", "text/html", buffer);
+				}
+				else{
+					std::cout << "\nnothing to read\n\n";
+					epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
+					close(client_fd);
+					cgi_map.erase(fd);
+					close(fd);
+				}
+			}
+			else if(!cgi_map.count(fd)){
 				char buffer[1024 * 1024];
 				std::memset(buffer, 0, sizeof(buffer));
 				ssize_t valread = recv(fd, buffer, sizeof(buffer), MSG_DONTWAIT);
@@ -414,9 +454,11 @@ int handle_requests(struct server *servers, int epfd, sockaddr_in address, size_
 						//TODO
 					}
 
-					if (methods(request, fd, get_server(servers, port))){
+					int returnValue = methods(request, fd, get_server(servers, port), epfd);
+					if (returnValue){
 							epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
-							close(fd);
+							if (returnValue != 3)
+								close(fd);
 							continue;
 					}
 					http_respond_html(fd,"200 OK", "text/html", file_html);
