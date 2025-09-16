@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/13 17:00:44 by aindjare          #+#    #+#             */
-/*   Updated: 2025/09/16 15:01:01 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/09/16 15:43:35 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,6 +15,8 @@
 
 #include <iostream>
 
+i32	main_toml(i32 argc, type::cstring* argv);
+
 i32	main(i32 argc, type::cstring *argv) {
-	return (0);
+	return (main_toml(argc, argv));
 }

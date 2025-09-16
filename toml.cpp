@@ -1,5 +1,6 @@
 #include <ostream>
 #include <iostream>
+#include "types.hpp"
 
 #include <stdint.h>
 #define nullptr 0
@@ -24,308 +25,6 @@ typedef int8_t		i8;
 typedef int16_t		i16;
 typedef int32_t		i32;
 typedef int64_t		i64;
-
-namespace type {
-	typedef const char*	cstring;
-	u32	cstring_len(cstring str) {
-		if (str == NULL) return (0u);
-
-		u32	len = 0;
-		while (str[len]) len++;
-		return (len);
-	}
-
-	struct string {
-		byte*	data;
-		u32		len;
-		
-		string(void): data(nullptr), len(0u) { };
-		string(cstring other): data((byte*)other), len(cstring_len(other)) { };
-		string(cstring other, u32 len): data((byte*)other), len(len) {
-			u32	other_len = cstring_len(other);
-			if (other_len < len) len = other_len;
-		};
-		string(byte* other, u32 len): data(other), len(len) { };
-		string(const string& other): data(other.data), len(other.len) { };
-		~string(void) { };
-
-		i32		find_index(byte needle) const {
-			if (needle == '\0' || data == nullptr || len == 0u) return (-1);
-			for (i32 i = 0; (u32)i < len; i++)
-				if (data[i] == needle) return (i);
-			return (-1);
-		}
-		i32		find_index(const string& needle) const {
-			if (needle.len > len) return (-1);
-			for (i32 i = 0; (u32)i < len; i++) {
-				u32		delta = 0;
-				bool	match = true;
-				while (delta < needle.len && (u32)i + delta < len && match) {
-					match = (needle[delta] == data[(u32)i + delta]);
-					delta++;
-				}
-				if (delta == needle.len && match) return (i);
-			}
-			return (-1);
-		}
-		bool	contains(const string& needle) const {
-			return (find_index(needle) >= 0);
-		}
-		string	slice(u32 start, u32 end) const {
-			if (end < start) end = start;
-			u32		slice_len = end - start;
-			byte*	slice_data = (start > len) ? nullptr : &data[start];
-			return (string(slice_data, slice_len));
-		}
-		string	slice(u32 start) const {
-			return (slice(start, len));
-		}
-
-		string	clone(void) const {
-			string	copy(*this);
-			copy.data = new byte[copy.len]();
-			for (u32 i = 0u; i < len * (u32)sizeof(char); ++i)
-				copy.data[i] = data[i];
-			return (copy);
-		}
-		void	free(void) {
-			delete[] data;
-
-			len = 0u;
-			data = nullptr;
-		}
-
-		operator	bool() const {
-			if (data == nullptr) return (false);
-			if (len == 0u) return (false);
-			return (true);
-		};
-		string&		operator=(const string& other) {
-			if (&other != this) {
-				data = other.data;
-				len = other.len;
-			}
-			return (*this);
-		};
-		string&		operator=(cstring other) {
-			*this = string(other);
-			return (*this);
-		};
-		byte&		operator[](u64 index) {
-			if (index >= (u64)len) throw std::runtime_error("Out of bounds string access");
-			return (data[index]);
-		}
-		const byte&	operator[](u64 index) const {
-			if (index >= (u64)len) throw std::runtime_error("Out of bounds string access");
-			return (data[index]);
-		}
-
-		bool		operator==(cstring rhs) const {
-			return (*this == string(rhs));
-		}
-		bool		operator==(const string& rhs) const {
-			return (rhs.len == len && find_index(rhs) == 0);
-		}
-	};
-	
-	template <typename V>
-	struct dynamic_array {
-		byte*	items;
-		u32		len;
-		u32		cap;
-
-		dynamic_array(void): items(nullptr), len(0u), cap(0u) { };
-		~dynamic_array(void) { };
-		dynamic_array(const dynamic_array& other): items(other.items), len(other.len), cap(other.cap) { };
-		dynamic_array&	operator=(const dynamic_array& other) {
-			if (this != &other) {
-				items = other.items;
-				len = other.len;
-				cap = other.cap;
-			}
-			return (*this);
-		}
-		V&			operator[](u64 index) {
-			return (((V*)items)[index]);
-		}
-		const V&	operator[](u64 index) const {
-			return (((V*)items)[index]);
-		}
-
-		void	clear(void) {
-			len = 0u;
-		}
-		void	free(void) {
-			delete[] items;
-
-			len = 0u;
-			cap = 0u;
-			items = nullptr;
-		}
-		void	resize(u32 cap_new) {
-			byte*	items_old = items;
-			byte*	items_new = new byte[cap_new * sizeof(V)]();
-			for (u32 i = 0; i < cap * (u32)sizeof(V); ++i)
-				items_new[i] = items[i];
-			
-			cap = cap_new;
-			items = items_new;
-			delete[] items_old;
-		}
-		V&	push(const V& item) {
-			if (len >= cap) resize((cap > 0u) ? (cap * 2u) : 8u);
-			V&	value = ((V*)items)[len];
-			return (++len, value = item);
-		}
-	};
-
-	template <typename V>
-	struct hash_map {
-		struct item {
-			string	key;
-			V		value;
-		};
-		struct iterator {
-			hash_map&	parent;
-			item*		item_curr;
-			u32			index;
-			iterator(hash_map& parent): parent(parent), item_curr(nullptr), index(0u) { };
-			~iterator(void) { }
-			bool	next(void) {
-				while (index < (size_t)parent.items.cap) {
-					size_t	i = index++;
-					if ((bool)parent.items[i].key) {
-						item_curr = &parent.items[i];
-						return (true);
-					}
-				}
-				return (false);
-			}
-		};
-		static u64 fnv_1a(const string& key) {
-			u64	hash = 14695981039346656037ul;
-			for (u32 i = 0; i < key.len; i++) {
-				hash ^= (u64)(byte)(key[i]);
-				hash ^= 1099511628211ul;
-			}
-			return (hash);
-		}
-
-		dynamic_array<item>	items;
-		u32					count;
-		hash_map(void): items(), count(0u) { };
-		~hash_map(void) { };
-		hash_map(const hash_map& other): items(other.items), count(other.count) { };
-
-		hash_map&	operator=(const hash_map& other) {
-			if (this != &other) {
-				items = other.items;
-				count = other.count;
-			}
-			return (*this);
-		}
-		V&			operator[](const string& key) {
-			if (count == 0) throw std::runtime_error("empty hash_map");
-			unsigned long	hash = fnv_1a(key);
-			u64				index = (u64)(hash & ((u64)items.cap - 1ul));
-			while ((bool)items[index].key) {
-				if (items[index].key == key)
-					return (items[index].value);
-				if (++index >= (u64)items.cap) index = 0u;
-			}
-			throw std::runtime_error("invalid key");
-		}
-		const V&	operator[](const string& key) const {
-			if (count == 0) throw std::runtime_error("empty hash_map");
-			unsigned long	hash = fnv_1a(key);
-			u64				index = (u64)(hash & ((u64)items.cap - 1ul));
-			while ((bool)items[index].key) {
-				if (items[index].key == key)
-					return (items[index].value);
-				if (++index >= (u64)items.cap) index = 0u;
-			}
-			throw std::runtime_error("invalid key");
-		}
-		void		resize(u32 cap_new) {
-			items.resize(cap_new);
-		}
-		void		free(void) {
-			iterator	iter(*this);
-			for (bool ok = iter.next(); ok; ok = iter.next()) {
-				item&	item = *iter.item_curr;
-				item.key.free();
-			}
-			count = 0u;
-
-			items.free();
-		}
-		iterator	iter(void) {
-			return (iterator(*this));
-		};
-		V&			set(const string& key, const V& value) {
-			if (!(bool)key) throw std::runtime_error("invalid key");
-			if (count >= items.cap / 2) resize((items.cap == 0u) ? 8u : (items.cap * 2u));
-
-			u64	hash = fnv_1a(key);
-			u64	index = (u64)(hash & ((u64)items.cap - 1ul));
-			while ((bool)(items[index].key)) {
-				if (items[index].key == key) {
-					items[index].value = value;
-					return (items[index].value);
-				}
-				if (++index >= items.cap) index = 0u;
-			}
-			items[index] = (item){
-				.key = key.clone(),
-				.value = value,
-			};
-			count++;
-			return (items[index].value);
-		};
-
-		bool		has(const string& key) const {
-			if (count == 0u) return (false);
-
-			unsigned long	hash = fnv_1a(key);
-			u64				index = (u64)(hash & ((u64)items.cap - 1ul));
-			while ((bool)items[index].key) {
-				if (items[index].key == key)
-					return (true);
-				if (++index >= (u64)items.cap) index = 0u;
-			}
-			return (false);
-		}
-	};
-};
-std::ostream&	operator<<(std::ostream& stream, const type::string& string) {
-	if (string.data == nullptr) return (stream << "(null)");
-
-	stream << '"';
-	for (u32 i = 0u; i < string.len; ++i) {
-		switch (string.data[i]) {
-			case '\a': {
-				stream << "\\a";
-			} break;
-			case '\b': {
-				stream << "\\b";
-			} break;
-			case '\t': {
-				stream << "\\t";
-			} break;
-			case '\n': {
-				stream << "\\n";
-			} break;
-			case '\0': {
-				stream << "\\0";
-			} break;
-			default: {
-				stream << string.data[i];
-			} break;
-		}
-	}
-	stream << '"';
-	return (stream);
-}
 
 namespace strconv {
 	bool	parse_i64(const type::string& string, i64& n) {
@@ -539,7 +238,7 @@ namespace toml {
 		void	report_error(const char* note) {
 			std::cerr << TERMINAL_COLOR_WHITE "(todo):" << loc_last.line << ':' << loc_last.column << ": " TERMINAL_NOTICE_ERROR ": " TERMINAL_STYLE_RESET << note << std::endl;
 
-			i32		line_end_index = source.slice(line_begin_index).find_index('\n');
+			i32		line_end_index = source.slice(line_begin_index).find('\n');
 			if (line_end_index == -1) line_end_index = (i32)source.len;
 			string	line = source.slice(line_begin_index, (u32)line_end_index);
 			std::cerr << "\t|\t";
@@ -633,7 +332,7 @@ namespace toml {
 				value_table&	table = *data.table;
 				toml::value_table::iterator	iter(table);
 				for (bool ok = iter.next(); ok; ok = iter.next()) {
-					toml::value& value = iter.item_curr->value;
+					toml::value& value = iter.item->value;
 					value.free();
 				}
 				table.free();
@@ -992,11 +691,11 @@ std::ostream&	operator<<(std::ostream& stream, const toml::value& value) {
 			return (stream);
 		} break ;
 		case toml::VALUE_TABLE: {
-			toml::value_table::iterator	iter = value.data.table->iter();
+			toml::value_table::iterator	iter = toml::value_table::iterator(*value.data.table);
 			stream << "value::table{ ";
 			for (bool ok = iter.next(); ok;) {
-				const toml::string& key = iter.item_curr->key;
-				const toml::value& value = iter.item_curr->value;
+				const toml::string& key = iter.item->key;
+				const toml::value& value = iter.item->value;
 				stream << key << " = " << value;
 
 				ok = iter.next();
@@ -1009,9 +708,9 @@ std::ostream&	operator<<(std::ostream& stream, const toml::value& value) {
 	}
 }
 
-i32	main(i32 argc, type::cstring* argv) {
+i32	main_toml(i32 argc, type::cstring* argv) {
 	((void)argc, (void)argv);
-	const toml::string		source = "[[webserv]]";
+	const toml::string		source = "[[webserv]]\ntest= 123 #test\ngood = \"good\"";
 	toml::dynamic_tokens	tokens;
 	toml::value				scope(new toml::value_table);
 	if (!toml::process(source, tokens, scope.data.table))

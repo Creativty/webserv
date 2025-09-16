@@ -6,15 +6,15 @@
 #    By: aindjare <marvin@42.fr>                    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/08/23 15:57:56 by aindjare          #+#    #+#              #
-#    Updated: 2025/09/16 14:58:35 by aindjare         ###   ########.fr        #
+#    Updated: 2025/09/16 16:06:58 by aindjare         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
 NAME		:=	webserv
-SRCS		:=	main.cpp  # $(wildcard *.cpp)
+SRCS		:=	$(wildcard *.cpp)
+INCS		:=	$(wildcard *.hpp)
 OBJS		:=	$(SRCS:.cpp=.o)
 DEPS		:=	$(OBJS:.o=.d)
-INCS		:=	$(wildcard *.hpp)
 
 CXX			:=	c++
 CXXFLAGS	:=	-Wall -Wextra -Werror -Wconversion -Wswitch-enum -std=c++98 -g -MMD -MP
@@ -22,16 +22,16 @@ CXXFLAGS	:=	-Wall -Wextra -Werror -Wconversion -Wswitch-enum -std=c++98 -g -MMD 
 all: $(NAME)
 
 clean:
+	$(RM) $(DEPS)
 	$(RM) $(OBJS)
 
 fclean: clean
-	$(RM) $(DEPS)
 	$(RM) $(NAME)
 
 re: fclean all
 
-$(NAME): $(INCS) $(SRCS)
-	$(CXX) -o $@	$(SRCS)
+$(NAME): $(INCS) $(OBJS)
+	$(CXX) -o $@	$(OBJS)
 
 -include $(DEPS)
 
