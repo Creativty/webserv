@@ -1,459 +1,417 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   toml.cpp                                           :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/09/16 16:14:31 by aindjare          #+#    #+#             */
+/*   Updated: 2025/09/16 17:20:36 by aindjare         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include <ostream>
 #include <iostream>
-#include "types.hpp"
 
 #include <stdint.h>
-#define nullptr 0
 
-#define TERMINAL_COLOR_RED "\x1b[1;31m"
-#define TERMINAL_COLOR_GREEN "\x1b[1;32m"
-#define TERMINAL_COLOR_WHITE "\x1b[1;37m"
-#define TERMINAL_COLOR_YELLOW "\x1b[1;33m"
-#define TERMINAL_STYLE_RESET "\x1b[0m"
+#include "types.hpp"
+#include "strconv.hpp"
+#include "terminal.hpp"
+#include "toml.hpp"
 
-#define TERMINAL_NOTICE_ERROR TERMINAL_COLOR_RED "error"
+/* Matchers */
 
-/// TYPES
-typedef uint8_t		byte;
-
-typedef uint8_t		u8;
-typedef uint16_t	u16;
-typedef uint32_t	u32;
-typedef uint64_t	u64;
-
-typedef int8_t		i8;
-typedef int16_t		i16;
-typedef int32_t		i32;
-typedef int64_t		i64;
-
-namespace strconv {
-	bool	parse_i64(const type::string& string, i64& n) {
-		n = 0l;
-		i64	s = 1l;
-		u32	i = 0ul;
-		if (!(bool)string) return (false);
-		if (string.len > 0 && (string[i] == '-' || string[i] == '+')) {
-			if (string[i] == '-')
-				s = -1l;
-			i++;
-		}
-		while (i < string.len) {
-			byte	digit = string[i];
-			if (digit < '0' || digit > '9') break ;
-			n = (n * 10l) + (i64)(digit - '0');
-			i++;
-		}
-		bool ok = (string.data != nullptr && i == string.len);
-		n = ok ? n * s : 0l;
-		return (ok);
-	}
+static byte	to_lower(byte b) {
+	return ((b >= 'A' && b <= 'Z') ? (b ^ 32) : b);
+};
+static bool	is_digit(byte d) {
+	return (d >= '0' && d <= '9');
+};
+static bool	is_alphabet(byte b) {
+	byte	a = to_lower(b);
+	return (a >= 'a' && a <= 'z');
+};
+static bool	is_newline(byte n) {
+	return (n == '\n');
+}
+static bool	is_string_delimiter(byte d) {
+	return (is_newline(d) || d == '"');
+}
+static bool	is_whitespace(byte w) {
+	return (w == ' ' || w <= '\t');
+};
+static bool	is_identifier_prefix(byte b) {
+	return (is_alphabet(b) || b == '_');
+};
+static bool	is_identifier_infix(byte b) {
+	return (is_identifier_prefix(b) || is_digit(b));
 };
 
-/// TOML: Forward declarations
-namespace toml {
-	// NOTE(xenobas): `POV: you cannot forward declare enums in C...`
-	enum token_kind {
-		TOKEN_INVALID,
+/* Location */
 
-		TOKEN_ASSIGN,
-		TOKEN_COMMA,
-		TOKEN_NEWLINE,
-		TOKEN_TABLE_INLINE_OPEN,
-		TOKEN_TABLE_INLINE_CLOSE,
-		TOKEN_ARRAY_OPEN,
-		TOKEN_ARRAY_CLOSE,
-
-		TOKEN_STRING,
-		TOKEN_NUMBER,
-		TOKEN_IDENT,
-		TOKEN_TRUE,
-		TOKEN_FALSE,
-
-		TOKEN_EOF,
-	};
-	enum value_kind {
-		VALUE_INVALID,
-
-		VALUE_NUMBER,
-		VALUE_BOOLEAN,
-		VALUE_STRING,
-		VALUE_ARRAY,
-		VALUE_TABLE,
-	};
-
-	struct token;
-	struct value;
-	struct parser;
-
-	typedef i64							value_number;
-	typedef bool						value_boolean;
-	typedef type::string				value_string;
-	typedef type::dynamic_array<value>	value_array;
-	typedef type::hash_map<value>		value_table;
-
-	bool	parse_value(parser& p, value* val, token_kind recover_kind);
-	bool	parse_key_value(parser& p, value_table* scope);
-	bool	parse_document(parser& p);
-};
-std::ostream&	operator<<(std::ostream& stream, const toml::token_kind& kind);
-std::ostream&	operator<<(std::ostream& stream, const toml::value_kind& kind);
-std::ostream&	operator<<(std::ostream& stream, const toml::token& token);
-std::ostream&	operator<<(std::ostream& stream, const toml::value& value);
-
-// TOML: Implementation
-namespace toml {
-	struct token;
-	typedef type::string				string;
-	typedef type::dynamic_array<token>	dynamic_tokens;
-
-	byte	to_lower(byte b) {
-		return ((b >= 'A' && b <= 'Z') ? (b ^ 32) : b);
-	};
-	bool	is_digit(byte d) {
-		return (d >= '0' && d <= '9');
-	};
-	bool	is_alphabet(byte b) {
-		byte	a = to_lower(b);
-		return (a >= 'a' && a <= 'z');
-	};
-	bool	is_newline(byte n) {
-		return (n == '\n');
+toml::location::location(void): index(0u), line(1u), column(1u) {
+}
+toml::location::~location(void) {
+}
+toml::location::location(const location& loc): index(loc.index), line(loc.line), column(loc.column) {
+}
+toml::location& toml::location::operator=(const toml::location& ref) {
+	if (this != &ref) {
+		index = ref.index;
+		line = ref.line;
+		column = ref.column;
 	}
-	bool	is_string_delimiter(byte d) {
-		return (is_newline(d) || d == '"');
+	return (*this);
+}
+
+toml::location::location(u32 index, u32 line, u32 column): index(index), line(line), column(column) {
+}
+
+void			toml::location::advance(byte b) {
+	if (b == '\0') return ;
+
+	index++;
+	if (b != '\n') column++;
+	else {
+		line++;
+		column = 1u;
 	}
-	bool	is_whitespace(byte w) {
-		return (w == ' ' || w <= '\t');
-	};
-	bool	is_identifier_prefix(byte b) {
-		return (is_alphabet(b) || b == '_');
-	};
-	bool	is_identifier_infix(byte b) {
-		return (is_identifier_prefix(b) || is_digit(b));
-	};
+}
 
-	struct location {
-		u32	index;
-		u32	line;
-		u32	column;
-		location(void): index(0u), line(1u), column(1) { };
-		location(u32 index, u32 line, u32 column): index(index), line(line), column(column) { };
-		location(const location& other): index(other.index), line(other.line), column(other.column) { };
-		location&	operator=(const location& other) {
-			if (this != &other) {
-				index = other.index;
-				line = other.line;
-				column = other.column;
-			}
-			return (*this);
-		};
+/* Token */
 
-		void		advance(byte b) {
-			if (b == '\0') return ;
+toml::token::token(void): text(), kind(toml::TOKEN_INVALID), loc() {
+}
+toml::token::~token(void) {
+}
+toml::token::token(const token& ref): text(ref.text), kind(ref.kind), loc(ref.loc) {
+}
+toml::token& toml::token::operator=(const token& ref) {
+	if (this != &ref) {
+		text = ref.text;
+		kind = ref.kind;
+		loc = ref.loc;
+	}
+	return (*this);
+}
 
-			index++;
-			if (b != '\n') column++;
+toml::token::token(token_kind kind): text(), kind(kind), loc() {
+}
+
+toml::token::token(string text, token_kind kind, const location& loc): text(text), kind(kind), loc(loc) {
+}
+
+/* Lexer */
+
+toml::lexer::lexer(const string source): source(source), loc_curr(), loc_last(), line_begin_index() {
+}
+toml::lexer::~lexer(void) {
+}
+
+bool			toml::lexer::end(void) const {
+	return (loc_curr.index >= source.len);
+}
+
+byte			toml::lexer::peek_byte(void) const {
+	if (end()) return (0);
+	return (source[loc_curr.index]);
+}
+toml::string	toml::lexer::peek_text(void) const {
+	return (source.slice(loc_last.index, loc_curr.index));
+}
+
+byte			toml::lexer::next_byte(void) {
+	byte	b = peek_byte();
+
+	loc_curr.advance(b);
+	if (b == '\n')
+		line_begin_index = loc_curr.index;
+	return (b);
+}
+toml::string	toml::lexer::next_text(void) {
+	string	text = peek_text();
+
+	loc_last = loc_curr;
+	return (text);
+}
+toml::token		toml::lexer::next_token(token_kind kind) {
+	location	loc = loc_last;
+	string		text = next_text();
+	return (token(text, kind, loc));
+}
+
+u32				toml::lexer::next_byte_while(toml::lexer::lexer_predicate predicate) {
+	u32	count = 0u;
+	while (!end()) {
+		if (!predicate(peek_byte()))
+			break ;
+		next_byte();
+	}
+	return (count);
+}
+u32				toml::lexer::skip_byte_while(toml::lexer::lexer_predicate predicate) {
+	u32	count = next_byte_while(predicate);
+
+	next_text();
+	return (count);
+}
+u32				toml::lexer::next_byte_while_not(toml::lexer::lexer_predicate predicate) {
+	u32	count = 0u;
+	while (!end()) {
+		if (predicate(peek_byte()))
+			break ;
+		next_byte();
+	}
+	return (count);
+}
+u32				toml::lexer::skip_byte_while_not(toml::lexer::lexer_predicate predicate) {
+	u32	count = next_byte_while_not(predicate);
+
+	next_text();
+	return (count);
+}
+
+void			toml::lexer::report_error(const char* note) {
+	std::cerr << TERMINAL_COLOR_WHITE "(unimplemented toml path):";
+	std::cerr << loc_last.line << ':' << loc_last.column << ": ";
+	std::cerr << TERMINAL_NOTICE_ERROR ": " TERMINAL_STYLE_RESET;
+	std::cerr << note << std::endl;
+
+	i32		line_end_index = source
+		.slice(line_begin_index)
+		.find('\n');
+	if (line_end_index == -1)
+		line_end_index = (i32)source.len;
+
+	string	line = source.slice(line_begin_index, (u32)line_end_index);
+	for (u32 i = 0u; i < line.len; ++i) {
+		byte	b = line[i];
+		if (is_newline(b))
+			std::cerr << std::endl << "\t|\t" << std::endl;
+		else
+			std::cerr << b;
+	}
+	std::cerr << std::endl;
+}
+
+bool			toml::lexer::process(token_array& tokens, const string source) {
+	lexer	l(source);
+	while (!l.end()) {
+		l.skip_byte_while(is_whitespace);
+		byte		b = l.next_byte();
+		token_kind	k = TOKEN_INVALID;
+	
+		if (b == '\n') k = TOKEN_NEWLINE;
+		else if (b == ',') k = TOKEN_COMMA;
+		else if (b == '=') k = TOKEN_ASSIGN;
+		else if (b == '{') k = TOKEN_TABLE_INLINE_OPEN;
+		else if (b == '}') k = TOKEN_TABLE_INLINE_CLOSE;
+		else if (b == '[') k = TOKEN_ARRAY_OPEN;
+		else if (b == ']') k = TOKEN_ARRAY_CLOSE;
+		else if (b == '#') {
+			l.skip_byte_while_not(is_newline);
+			continue ;
+		}
+		else if (b == '"') {
+			l.next_byte_while_not(is_string_delimiter);
+			if (l.peek_byte() == '"') l.next_byte();
 			else {
-				line++;
-				column = 1u;
-			}
-		}
-	};
-
-	struct token {
-		string		text;
-		token_kind	kind;
-		location	loc;
-		token(void): text(), kind(TOKEN_INVALID), loc() { };
-		token(token_kind kind): text(), kind(kind), loc() { };
-		token(string text, token_kind kind, const location& loc): text(text), kind(kind), loc(loc) { };
-		token(const token& other): text(other.text), kind(other.kind), loc(other.loc) { };
-		token&	operator=(const token& other) {
-			if (this != &other) {
-				text = other.text;
-				kind = other.kind;
-				loc = other.loc;
-			}
-			return (*this);
-		};
-		~token(void) { };
-	};
-	struct lexer {
-		const string	source;
-		location		loc_curr;
-		location		loc_last;
-		u32				line_begin_index;
-		lexer(const string source): source(source), loc_curr(), loc_last(), line_begin_index() { };
-		~lexer(void) { };
-		bool	end(void) const {
-			return (loc_curr.index >= source.len);
-		}
-		byte	peek_byte(void) const {
-			if (loc_curr.index >= source.len) return (0);
-			return (source[loc_curr.index]);
-		};
-		byte	next_byte(void) {
-			byte	b = peek_byte();
-			loc_curr.advance(b);
-			if (b == '\n') line_begin_index = loc_curr.index;
-			return (b);
-		};
-		string	peek_text(void) {
-			return (source.slice(loc_last.index, loc_curr.index));
-		}
-		string	next_text(void) {
-			string	text = peek_text();
-			return (loc_last = loc_curr, text);
-		}
-		token	next_token(token_kind kind) {
-			location	loc(loc_last);
-			return (token(next_text(), kind, loc));
-		}
-		u32		next_byte_while(bool (*predicate)(byte)) {
-			u32			count = 0u;
-			while (!end()) {
-				byte	b = peek_byte();
-				if (!predicate(b)) break ;
-				next_byte();
-			}
-			return (count);
-		};
-		u32		skip_byte_while(bool (*predicate)(byte)) {
-			u32	count = next_byte_while(predicate);
-			return (next_text(), count);
-		}
-		u32		next_byte_while_not(bool (*predicate)(byte)) {
-			u32			count = 0u;
-			while (!end()) {
-				byte	b = peek_byte();
-				if (predicate(b)) break ;
-				next_byte();
-			}
-			return (count);
-		};
-		u32		skip_byte_while_not(bool (*predicate)(byte)) {
-			u32	count = next_byte_while_not(predicate);
-			return (next_text(), count);
-		}
-		void	report_error(const char* note) {
-			std::cerr << TERMINAL_COLOR_WHITE "(todo):" << loc_last.line << ':' << loc_last.column << ": " TERMINAL_NOTICE_ERROR ": " TERMINAL_STYLE_RESET << note << std::endl;
-
-			i32		line_end_index = source.slice(line_begin_index).find('\n');
-			if (line_end_index == -1) line_end_index = (i32)source.len;
-			string	line = source.slice(line_begin_index, (u32)line_end_index);
-			std::cerr << "\t|\t";
-			for (u32 i = 0; i < line.len; ++i) {
-				byte	b = line[i];
-				if (is_newline(b)) std::cerr << std::endl << "\t|\t" << line << std::endl;
-				else std::cerr << b;
-			}
-			std::cerr << std::endl;
-		}
-
-		static bool	process(dynamic_tokens& tokens, const string source) {
-			lexer	l(source);
-			while (!l.end()) {
-				l.skip_byte_while(is_whitespace);
-				byte		b = l.next_byte();
-				token_kind	k = TOKEN_INVALID;
-
-				if (b == '\n') k = TOKEN_NEWLINE;
-				else if (b == ',') k = TOKEN_COMMA;
-				else if (b == '=') k = TOKEN_ASSIGN;
-				else if (b == '{') k = TOKEN_TABLE_INLINE_OPEN;
-				else if (b == '}') k = TOKEN_TABLE_INLINE_CLOSE;
-				else if (b == '[') k = TOKEN_ARRAY_OPEN;
-				else if (b == ']') k = TOKEN_ARRAY_CLOSE;
-				else if (b == '#') {
-					l.skip_byte_while_not(is_newline);
-					continue ;
-				}
-				else if (b == '"') {
-					l.next_byte_while_not(is_string_delimiter);
-					if (l.peek_byte() == '"') l.next_byte();
-					else {
-						l.report_error("missing terminating \" character");
-						return (false);
-					}
-					k = TOKEN_STRING;
-				}
-				else if (is_digit(b)) {
-					l.next_byte_while(is_digit);
-					k = TOKEN_NUMBER;
-				}
-				else if (is_identifier_prefix(b)) {
-					l.next_byte_while(is_identifier_infix);
-					k = TOKEN_IDENT;
-					if (l.peek_text() == "true")
-						k = TOKEN_TRUE;
-					if (l.peek_text() == "false")
-						k = TOKEN_FALSE;
-				}
-
-				token		t = l.next_token(k);
-				tokens.push(t);
-			}
-			token	eof = l.next_token(TOKEN_EOF);
-			tokens.push(eof);
-			return (true);
-		}
-	};
-
-	struct value {
-		value_kind	kind;
-		union {
-			value_number	number;
-			value_boolean	boolean;
-			value_string*	string;
-			value_array*	array;
-			value_table*	table;
-		}			data;
-		value(void): kind(VALUE_INVALID), data() { };
-		value(value_number number): kind(VALUE_NUMBER) { data.number = number; };
-		value(value_boolean boolean): kind(VALUE_BOOLEAN) { data.boolean = boolean; };
-		value(value_string* string): kind(VALUE_STRING) { data.string = string; };
-		value(value_array* array): kind(VALUE_ARRAY) { data.array = array; };
-		value(value_table* table): kind(VALUE_TABLE) { data.table = table; };
-		~value() { };
-
-		void	free(void) {
-			if (kind == VALUE_STRING) {
-				data.string->free();
-				delete data.string;
-			}
-			else if (kind == VALUE_ARRAY) {
-				value_array&	array = *data.array;
-				for (u32 i = 0u; i < array.len; ++i)
-					array[i].free();
-				array.free();
-				delete data.array;
-			}
-			else if (kind == VALUE_TABLE) {
-				value_table&	table = *data.table;
-				toml::value_table::iterator	iter(table);
-				for (bool ok = iter.next(); ok; ok = iter.next()) {
-					toml::value& value = iter.item->value;
-					value.free();
-				}
-				table.free();
-				delete data.table;
-			}
-		};
-	};
-
-	struct parser {
-		dynamic_tokens&	tokens;
-		value_table*	document;
-		value_table*	scope;
-		u32				index;
-		token			curr;
-		bool			ok;
-
-		parser(dynamic_tokens& tokens, value_table& document): tokens(tokens), document(&document), scope(&document), index(0u), curr(), ok(true) { };
-		~parser(void) { };
-
-		bool	end(void) const {
-			return (index >= tokens.len || tokens[index].kind == TOKEN_EOF || tokens[index].kind == TOKEN_INVALID);
-		};
-		token	peek(void) const {
-			if (end()) return (token(TOKEN_EOF));
-			return (tokens[index]);
-		};
-		token	next(void) {
-			curr = peek();
-			if (end()) return (curr);
-			return (++index, curr);
-		};
-		u32		next_while(token_kind delimiter) {
-			u32			count = 0u;
-			while (!end()) {
-				token	t = peek();
-				if (t.kind != delimiter) break ;
-				else next();
-			}
-			return (count);
-		}
-		u32		next_while_not(token_kind delimiter) {
-			u32			count = 0u;
-			while (!end()) {
-				token	t = peek();
-				if (t.kind == delimiter) break ;
-				else next();
-			}
-			return (count);
-		}
-		u32		next_while_not(bool	(*predicate)(token_kind)) {
-			u32			count = 0u;
-			while (!end()) {
-				token	t = peek();
-				if (!predicate(t.kind)) break ;
-				else next();
-			}
-			return (count);
-		}
-		bool	accept(token_kind kind) {
-			token	t = peek();
-			if (t.kind == kind)
-				return (next(), true);
-			return (false);
-		}
-		bool	expect(token_kind kind) {
-			if (!accept(kind)) {
-				token		fail_tok = peek();
-				location	fail_loc = fail_tok.loc;
-				std::cerr << TERMINAL_COLOR_WHITE "(todo):" << fail_loc.line << ':' << fail_loc.column << ": " TERMINAL_NOTICE_ERROR ": " TERMINAL_STYLE_RESET;
-				std::cerr << "expected `" << kind << "`, got " << fail_tok.text << " instead" << std::endl;
+				l.report_error("missing terminating \" character");
 				return (false);
 			}
-			return (true);
+			k = TOKEN_STRING;
 		}
-		bool	expect(token_kind* kinds, u64 kinds_n) {
-			for (u64 i = 0ul; i < kinds_n; ++i)
-				if (accept(kinds[i])) return (true);
-			token		fail_tok = peek();
-			location	fail_loc = fail_tok.loc;
-			std::cerr << TERMINAL_COLOR_WHITE "(todo):" << fail_loc.line << ':' << fail_loc.column << ": " TERMINAL_NOTICE_ERROR ": " TERMINAL_STYLE_RESET;
-			std::cerr << "expected any of [";
-			for (u64 i = 0; i < kinds_n; ++i) {
-				std::cerr << '`' << kinds[i] << '`';
-				if (i + 1 < kinds_n) std::cerr << ',' << ' ';
-			}
-			std::cerr << "], got " << fail_tok.text << " instead" << std::endl;
-			return (false);
+		else if (is_digit(b)) {
+			l.next_byte_while(is_digit);
+			k = TOKEN_NUMBER;
 		}
-		bool	expect_recover(token_kind expect_kind, token_kind recover_kind) {
-			if (!expect(expect_kind)) {
-				// u32		restore_index = index;
-				// token	restore_curr = curr;
-				next_while_not(recover_kind);
-				// if (end()) {
-				// 	index = restore_index;
-				// 	curr = restore_curr;
-				// }
-				return (false);
-			}
-			return (true);
+		else if (is_identifier_prefix(b)) {
+			l.next_byte_while(is_identifier_infix);
+			k = TOKEN_IDENT;
+			if (l.peek_text() == "true")
+				k = TOKEN_TRUE;
+			if (l.peek_text() == "false")
+				k = TOKEN_FALSE;
 		}
-		bool	expect_recover(token_kind* expect_kinds, u64 expect_kinds_n, token_kind recover_kind) {
-			if (!expect(expect_kinds, expect_kinds_n)) {
-				// u32		restore_index = index;
-				// token	restore_curr = curr;
-				next_while_not(recover_kind);
-				// if (end()) {
-				// 	index = restore_index;
-				// 	curr = restore_curr;
-				// }
-				return (false);
-			}
-			return (true);
-		}
+	
+		token		t = l.next_token(k);
+		tokens.push(t);
+	}
+	token	eof = l.next_token(TOKEN_EOF);
+	tokens.push(eof);
+	return (true);
+}
 
-		static bool	process(dynamic_tokens& tokens, value_table& document) {
-			parser	p(tokens, document);
-			return (parse_document(p));
-		};
-	};
+/* Value */
 
+toml::value::value(void): kind(VALUE_INVALID), data() {
+}
+toml::value::~value(void) {
+}
+
+toml::value::value(value_number v): kind(VALUE_NUMBER) {
+	data.number = v;
+};
+toml::value::value(value_boolean v): kind(VALUE_BOOLEAN) {
+	data.boolean = v;
+};
+toml::value::value(value_string* v): kind(VALUE_STRING) {
+	data.string = v;
+};
+toml::value::value(value_array* v): kind(VALUE_ARRAY) {
+	data.array = v;
+};
+toml::value::value(value_table* v): kind(VALUE_TABLE) {
+	data.table = v;
+};
+
+void	toml::value::free(void) {
+	switch (kind) {
+		case VALUE_STRING: {
+			data.string->free();
+			delete data.string;
+		} break ;
+		case VALUE_ARRAY: {
+			value_array&	array = *data.array;
+			for (u32 i = 0u; i < array.len; ++i)
+				array[i].free();
+			
+			array.free();
+			delete data.array;
+		} break ;
+		case VALUE_TABLE: {
+			value_table&	table = *data.table;
+			toml::value_table::iterator	iter(table);
+			for (bool ok = iter.next(); ok; ok = iter.next()) {
+				toml::value& value = iter.item->value;
+				value.free();
+			}
+			table.free();
+			delete data.table;
+		} break ;
+		case VALUE_NUMBER:
+		case VALUE_BOOLEAN:
+		case VALUE_INVALID:
+		default: { } break ;
+	}
+}
+
+/* Parser */
+toml::parser::parser(toml::token_array& tokens, toml::value_table& document): tokens(tokens), document(&document), scope(&document), index(), curr(), ok(true) {
+}
+toml::parser::~parser(void) {
+}
+
+bool		toml::parser::end(void) const {
+	return (index >= tokens.len || tokens[index].kind == TOKEN_EOF || tokens[index].kind == TOKEN_INVALID);
+};
+toml::token	toml::parser::peek(void) const {
+	if (end()) return (token(TOKEN_EOF));
+	return (tokens[index]);
+};
+
+toml::token	toml::parser::next(void) {
+	curr = peek();
+	if (!end())
+		index++;
+	return (curr);
+};
+
+u32			toml::parser::next_while(toml::token_kind delimiter) {
+	u32			count = 0u;
+	while (!end()) {
+		token	t = peek();
+		if (t.kind != delimiter) break ;
+		else next();
+	}
+	return (count);
+}
+
+u32			toml::parser::next_while_not(toml::token_kind delimiter) {
+	u32			count = 0u;
+	while (!end()) {
+		token	t = peek();
+		if (t.kind == delimiter) break ;
+		else next();
+	}
+	return (count);
+}
+u32			toml::parser::next_while_not(toml::parser::parser_predicate predicate) {
+	u32			count = 0u;
+	while (!end()) {
+		token	t = peek();
+		if (!predicate(t.kind)) break ;
+		else next();
+	}
+	return (count);
+}
+
+bool		toml::parser::accept(toml::token_kind kind) {
+	token	t = peek();
+	if (t.kind == kind)
+		return (next(), true);
+	return (false);
+}
+
+bool		toml::parser::expect(toml::token_kind kind) {
+	if (!accept(kind)) {
+		token		fail_tok = peek();
+		location	fail_loc = fail_tok.loc;
+		std::cerr << TERMINAL_COLOR_WHITE "(todo):" << fail_loc.line << ':' << fail_loc.column << ": " TERMINAL_NOTICE_ERROR ": " TERMINAL_STYLE_RESET;
+		std::cerr << "expected `" << kind << "`, got " << fail_tok.text << " instead" << std::endl;
+		return (false);
+	}
+	return (true);
+}
+bool		toml::parser::expect(toml::token_kind* kinds, u64 kinds_n) {
+	for (u64 i = 0ul; i < kinds_n; ++i)
+		if (accept(kinds[i])) return (true);
+	token		fail_tok = peek();
+	location	fail_loc = fail_tok.loc;
+	std::cerr << TERMINAL_COLOR_WHITE "(todo):" << fail_loc.line << ':' << fail_loc.column << ": " TERMINAL_NOTICE_ERROR ": " TERMINAL_STYLE_RESET;
+	std::cerr << "expected any of [";
+	for (u64 i = 0; i < kinds_n; ++i) {
+		std::cerr << '`' << kinds[i] << '`';
+		if (i + 1 < kinds_n) std::cerr << ',' << ' ';
+	}
+	std::cerr << "], got " << fail_tok.text << " instead" << std::endl;
+	return (false);
+}
+
+bool		toml::parser::expect_recover(toml::token_kind expect_kind, toml::token_kind recover_kind) {
+	if (!expect(expect_kind)) {
+		// u32		restore_index = index;
+		// token	restore_curr = curr;
+		next_while_not(recover_kind);
+		// if (end()) {
+		// 	index = restore_index;
+		// 	curr = restore_curr;
+		// }
+		return (false);
+	}
+	return (true);
+}
+bool		toml::parser::expect_recover(toml::token_kind* expect_kinds, u64 expect_kinds_n, toml::token_kind recover_kind) {
+	if (!expect(expect_kinds, expect_kinds_n)) {
+		// u32		restore_index = index;
+		// token	restore_curr = curr;
+		next_while_not(recover_kind);
+		// if (end()) {
+		// 	index = restore_index;
+		// 	curr = restore_curr;
+		// }
+		return (false);
+	}
+	return (true);
+}
+
+bool		toml::parser::process(toml::token_array& tokens, toml::value_table& document) {
+	parser	p(tokens, document);
+	return (parse_document(p));
+};
+
+namespace toml {
 	bool	parse_value_boolean(parser& p, value* val, const token& tok) {
 		if (tok.kind == TOKEN_TRUE || tok.kind == TOKEN_FALSE) {
 			if (tok.kind == TOKEN_TRUE) { val->data.boolean = true; }
@@ -544,7 +502,7 @@ namespace toml {
 				if (p.end() || tok.kind == TOKEN_TABLE_INLINE_CLOSE) break ;
 
 				if (!p.expect_recover(TOKEN_IDENT, TOKEN_TABLE_INLINE_CLOSE)) break ; // TODO(xenobas): this skips all further entries until end of dict :/
-				if (!parse_key_value(p, table)) break ;
+				if (!parse_keyval(p, table)) break ;
 				comma_seen = p.accept(TOKEN_COMMA);
 				if (!comma_seen) break ;
 			}
@@ -592,7 +550,7 @@ namespace toml {
 		array.push(value(slot));
 		return (p.scope = slot, true);
 	}
-	bool	parse_key_value(parser& p, value_table* scope = nullptr) {
+	bool	parse_keyval(parser& p, value_table* scope = nullptr) {
 		value	val;
 		token	key = p.curr;
 
@@ -625,7 +583,7 @@ namespace toml {
 			return (p.expect(delimit, delimit_n));
 		}
 		else if (tok.kind == TOKEN_IDENT) {
-			if (!parse_key_value(p)) return (false);
+			if (!parse_keyval(p)) return (false);
 			return (p.expect(delimit, delimit_n));
 		}
 		return (false);
@@ -636,87 +594,8 @@ namespace toml {
 		return (p.ok);
 	}
 
-	bool	process(const string source, toml::dynamic_tokens& tokens, toml::value_table* scope) {
+	bool	process(const string source, toml::token_array& tokens, toml::value_table* scope) {
 		if (!toml::lexer::process(tokens, source)) return (false);
 		return (toml::parser::process(tokens, *scope));
 	}
 };
-std::ostream&	operator<<(std::ostream& stream, const toml::token_kind& kind) {
-	switch (kind) {
-		case toml::TOKEN_INVALID: return (stream << "token::invalid");
-		case toml::TOKEN_ASSIGN: return (stream << "token::assign");
-		case toml::TOKEN_COMMA: return (stream << "token::comma");
-		case toml::TOKEN_NEWLINE: return (stream << "token::newline");
-		case toml::TOKEN_TABLE_INLINE_OPEN: return (stream << "token::table_inline_open");
-		case toml::TOKEN_TABLE_INLINE_CLOSE: return (stream << "token::table_inline_close");
-		case toml::TOKEN_ARRAY_OPEN: return (stream << "token::array_open");
-		case toml::TOKEN_ARRAY_CLOSE: return (stream << "token::array_close");
-		case toml::TOKEN_STRING: return (stream << "token::string");
-		case toml::TOKEN_NUMBER: return (stream << "token::number");
-		case toml::TOKEN_IDENT: return (stream << "token::identifier");
-		case toml::TOKEN_TRUE: return (stream << "token::true");
-		case toml::TOKEN_FALSE: return (stream << "token::false");
-		case toml::TOKEN_EOF: return (stream << "token::eof");
-		default: return (stream << "token::unknown(" << (i32)kind << ')');
-	}
-}
-std::ostream&	operator<<(std::ostream& stream, const toml::value_kind& kind) {
-	switch (kind) {
-		case toml::VALUE_INVALID: return (stream << "value::invalid");
-		case toml::VALUE_NUMBER: return (stream << "value::number");
-		case toml::VALUE_BOOLEAN: return (stream << "value::boolean");
-		case toml::VALUE_STRING: return (stream << "value::string");
-		case toml::VALUE_ARRAY: return (stream << "value::array");
-		case toml::VALUE_TABLE: return (stream << "value::table");
-		default: return (stream << "value::unknown");
-	}
-}
-std::ostream&	operator<<(std::ostream& stream, const toml::token& token) {
-	return (stream << '{' << ' ' << token.kind << ',' << ' ' << token.text << ' ' << '}');
-}
-std::ostream&	operator<<(std::ostream& stream, const toml::value& value) {
-	switch (value.kind) {
-		case toml::VALUE_INVALID: return (stream << "value::invalid");
-		case toml::VALUE_NUMBER: return (stream << "value::number(" << value.data.number << ')');
-		case toml::VALUE_BOOLEAN: return (stream << "value::boolean(" << (value.data.boolean ? "true" : "false") << ')');
-		case toml::VALUE_STRING: return (stream << "value::string(" << *value.data.string << ')');
-		case toml::VALUE_ARRAY: {
-			stream << "value::array[";
-			for (u32 i = 0u; i < value.data.array->len; ++i) {
-				stream << (*value.data.array)[i];
-				if (i + 1 < value.data.array->len)
-					stream << ',' << ' ';
-			}
-			stream << ']';
-			return (stream);
-		} break ;
-		case toml::VALUE_TABLE: {
-			toml::value_table::iterator	iter = toml::value_table::iterator(*value.data.table);
-			stream << "value::table{ ";
-			for (bool ok = iter.next(); ok;) {
-				const toml::string& key = iter.item->key;
-				const toml::value& value = iter.item->value;
-				stream << key << " = " << value;
-
-				ok = iter.next();
-				if (ok) stream << ',' << ' ';
-			}
-			stream << ' ' << '}';
-			return (stream);
-		} break ;
-		default: return (stream << "value::unknown");
-	}
-}
-
-i32	main_toml(i32 argc, type::cstring* argv) {
-	((void)argc, (void)argv);
-	const toml::string		source = "[[webserv]]\ntest= 123 #test\ngood = \"good\"";
-	toml::dynamic_tokens	tokens;
-	toml::value				scope(new toml::value_table);
-	if (!toml::process(source, tokens, scope.data.table))
-		std::cerr << "An error has occurred during parsing..." << std::endl;
-	std::cout << scope << std::endl;
-	scope.free();
-	tokens.free();
-	return (0);
-}
