@@ -64,6 +64,14 @@ bool					type::string::operator==(const string& rhs) const {
 	return (find(rhs) == 0);
 }
 
+bool					type::string::operator!=(cstring rhs) const {
+	return (!(*this == string(rhs)));
+}
+
+bool					type::string::operator!=(const string& rhs) const {
+	return (!(*this == rhs));
+}
+
 type::string::operator	bool() const {
 	return (data != nullptr && len > 0u);
 }

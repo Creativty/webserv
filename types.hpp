@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/13 15:31:05 by aindjare          #+#    #+#             */
-/*   Updated: 2025/09/16 16:08:37 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/09/17 16:05:09 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -60,6 +60,8 @@ namespace type {
 		const byte&			operator[](u64) const;
 		bool				operator==(cstring) const;
 		bool				operator==(const string&) const;
+		bool				operator!=(cstring) const;
+		bool				operator!=(const string&) const;
 
 		void				free(void);
 		string				clone(void) const;
