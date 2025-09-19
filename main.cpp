@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/13 17:00:44 by aindjare          #+#    #+#             */
-/*   Updated: 2025/09/17 16:17:07 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/09/19 19:44:49 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,6 +19,7 @@
 #include <cstring>
 
 #include "types.hpp"
+#include "http.hpp"
 #include "toml.hpp"
 #include "terminal.hpp"
 
@@ -115,7 +116,23 @@ bool	load_config_file(type::cstring cmdname, type::cstring confpath, type::dynam
 	return (root.free(), tokens.free(), parse_ok);
 }
 
+#include <unistd.h>
+
 i32	main(i32 argc, type::cstring *argv) {
+	if (argc == 1) {
+		http::request	req;
+		byte			bytes[1024] = { 0 };
+		ssize_t			bytes_n = read(0, bytes, 1024);
+		if (bytes_n == -1)
+			return (2);
+
+		if (!http::request::parse(req, bytes, (u32)bytes_n))
+			return (4);
+		std::cout << req.method.string << std::endl;
+		std::cout << req.uri << std::endl;
+		std::cout << req.version << std::endl;
+		return (0);
+	}
 	if (argc != 2) {
 		std::cerr << TERMINAL_COLOR_WHITE << argv[0] << ": " TERMINAL_NOTICE_ERROR TERMINAL_STYLE_RESET ": Incorrect number of arguments passed" << std::endl;
 		std::cerr << "\tUsage: " << argv[0] << " <FILE>" << std::endl;
