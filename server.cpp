@@ -15,6 +15,7 @@
 #include <sstream>
 #include <limits.h>
 #include <sys/wait.h>
+#include <cstdlib>
 
 
 static std::map<int, int> cgi_map;
@@ -66,8 +67,8 @@ std::string getFileExtension(const std::string& type) {
     if (type == " video/x-msvideo")          	return ".avi";
     if (type == " video/quicktime")          	return ".mov";
     if (type == " video/x-matroska")         	return ".mkv";
- 
-    // Fonts	 
+    
+	// Fonts	 
     if (type == " font/ttf")                 	return ".ttf";
     if (type == " font/otf")                 	return ".otf";
     if (type == " font/woff")                	return ".woff";
@@ -187,15 +188,41 @@ std::string generateRandomFileName(std::string ext){
     return oss.str();
 }
 
+
+
+std::string	getMethod(http::HTTP_Method method){
+	if (method == http::HTTP_METHOD_DELETE) return "DELETE";
+	if (method == http::HTTP_METHOD_POST) return "POST";
+	if (method == http::HTTP_METHOD_GET) return "GET";
+	return "";
+}
+
+
+
+void PrepareEnvirement(http::Request request){
+	if(setenv("REQUEST_METHOD", getMethod(request.method).c_str(), 1))
+		std::cerr << "Error setting environment variable" << std::endl;
+
+	std::map<std::string, std::string>::const_iterator it;
+	for(it = request.headers.begin(); it != request.headers.end(); it++){
+		std::string tmp = it->first;
+		for (size_t i=0 ; i < tmp.length(); i++){
+			if (tmp[i] == '-') tmp[i] = '_';
+			tmp[i] = static_cast<char>(std::toupper(static_cast<unsigned char>(tmp[i])));
+		}
+		std::cout<< tmp << "=" << (it->second).substr(1) << std::endl;
+		if(setenv(tmp.c_str(), it->second.c_str(), 1))
+			std::cerr << "Error setting environment variable" << std::endl;
+    }
+}
+
+
+
 int methods(http::Request request, int new_socket, struct server server, int epfd){
     std::string path = url_decode(request.uri);
     bool file_ok;
 
     if (request.uri.find("/favicon.ico") == 0) return(1);
-
-
-
-
 
 
 
@@ -208,17 +235,19 @@ int methods(http::Request request, int new_socket, struct server server, int epf
 		server.config.cgi_path = server.config.cgi_path.substr(1);
 		std::cout << path << std::endl;
 		if (dirExists(server.config.cgi_path)){
-			// std::string inFileName = generateRandomFileName(".in");
-			// int tmpFd = open(inFileName.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-			// if (tmpFd < 0)
-			// 	perror("open file");
-			// write(tmpFd, request.body.c_str(), request.body.length());
-			// close(tmpFd);
-			
-			// std::string outFileName = generateRandomFileName(".out");
-			// int outFd = open(outFileName.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0644);
-			// if (outFd < 0)
-			// 	perror("open file");
+
+			std::string typ = " " + getContentType(path);
+			std::string ext = getFileExtension(typ);
+			char *argv[] = {
+				(char*)server.config.cgi_scripts[ext].c_str(),
+				(char*)path.c_str(),
+				NULL
+			};
+			if (strlen(argv[0]) == 0){
+				return 0;
+			}
+
+			PrepareEnvirement(request);
 
 			int inPipe[2], outPipe[2];
 			if (pipe(inPipe) == -1 || pipe(outPipe) == -1)
@@ -226,9 +255,9 @@ int methods(http::Request request, int new_socket, struct server server, int epf
 						
 			int pid = fork();
 			if (pid < 0) return(perror("fork"), 1);
+
 			if (pid == 0){
 				if (request.method == http::HTTP_METHOD_POST){
-					//when i use send nothing writing in inPipe[1]
 					write(inPipe[1], request.body.c_str(), request.body.length());
 				}
 				close(inPipe[1]);
@@ -242,12 +271,6 @@ int methods(http::Request request, int new_socket, struct server server, int epf
 				close(outPipe[1]);
 
 
-				
-				char *argv[] = {
-					(char*)server.config.cgi_interpreter.c_str(),
-				    (char*)path.c_str(),
-				    NULL
-				};
 				
 				execv(argv[0], argv);
 				perror("execv");
@@ -264,17 +287,6 @@ int methods(http::Request request, int new_socket, struct server server, int epf
 				epoll_ctl(epfd, EPOLL_CTL_ADD, outPipe[0], &ev);
 
 				cgi_map[outPipe[0]] = new_socket;
-
-				// char buffer[1024 * 1024];
-				// std::memset(buffer, 0, sizeof(buffer));
-				// ssize_t valread = recv(outPipe[0], buffer, sizeof(buffer), MSG_DONTWAIT);
-				// close(outPipe[0]);
-
-				// std::cout << "file content: \n" << buffer << std::endl;
-				// if (valread > 0){         
-				// 	http_respond_html(new_socket, "200 OK", "text/pain", buffer);
-				// }
-
 			}
 		}
 		return 3;
@@ -324,21 +336,23 @@ int methods(http::Request request, int new_socket, struct server server, int epf
 		}
 		return 0;
     }
-    if (request.uri.find("/DELETE?data=") == 0){
-        path = url_decode(request.uri.substr(13));
+    if (request.method == http::HTTP_METHOD_DELETE){
+		path = url_decode(request.uri.substr(1));
+		printf("\n\n%s\n%s\n\n",request.uri.c_str() ,path.c_str());
         if (access(path.c_str(), F_OK)){
             http_respond_html(new_socket, "404 Not Found", "text/pain", "");
-            close(new_socket);
             std::cout << "ERROR: cannot open " << path << std::endl;
-            return(1);
         }else{
             if (remove(path.c_str())){
-                http_respond_html(new_socket, "403 Forbidden", "text/pain", "");
-                close(new_socket);
-                return(1);
-            }
-            return(0);
+
+				bool				file_html_ok;
+				const std::string	file_html = read_entire_file("pages/403.html", &file_html_ok);
+				assert(file_html_ok && "could not load template html file");
+                http_respond_html(new_socket, "403 Forbidden", "text/html", file_html);
+            }else
+				http_respond_html(new_socket, "204 No Content", "text/pain", "");
         }
+		return(1);
     }
     if (request.uri.find("/GET?data=") == 0){
         path = url_decode(request.uri.substr(10));
@@ -390,7 +404,6 @@ int handle_requests(struct server *servers, int epfd, sockaddr_in address, size_
 					perror("In accept");
 					return EXIT_FAILURE;
 				}
-				// fcntl(new_socket, F_SETFL, O_NONBLOCK);
 
 				struct epoll_event client_ev;
 				client_ev.events = EPOLLIN;
@@ -412,13 +425,7 @@ int handle_requests(struct server *servers, int epfd, sockaddr_in address, size_
 					std::cout << "client_fd: \n" << client_fd << std::endl;
 					std::cout << "fd: \n" << fd << std::endl;
 					std::cout << "file content: \n" << buffer << std::endl;
-					// std::string	response_line = "HTTP/1.0 200 OK\r\n";
-					// std::string	headers = "Content-Type: text/html\r\n"
-					// "\r\n";
-					// ::send(client_fd, response_line.c_str(), response_line.size(), MSG_DONTWAIT);
-					// ::send(client_fd, headers.c_str(), headers.size(), MSG_DONTWAIT);
-					::send(client_fd, buffer, sizeof(buffer), MSG_DONTWAIT);
-					// http_respond_html(client_fd, "200 OK", "text/html", buffer);
+					http_respond_html(client_fd, "200 OK", "text/html", buffer);
 				}
 				else{
 					std::cout << "\nnothing to read\n\n";
@@ -432,9 +439,6 @@ int handle_requests(struct server *servers, int epfd, sockaddr_in address, size_
 				char buffer[1024 * 1024];
 				std::memset(buffer, 0, sizeof(buffer));
 				ssize_t valread = recv(fd, buffer, sizeof(buffer), MSG_DONTWAIT);
-
-				// std::cout << " the buffer :\n'" << buffer << "'\n";
-
 
 				sockaddr_in local_addr;
 				socklen_t len = sizeof(local_addr);
@@ -463,6 +467,7 @@ int handle_requests(struct server *servers, int epfd, sockaddr_in address, size_
 					}
 					http_respond_html(fd,"200 OK", "text/html", file_html);
 					epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
+					::close(cgi_map[fd]);
 					::close(fd);
 				} else {
 					std::cout << "No bytes are there to read" << std::endl;
@@ -489,6 +494,8 @@ int	setup_servers(struct server *server, int num_server, toml::Config *config){
 	for (int i = 0; i < num_server; i++){
 		server[i].fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
 		server[i].config = config[i];
+
+
 		struct sockaddr_in address;
 		size_t addrlen = sizeof(address);
 		
@@ -524,22 +531,19 @@ void setup_config(toml::Config *config){
 	config[0].host = "127.0.0.1";
 	config[0].upload_dir = "upload";
 	config[0].cgi_path = "/../webserv/";
-	config[0].cgi_interpreter = "/usr/bin/python3";
-	config[0].cgi_extension = ".py";
+	config[0].cgi_scripts[".py"] = "/usr/bin/python3"; 
+	config[0].cgi_scripts[".php"] = "/usr/bin/php"; 
 	
 	config[1].port = 8081;
 	config[1].host = "127.0.0.1";
 	config[1].upload_dir = "upload1";
 	config[1].cgi_path = "/../webserv/";
-	config[1].cgi_interpreter = "/usr/bin/python3";
-	config[1].cgi_extension = ".py";
 	
 	config[2].port = 8082;
 	config[2].host = "127.0.0.1";
 	config[2].upload_dir = "upload2";
 	config[2].cgi_path = "/../webserv/";
 	config[2].cgi_interpreter = "/usr/bin/python3";
-	config[2].cgi_extension = ".py";
 }
 
 int server() {
@@ -571,7 +575,8 @@ int server() {
 
 	handle_requests(servers, epfd, address, addrlen);
 
-	close(servers[0].fd);
+	for (int i = 0; i < n_ser; i++)
+		close(servers[i].fd);
 
 	return 0;
 }
