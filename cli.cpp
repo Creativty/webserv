@@ -6,14 +6,14 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:16:13 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/27 14:01:05 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/10/27 14:43:40 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "webserv.hpp"
-#include <cstdarg>
 
 string_view		CLI_exec_path = "<CLI_exec_path>";
+b32				CLI_is_tty = 0;
 
 void			CLI_debug_internal(const char* file, i32 line, const char *fmt, ...) {
 #ifdef WEBSERV_DEBUG
@@ -41,7 +41,11 @@ void			CLI_show_help(FILE* stream) {
 void			CLI_show_extra(const char* prefix, const char* fmt, ...) {
 	va_list	args;
 	va_start(args, fmt);
-	fprintf(stderr, "    " TERMINAL_COLOR_WHITE "%s" TERMINAL_STYLE_RESET": ", prefix);
+	if (CLI_is_tty) {
+		fprintf(stderr, "    " TERMINAL_COLOR_WHITE "%s" TERMINAL_STYLE_RESET": ", prefix);
+	} else {
+		fprintf(stderr, "    %s: ", prefix);
+	}
 	vfprintf(stderr, fmt, args);
 	fprintf(stderr, "\n");
 	va_end(args);
@@ -50,14 +54,17 @@ void			CLI_show_extra(const char* prefix, const char* fmt, ...) {
 static void		CLI_show_error_file(const char* fmt, ...) {
 	va_list	args;
 	va_start(args, fmt);
-	fprintf(stderr, "%.*s: " TERMINAL_COLOR_RED "File Error" TERMINAL_STYLE_RESET ": ", CLI_exec_path.len, CLI_exec_path.text);
+	if (CLI_is_tty) {
+		fprintf(stderr, "%.*s: " TERMINAL_COLOR_RED "File Error" TERMINAL_STYLE_RESET ": ", CLI_exec_path.len, CLI_exec_path.text);
+	} else {
+		fprintf(stderr, "%.*s: File Error: ", CLI_exec_path.len, CLI_exec_path.text);
+	}
 	vfprintf(stderr, fmt, args);
 	fprintf(stderr, "\n");
 	va_end(args);
 }
 void			CLI_show_error_file_ext(string_view file_path) {
 	CLI_show_error_file("Input file name \"%.*s\" does not end in \".toml\"", file_path.len, file_path.text);
-	// fprintf(stderr, "%.*s: CLI Error: Input file name \"%.*s\" must end in \".toml\"\n", CLI_exec_path.len, CLI_exec_path.text, file_path.len, file_path.text);
 }
 void			CLI_show_error_file_access(string_view file_path) {
 	CLI_show_error_file("Could not access file at \"%.*s\"", file_path.len, file_path.text);
@@ -78,7 +85,11 @@ void			CLI_show_error_file_mode(string_view file_path, mode_t mode) {
 void			CLI_show_error_syntax(const Position pos, const char* fmt, ...) {
 	va_list	args;
 	va_start(args, fmt);
-	fprintf(stderr, "%.*s:%d:%d: " TERMINAL_COLOR_RED "Syntax Error" TERMINAL_STYLE_RESET ": ", pos.file.len, pos.file.text, pos.col, pos.row);
+	if (CLI_is_tty) {
+		fprintf(stderr, "%.*s:%d:%d: " TERMINAL_COLOR_RED "Syntax Error" TERMINAL_STYLE_RESET ": ", pos.file.len, pos.file.text, pos.col, pos.row);
+	} else {
+		fprintf(stderr, "%.*s:%d:%d: Syntax Error: ", pos.file.len, pos.file.text, pos.col, pos.row);
+	}
 	vfprintf(stderr, fmt, args);
 	fprintf(stderr, "\n");
 	va_end(args);
@@ -86,12 +97,19 @@ void			CLI_show_error_syntax(const Position pos, const char* fmt, ...) {
 void			CLI_show_error_config(const Position pos, const char* fmt, ...) {
 	va_list	args;
 	va_start(args, fmt);
-	fprintf(stderr, "%.*s:%d:%d: " TERMINAL_COLOR_RED "Config Error" TERMINAL_STYLE_RESET ": ", pos.file.len, pos.file.text, pos.col, pos.row);
+	if (CLI_is_tty) {
+		fprintf(stderr, "%.*s:%d:%d: " TERMINAL_COLOR_RED "Config Error" TERMINAL_STYLE_RESET ": ", pos.file.len, pos.file.text, pos.col, pos.row);
+	} else {
+		fprintf(stderr, "%.*s:%d:%d: Config Error: ", pos.file.len, pos.file.text, pos.col, pos.row);
+	}
 	vfprintf(stderr, fmt, args);
 	va_end(args);
 }
 
 void			CLI_show_error_toml_line(const TOML_Document& document, const Position& pos) {
+	if (!CLI_is_tty)
+		return ;
+
 	string_view	source = document.lexer.source;
 
 	i32			line_begin = pos.index;
@@ -102,8 +120,8 @@ void			CLI_show_error_toml_line(const TOML_Document& document, const Position& p
 	}
 
 	i32			line_end = pos.index;
-	while (source.len > line_end + 1) {
-		if (source[line_end + 1] == '\n')
+	while (source.len > line_end) {
+		if (source[line_end] == '\n')
 			break ;
 		line_end++;
 	}
@@ -111,12 +129,23 @@ void			CLI_show_error_toml_line(const TOML_Document& document, const Position& p
 	i32			col_space = 5;
 
 	string_view	line = source.slice(line_begin, line_end);
-	fprintf(stderr, "%*d |    %.*s\n", col_space, pos.col, line.len, line.text);
+	fprintf(stderr, "%*d |    ", col_space, pos.col);
+	for (i32 i = 0; i < line.len; ++i) {
+		if (line[i] == '\t') {
+			fprintf(stderr, TERMINAL_COLOR_BLACK "\\>  " TERMINAL_STYLE_RESET);
+		} else {
+			fprintf(stderr, "%c", line[i]);
+		}
+	}
+	fprintf(stderr, "\n");
 
-	i32	cursor = line_begin - 4;
-	fprintf(stderr, "%*s |", col_space, "");
+	i32	cursor = line_begin;
+	fprintf(stderr, "%*s |    ", col_space, "");
 	while (cursor < pos.index) {
 		fprintf(stderr, " ");
+		if (source[cursor] == '\t') {
+			fprintf(stderr, "   ");
+		}
 		cursor++;
 	}
 	fprintf(stderr, "^\n");
@@ -130,6 +159,11 @@ void			CLI_show_error_toml_parse(const TOML_Document& document) {
 		case TOML_ERROR_LOAD_BYTES: {
 			string_view	file = document.file;
 			CLI_show_error_file("Could not load bytes from \"%.*s\"", file.len, file.text);
+		} break;
+		case TOML_ERROR_TOKEN_INVALID: {
+			char	b = document.lexer.source[err.pos.index];
+			CLI_show_error_syntax(err.pos, "Invalid byte '%c': 0x%02X", b, b);
+			CLI_show_error_toml_line(document, err.pos);
 		} break;
 		case TOML_ERROR_TOKEN_UNTERMINATED: {
 			CLI_show_error_syntax(err.pos, "Unterminated string");

@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:51:12 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/27 13:34:57 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/10/27 14:27:11 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -125,6 +125,7 @@ static TOML_Token	TOML_lexer_token(TOML_Document& document) {
 
 	Position		pos = lexer.pos;
 	TOML_Token_Kind	kind = TOML_TOKEN_INVALID;
+
 	byte			b = TOML_lexer_next(lexer);
 	if (b == '\n') {
 		kind = TOML_TOKEN_EOL;
@@ -190,6 +191,10 @@ static TOML_Token	TOML_lexer_token(TOML_Document& document) {
 		}
 
 		kind = TOML_TOKEN_NUMBER;
+	} else {
+		TOML_error(document, TOML_ERROR_TOKEN_INVALID, pos);
+
+		kind = TOML_TOKEN_INVALID;
 	}
 
 	string_view	str = lexer.source.slice(pos.index, lexer.pos.index);
@@ -228,7 +233,13 @@ TOML_Document		TOML_parse_file(const string_view& file) {
 	TOML_Document	document = TOML_make(file);
 
 	TOML_step_load_bytes(document);
+	if (document.errors.len == 0)
+		CLI_debug("TOML loaded %d bytes.", document.bytes.len);
+
 	TOML_step_tokenize(document);
+	if (document.errors.len == 0)
+		CLI_debug("TOML lexer collected %d tokens.", document.tokens.len);
+
 	TOML_step_parse(document);
 
 	document.ok = (document.errors.len == 0);

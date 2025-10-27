@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:45:19 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/27 13:44:10 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/10/27 14:15:14 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,7 @@
 
 i32	main(i32 argc, cstring argv[]) {
 	CLI_exec_path = argv[0];
+	CLI_is_tty = isatty(STDOUT_FILENO);
 
 	if (argc != 2 || string_view("--help") == argv[1]) {
 		CLI_show_help(argc == 2 ? stderr : stdout);
@@ -42,7 +43,6 @@ i32	main(i32 argc, cstring argv[]) {
 		TOML_delete(document);
 		return (4);
 	}
-	CLI_debug("Lexer collected %d tokens.", document.tokens.len);
 
 	TOML_delete(document);
 	return (0);

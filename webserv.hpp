@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/27 13:48:27 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/10/27 14:13:20 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,6 +20,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <cstdarg>
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -74,6 +75,9 @@ enum TOML_Error_Kind {
 	TOML_ERROR_INVALID,
 
 	TOML_ERROR_LOAD_BYTES,
+
+	/* Tokenizer */
+	TOML_ERROR_TOKEN_INVALID,
 	TOML_ERROR_TOKEN_UNTERMINATED,
 };
 
@@ -164,6 +168,7 @@ struct WEBSERV_Config {
 typedef dynamic_array<WEBSERV_Config>	WEBSERV_Config_Array;
 
 extern string_view		CLI_exec_path;
+extern b32				CLI_is_tty;
 
 b32				OS_read_file(const string_view path, dynamic_array<byte>& out_data);
 b32				OS_stat_file(const string_view& path, struct stat* buf = 0);
