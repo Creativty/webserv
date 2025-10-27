@@ -1,24 +1,35 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   terminal.hpp                                       :+:      :+:    :+:   */
+/*   base.hpp                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/09/16 16:14:58 by aindjare          #+#    #+#             */
-/*   Updated: 2025/09/16 16:14:59 by aindjare         ###   ########.fr       */
+/*   Created: 2025/10/17 15:56:46 by aindjare          #+#    #+#             */
+/*   Updated: 2025/10/26 16:03:42 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef   TERMINAL_HPP
-#define   TERMINAL_HPP
+#ifndef BASE_HPP
+#define BASE_HPP
 
-#define TERMINAL_COLOR_RED "\x1b[1;31m"
-#define TERMINAL_COLOR_GREEN "\x1b[1;32m"
-#define TERMINAL_COLOR_WHITE "\x1b[1;37m"
-#define TERMINAL_COLOR_YELLOW "\x1b[1;33m"
-#define TERMINAL_STYLE_RESET "\x1b[0m"
+#include <stdint.h>
 
-#define TERMINAL_NOTICE_ERROR TERMINAL_COLOR_RED "error"
+#define cast(T) (T)
+#define unused(V) ((void)(V))
 
-#endif /* TERMINAL_HPP */
+typedef int8_t		i8;
+typedef int16_t		i16;
+typedef int32_t		i32;
+typedef int64_t		i64;
+
+typedef uint8_t		u8;
+typedef uint16_t	u16;
+typedef uint32_t	u32;
+typedef uint64_t	u64;
+
+typedef u8			byte;
+typedef i32			b32;
+typedef const char*	cstring;
+
+#endif

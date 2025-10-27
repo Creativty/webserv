@@ -5,143 +5,34 @@
 /*                                                    +:+ +:+         +:+     */
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/09/13 17:00:44 by aindjare          #+#    #+#             */
-/*   Updated: 2025/09/19 19:44:49 by aindjare         ###   ########.fr       */
+/*   Created: 2025/10/26 15:45:19 by aindjare          #+#    #+#             */
+/*   Updated: 2025/10/27 10:42:50 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <string>
-#include <fstream>
-#include <sstream>
-#include <iostream>
+#include "webserv.hpp"
 
-#include <cerrno>
-#include <cstring>
+i32	main(i32 argc, cstring argv[]) {
+	CLI_exec_path = argv[0];
 
-#include "types.hpp"
-#include "http.hpp"
-#include "toml.hpp"
-#include "terminal.hpp"
-
-namespace file {
-	bool	read(const char* in_path, std::string& out_string) {
-		std::ifstream		in_stream(in_path);
-		std::stringstream	out_stream;
-
-		if (in_stream.fail())
-			return (false);
-
-		while (in_stream >> out_stream.rdbuf());
-		out_string = out_stream.str();
-		return (true);
-	}
-};
-
-namespace webserv {
-	enum config_kind {
-		CONFIG_VARIANT_INVALID,
-
-		CONFIG_VARIANT_CGI,
-	};
-	struct config_cgi {
-		type::string						path;
-		type::string						extension;
-		type::string						interpreter;
-	};
-	struct config {
-		u16									port;
-		i64									max_num_client;
-		type::dynamic_array<type::string>	hosts;
-
-		config_kind							_kind;
-		union {
-			config_cgi*						cgi;
-		}									_variant;
-	};
-};
-
-bool	load_config_file(type::cstring cmdname, type::cstring confpath, type::dynamic_array<webserv::config>& configs) {
-	std::string		confstr;
-	if (!file::read(confpath, confstr)) {
-		std::cerr << TERMINAL_COLOR_WHITE << cmdname << ": " TERMINAL_NOTICE_ERROR TERMINAL_STYLE_RESET ": Failed while reading file `" << confpath << "`" << std::endl;
-		std::cerr << "\tReason: " << strerror(errno) << std::endl;
-		return (false);
+	if (argc != 2 || string_view("--help") == argv[1]) {
+		CLI_show_help(argc == 2 ? stderr : stdout);
+		return (argc == 2 ? 0 : 1);
 	}
 
-	toml::token_array			tokens;
-	type::string				source = confstr.c_str();
-	toml::value					root(new toml::value_table);
-	if (!toml::process(source, tokens, root.data.table))
-		return (root.free(), tokens.free(), false);
-	if (root.data.table->count == 0u) {
-		std::cerr << TERMINAL_COLOR_WHITE << cmdname << ": " TERMINAL_NOTICE_ERROR TERMINAL_STYLE_RESET ": Disallowed empty config file `" << confpath << "`" << std::endl;
-		return (root.free(), tokens.free(), false);
+	string_view	path_toml = string_view(argv[1]);
+	if (!path_toml.has_suffix(".toml")) {
+		CLI_show_error_file_ext(path_toml);
+		return (2);
 	}
 
-	(void)configs; /* TODO(xenobas): parse configs */
-	toml::value_table::iterator	root_iter(*root.data.table);
-	bool						parse_ok = true;
-	while (root_iter.next()) {
-		toml::string&		key = root_iter.item->key;
-		toml::value&		val = root_iter.item->value;
-		if (key != "webserv") {
-			std::cerr << TERMINAL_COLOR_WHITE << cmdname << ": " TERMINAL_NOTICE_ERROR TERMINAL_STYLE_RESET ": Disallowed key " << key << " usage in `" << confpath << "` global scope" << std::endl;
-			std::cerr << "\tSuggestion: Only [[webserv]] entries are allowed at the global scope" << std::endl;
-			parse_ok = false;
-			continue ;
-		}
-		if (val.kind != toml::VALUE_ARRAY) {
-			std::cerr << TERMINAL_COLOR_WHITE << cmdname << ": " TERMINAL_NOTICE_ERROR TERMINAL_STYLE_RESET ": Disallowed usage of `webserv` key in a `webserv = <value>` statement" << std::endl;
-			std::cerr << "\tSuggestion: Only [[webserv]] entries are allowed at the global scope" << std::endl;
-			parse_ok = false;
-			continue ;
-		}
-		toml::value_array&	arr = *val.data.array;
-		for (u64 i = 0ul; i < arr.len; ++i) {
-			toml::value&	val = arr[i];
-			if (val.kind != toml::VALUE_TABLE) {
-				std::cerr << TERMINAL_COLOR_WHITE << cmdname << ": " TERMINAL_NOTICE_ERROR TERMINAL_STYLE_RESET ": Disallowed usage of `webserv` key in a `webserv = <value>` statement" << std::endl;
-				std::cerr << "\tSuggestion: Only [[webserv]] entries are allowed at the global scope" << std::endl;
-				parse_ok = false;
-				break ;
-			}
-			if (val.data.table->count == 0u) {
-				std::cerr << TERMINAL_COLOR_WHITE << cmdname << ": " TERMINAL_NOTICE_ERROR TERMINAL_STYLE_RESET ": Forbidden empty webserv entry" << std::endl;
-				parse_ok = false;
-				continue ;
-			}
-		}
-		if (parse_ok == false) continue ;
+	struct stat	stat_toml;
+	if (!OS_stat_file(path_toml, &stat_toml) || !OS_access_file(path_toml, R_OK)) {
+		CLI_show_error_file_stat(path_toml);
+		return (2);
 	}
-	return (root.free(), tokens.free(), parse_ok);
-}
-
-#include <unistd.h>
-
-i32	main(i32 argc, type::cstring *argv) {
-	if (argc == 1) {
-		http::request	req;
-		byte			bytes[1024] = { 0 };
-		ssize_t			bytes_n = read(0, bytes, 1024);
-		if (bytes_n == -1)
-			return (2);
-
-		if (!http::request::parse(req, bytes, (u32)bytes_n))
-			return (4);
-		std::cout << req.method.string << std::endl;
-		std::cout << req.uri << std::endl;
-		std::cout << req.version << std::endl;
-		return (0);
-	}
-	if (argc != 2) {
-		std::cerr << TERMINAL_COLOR_WHITE << argv[0] << ": " TERMINAL_NOTICE_ERROR TERMINAL_STYLE_RESET ": Incorrect number of arguments passed" << std::endl;
-		std::cerr << "\tUsage: " << argv[0] << " <FILE>" << std::endl;
-		return (1);
-	}
-
-	type::dynamic_array<webserv::config>	configs;
-	if (!load_config_file(argv[0], argv[1], configs)) {
-		std::cerr << TERMINAL_COLOR_WHITE << argv[0] << ": " TERMINAL_NOTICE_ERROR TERMINAL_STYLE_RESET ": Could not load the provided configuration file `" << argv[1] << "`" << std::endl;
+	if (!(S_ISREG(stat_toml.st_mode))) {
+		CLI_show_error_file_mode(path_toml, stat_toml.st_mode);
 		return (2);
 	}
 
