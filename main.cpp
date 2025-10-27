@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:45:19 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/27 10:42:50 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/10/27 13:44:10 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,13 +28,22 @@ i32	main(i32 argc, cstring argv[]) {
 
 	struct stat	stat_toml;
 	if (!OS_stat_file(path_toml, &stat_toml) || !OS_access_file(path_toml, R_OK)) {
-		CLI_show_error_file_stat(path_toml);
+		CLI_show_error_file_access(path_toml);
 		return (2);
-	}
-	if (!(S_ISREG(stat_toml.st_mode))) {
+	} else if (!(S_ISREG(stat_toml.st_mode))) {
 		CLI_show_error_file_mode(path_toml, stat_toml.st_mode);
 		return (2);
 	}
 
+	TOML_Document	document = TOML_parse_file(path_toml);
+	if (!document.ok) {
+		CLI_show_error_toml_parse(document);
+
+		TOML_delete(document);
+		return (4);
+	}
+	CLI_debug("Lexer collected %d tokens.", document.tokens.len);
+
+	TOML_delete(document);
 	return (0);
 }

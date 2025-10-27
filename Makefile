@@ -6,7 +6,7 @@
 #    By: aindjare <marvin@42.fr>                    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/08/23 15:57:56 by aindjare          #+#    #+#              #
-#    Updated: 2025/09/16 16:06:58 by aindjare         ###   ########.fr        #
+#    Updated: 2025/10/27 13:44:51 by aindjare         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -17,7 +17,7 @@ OBJS		:=	$(SRCS:.cpp=.o)
 DEPS		:=	$(OBJS:.o=.d)
 
 CXX			:=	c++
-CXXFLAGS	:=	-Wall -Wextra -Werror -Wconversion -Wswitch-enum -std=c++98 -g -MMD -MP
+CXXFLAGS	:=	-Wall -Wextra -Werror -Wconversion -Wswitch-enum -std=c++98 -g -MMD -MP $$WEBSERV_DEFINES
 
 all: $(NAME)
 

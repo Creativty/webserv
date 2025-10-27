@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 17:02:26 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/27 10:36:19 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/10/27 13:26:50 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -47,7 +47,7 @@ b32		OS_read_file(const string_view _path, dynamic_array<byte>& out_data) {
 				out_data.push(0);
 		}
 	}
-	return (stream.good());
+	return (!stream.fail());
 }
 
 b32		OS_stat_file(const string_view& _path, struct stat* buf = 0) {

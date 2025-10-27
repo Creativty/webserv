@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/27 10:43:18 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/10/27 13:48:27 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,6 +16,7 @@
 #include "string_view.hpp"
 #include "dynamic_array.hpp"
 #include "hash_table.hpp"
+#include "terminal.hpp"
 
 #include <cstdio>
 #include <cstring>
@@ -34,6 +35,9 @@ struct Position {
 enum TOML_Token_Kind {
 	TOML_TOKEN_INVALID,
 
+	TOML_TOKEN_EOF, // \0
+	TOML_TOKEN_EOL, // \n
+
 	TOML_TOKEN_EQUALS, // =
 	TOML_TOKEN_COMMA, // ,
 
@@ -51,8 +55,8 @@ enum TOML_Token_Kind {
 	TOML_TOKEN_TRUE, // true
 	TOML_TOKEN_FALSE, // false
 
-	TOML_TOKEN_STRING, // ".*"
 	TOML_TOKEN_NUMBER, // [0-9]+
+	TOML_TOKEN_STRING, // ".*"
 };
 
 struct TOML_Token {
@@ -61,9 +65,34 @@ struct TOML_Token {
 	Position		pos;
 };
 
+struct TOML_Tokenizer {
+	Position	pos;
+	string_view	source;
+};
+
+enum TOML_Error_Kind {
+	TOML_ERROR_INVALID,
+
+	TOML_ERROR_LOAD_BYTES,
+	TOML_ERROR_TOKEN_UNTERMINATED,
+};
+
+struct TOML_Error {
+	TOML_Error_Kind	kind;
+
+	Position		pos;
+};
+
 struct TOML_Document {
 	dynamic_array<TOML_Token>	tokens;
-	// dynamic_array<TOML_Error>	error;
+	dynamic_array<TOML_Error>	errors;
+
+	TOML_Tokenizer				lexer;
+
+	string_view					file;
+	dynamic_array<byte>			bytes;
+
+	b32							ok;
 };
 
 enum WEBSERV_Method {
@@ -136,15 +165,24 @@ typedef dynamic_array<WEBSERV_Config>	WEBSERV_Config_Array;
 
 extern string_view		CLI_exec_path;
 
-b32						OS_read_file(const string_view path, dynamic_array<byte>& out_data);
-b32						OS_stat_file(const string_view& path, struct stat* buf = 0);
-b32						OS_access_file(const string_view& _path, i32 flags = F_OK);
+b32				OS_read_file(const string_view path, dynamic_array<byte>& out_data);
+b32				OS_stat_file(const string_view& path, struct stat* buf = 0);
+b32				OS_access_file(const string_view& _path, i32 flags = F_OK);
+        		
+#define			CLI_debug(...) CLI_debug_internal(__FILE__, __LINE__, __VA_ARGS__)
+void			CLI_debug_internal(const char* file, i32 line, const char *fmt, ...);
+void			CLI_show_help(FILE* stream);
+void			CLI_show_extra(const char* prefix, const char* fmt, ...);
+void			CLI_show_error_file_ext(string_view file_path);
+void			CLI_show_error_file_access(string_view file_path);
+void			CLI_show_error_file_mode(string_view file_path, mode_t mode);
+void			CLI_show_error_syntax(const Position pos, const char *fmt, ...);
+void			CLI_show_error_config(const Position pos, const char *fmt, ...);
+void			CLI_show_error_toml_parse(const TOML_Document& document);
 
-void					CLI_show_error_file_ext(string_view file_path);
-void					CLI_show_error_file_stat(string_view file_path);
-void					CLI_show_error_file_mode(string_view file_path, mode_t mode);
-void					CLI_show_help(FILE* stream);
+TOML_Document	TOML_make(const string_view& file);
+void			TOML_delete(TOML_Document& document);
+TOML_Document	TOML_parse_file(const string_view& file);
 
-TOML_Document			TOML_parse_file(const string_view path);
 WEBSERV_Config_Array	WEBSERV_parse_document(const TOML_Document document);
 #endif
