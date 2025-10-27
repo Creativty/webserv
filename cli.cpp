@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:16:13 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/27 14:43:40 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/10/27 18:14:37 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -151,7 +151,7 @@ void			CLI_show_error_toml_line(const TOML_Document& document, const Position& p
 	fprintf(stderr, "^\n");
 }
 
-void			CLI_show_error_toml_parse(const TOML_Document& document) {
+void			CLI_show_errors_toml_parse(const TOML_Document& document) {
 	const dynamic_array<TOML_Error>&	errors = document.errors;
 	for (i32 i = 0; i < errors.len; ++i) {
 		const TOML_Error&	err = errors[i];
@@ -167,6 +167,30 @@ void			CLI_show_error_toml_parse(const TOML_Document& document) {
 		} break;
 		case TOML_ERROR_TOKEN_UNTERMINATED: {
 			CLI_show_error_syntax(err.pos, "Unterminated string");
+			CLI_show_error_toml_line(document, err.pos);
+		} break;
+		case TOML_ERROR_PARSER_EXPECT: {
+			string_view	token = err.token.str;
+			if (err.token.kind == TOML_TOKEN_EOL) {
+				token = "\\n";
+			} else if (err.token.kind == TOML_TOKEN_EOF) {
+				token = "<EOF>";
+			} else if (err.token.kind == TOML_TOKEN_INVALID) {
+				token = "<INVALID>";
+			}
+			CLI_show_error_syntax(err.pos, "Expected \"%.*s\", got \"%.*s\"", err.str.len, err.str.text, token.len, token.text);
+			CLI_show_error_toml_line(document, err.pos);
+		} break;
+		case TOML_ERROR_PARSER_SCOPE_KEY_DUP: {
+			string_view	token = err.token.str;
+			if (err.token.kind == TOML_TOKEN_EOL) {
+				token = "\\n";
+			} else if (err.token.kind == TOML_TOKEN_EOF) {
+				token = "<EOF>";
+			} else if (err.token.kind == TOML_TOKEN_INVALID) {
+				token = "<INVALID>";
+			}
+			CLI_show_error_syntax(err.pos, "Duplicated entry \"%.*s\"", err.str.len, err.str.text);
 			CLI_show_error_toml_line(document, err.pos);
 		} break;
 		case TOML_ERROR_INVALID:

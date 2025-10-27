@@ -6,7 +6,7 @@
 #    By: aindjare <marvin@42.fr>                    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/08/23 15:57:56 by aindjare          #+#    #+#              #
-#    Updated: 2025/10/27 13:44:51 by aindjare         ###   ########.fr        #
+#    Updated: 2025/10/27 15:53:29 by aindjare         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -30,8 +30,11 @@ fclean: clean
 
 re: fclean all
 
+san: CXXFLAGS += -fsanitize=address
+san: fclean all
+
 $(NAME): $(INCS) $(OBJS)
-	$(CXX) -o $@	$(OBJS)
+	$(CXX) $(CXXFLAGS) -o $@	$(OBJS)
 
 -include $(DEPS)
 

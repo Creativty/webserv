@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:45:19 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/27 14:15:14 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/10/27 16:39:20 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -38,7 +38,7 @@ i32	main(i32 argc, cstring argv[]) {
 
 	TOML_Document	document = TOML_parse_file(path_toml);
 	if (!document.ok) {
-		CLI_show_error_toml_parse(document);
+		CLI_show_errors_toml_parse(document);
 
 		TOML_delete(document);
 		return (4);

@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/27 14:13:20 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/10/27 18:13:50 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -67,8 +67,49 @@ struct TOML_Token {
 };
 
 struct TOML_Tokenizer {
-	Position	pos;
-	string_view	source;
+	dynamic_array<TOML_Token>	tokens;
+
+	Position					pos;
+	string_view					source;
+};
+
+typedef struct TOML_Value			TOML_Value;
+
+typedef b32							TOML_Boolean;
+typedef i64							TOML_Number;
+typedef string_view					TOML_String;
+typedef dynamic_array<TOML_Value>	TOML_Array;
+typedef hash_table<TOML_Value>		TOML_Table;
+
+enum TOML_Value_Kind {
+	TOML_VALUE_NIL,
+
+	TOML_VALUE_BOOLEAN,
+	TOML_VALUE_NUMBER,
+	TOML_VALUE_STRING,
+
+	TOML_VALUE_ARRAY,
+	TOML_VALUE_TABLE,
+};
+
+struct TOML_Value {
+	TOML_Value_Kind	kind;
+	Position		pos;
+	union {
+		TOML_Boolean	Boolean;
+		TOML_Number		Number;
+		TOML_String*	String;
+
+		TOML_Array*		Array;
+		TOML_Table*		Table;
+	};
+};
+
+struct TOML_Parser {
+	i32				index;
+	TOML_Token		token;
+	TOML_Tokenizer*	lexer;
+	TOML_Value*		scope;
 };
 
 enum TOML_Error_Kind {
@@ -79,19 +120,27 @@ enum TOML_Error_Kind {
 	/* Tokenizer */
 	TOML_ERROR_TOKEN_INVALID,
 	TOML_ERROR_TOKEN_UNTERMINATED,
+
+	/* Parser */
+	TOML_ERROR_PARSER_EXPECT,
+	TOML_ERROR_PARSER_SCOPE_KEY_DUP,
 };
 
 struct TOML_Error {
 	TOML_Error_Kind	kind;
-
 	Position		pos;
+
+	string_view		str;
+	TOML_Token		token;
+	TOML_Value*		value;
 };
 
 struct TOML_Document {
-	dynamic_array<TOML_Token>	tokens;
+	TOML_Value					root;
 	dynamic_array<TOML_Error>	errors;
 
 	TOML_Tokenizer				lexer;
+	TOML_Parser					parser;
 
 	string_view					file;
 	dynamic_array<byte>			bytes;
@@ -183,7 +232,7 @@ void			CLI_show_error_file_access(string_view file_path);
 void			CLI_show_error_file_mode(string_view file_path, mode_t mode);
 void			CLI_show_error_syntax(const Position pos, const char *fmt, ...);
 void			CLI_show_error_config(const Position pos, const char *fmt, ...);
-void			CLI_show_error_toml_parse(const TOML_Document& document);
+void			CLI_show_errors_toml_parse(const TOML_Document& document);
 
 TOML_Document	TOML_make(const string_view& file);
 void			TOML_delete(TOML_Document& document);
