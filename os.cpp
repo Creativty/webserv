@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 17:02:26 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/27 13:26:50 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/10/28 15:14:27 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -33,13 +33,13 @@ static i32	cstring_len(cstring str) {
 
 b32		OS_read_file(const string_view _path, dynamic_array<byte>& out_data) {
 	std::string		path = _path.to_string();
-	std::fstream	stream(path.c_str(), std::ios::in | std::ios::binary);
+	std::ifstream	stream(path.c_str(), std::ios::in | std::ios::binary);
 
 	if (stream.good()) {
 		out_data.clear();
 		while (!stream.eof()) {
 			byte	buff[512] = { 0 };
-			stream.get((char*)buff, 512, '\0');
+			stream.read((char*)buff, 512);
 
 			i32		buff_len = cstring_len(cast(cstring)buff);
 			out_data.push(buff_len, buff);
@@ -47,7 +47,7 @@ b32		OS_read_file(const string_view _path, dynamic_array<byte>& out_data) {
 				out_data.push(0);
 		}
 	}
-	return (!stream.fail());
+	return (!(!stream.fail() && stream.eof()));
 }
 
 b32		OS_stat_file(const string_view& _path, struct stat* buf = 0) {

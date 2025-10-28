@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/16 09:24:38 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/26 16:44:49 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/10/28 14:42:19 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 #ifndef DYNAMIC_ARRAY_HPP
@@ -85,7 +85,7 @@ struct dynamic_array {
 		}
 		return (this->data[this->len++] = item);
 	};
-	T&		push(i32 size, const T array[size]) {
+	T&		push(i32 size, const T* array) {
 		i32	offset = this->len;
 		if (size > 0) {
 			if (this->len + size > this->cap) {
