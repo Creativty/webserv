@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/16 09:19:09 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/26 16:28:36 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/10/28 18:41:32 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -26,7 +26,7 @@ static int	cstring_len(const char* cstr) {
 	return (len);
 }
 
-string_view::string_view(void) { };
+string_view::string_view(void): text(0), len(0) { };
 string_view::~string_view(void) { };
 string_view::string_view(const string_view& view): text(view.text), len(view.len) { };
 string_view&	string_view::operator=(const string_view& view) {
@@ -132,7 +132,9 @@ std::ostream&	operator<<(std::ostream& stream, const string_view& view) {
 }
 
 void		string_view::free(void) {
-	delete[] this->text;
+	if (this->text != 0) {
+		delete[] this->text;
+	}
 
 	this->text = 0;
 	this->len = 0;

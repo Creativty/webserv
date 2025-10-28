@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/27 18:13:50 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/10/28 18:45:14 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -124,6 +124,9 @@ enum TOML_Error_Kind {
 	/* Parser */
 	TOML_ERROR_PARSER_EXPECT,
 	TOML_ERROR_PARSER_SCOPE_KEY_DUP,
+	TOML_ERROR_PARSER_NUMBER_CHAR,
+	TOML_ERROR_PARSER_NUMBER_RANGE,
+	TOML_ERROR_PARSER_STRING_QUOTES,
 };
 
 struct TOML_Error {

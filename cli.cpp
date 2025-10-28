@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:16:13 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/27 18:14:37 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/10/28 18:46:27 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -106,7 +106,7 @@ void			CLI_show_error_config(const Position pos, const char* fmt, ...) {
 	va_end(args);
 }
 
-void			CLI_show_error_toml_line(const TOML_Document& document, const Position& pos) {
+static void		CLI_show_error_toml_line(const TOML_Document& document, const Position& pos) {
 	if (!CLI_is_tty)
 		return ;
 
@@ -150,7 +150,6 @@ void			CLI_show_error_toml_line(const TOML_Document& document, const Position& p
 	}
 	fprintf(stderr, "^\n");
 }
-
 void			CLI_show_errors_toml_parse(const TOML_Document& document) {
 	const dynamic_array<TOML_Error>&	errors = document.errors;
 	for (i32 i = 0; i < errors.len; ++i) {
@@ -191,6 +190,20 @@ void			CLI_show_errors_toml_parse(const TOML_Document& document) {
 				token = "<INVALID>";
 			}
 			CLI_show_error_syntax(err.pos, "Duplicated entry \"%.*s\"", err.str.len, err.str.text);
+			CLI_show_error_toml_line(document, err.pos);
+		} break;
+		case TOML_ERROR_PARSER_NUMBER_CHAR: {
+			CLI_show_error_syntax(err.pos, "Number can only contain digits [0-9]");
+			CLI_show_error_toml_line(document, err.pos);
+		} break;
+		case TOML_ERROR_PARSER_NUMBER_RANGE: {
+			string_view	str = err.token.str;
+			CLI_show_error_syntax(err.pos, "Cannot fit \"%.*s\" inside an i64", str.len, str.text);
+			CLI_show_error_toml_line(document, err.pos);
+		} break;
+		case TOML_ERROR_PARSER_STRING_QUOTES: {
+			string_view	str = err.token.str;
+			CLI_show_error_syntax(err.pos, "Invalid string literal `%.*s'", str.len, str.text);
 			CLI_show_error_toml_line(document, err.pos);
 		} break;
 		case TOML_ERROR_INVALID:
