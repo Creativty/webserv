@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:16:13 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/28 18:46:27 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/10/29 18:52:32 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -205,6 +205,15 @@ void			CLI_show_errors_toml_parse(const TOML_Document& document) {
 			string_view	str = err.token.str;
 			CLI_show_error_syntax(err.pos, "Invalid string literal `%.*s'", str.len, str.text);
 			CLI_show_error_toml_line(document, err.pos);
+		} break;
+		case TOML_ERROR_PARSER_UNSUPPORTED: {
+			string_view	feature = err.str;
+			string_view	token = err.token.str;
+			CLI_show_error_syntax(err.pos, "Unsupported TOML feature `%.*s'", feature.len, feature.text);
+			CLI_show_error_toml_line(document, err.pos);
+			if (feature == "[table]") {
+				CLI_show_extra("Suggestion", "Use an inline table `%.*s = { ... }`", token.len, token.text);
+			}
 		} break;
 		case TOML_ERROR_INVALID:
 		default: {

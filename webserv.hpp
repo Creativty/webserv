@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/28 18:45:14 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/10/29 19:44:38 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -44,9 +44,6 @@ enum TOML_Token_Kind {
 
 	TOML_TOKEN_OSQUARE, // [
 	TOML_TOKEN_CSQUARE, // ]
-
-	TOML_TOKEN_OSQUARE_2X, // [[
-	TOML_TOKEN_CSQUARE_2X, // ]]
 
 	TOML_TOKEN_OCURLY, // {
 	TOML_TOKEN_CCURLY, // }
@@ -89,6 +86,7 @@ enum TOML_Value_Kind {
 	TOML_VALUE_STRING,
 
 	TOML_VALUE_ARRAY,
+	TOML_VALUE_ARRAY_TABLES,
 	TOML_VALUE_TABLE,
 };
 
@@ -127,6 +125,7 @@ enum TOML_Error_Kind {
 	TOML_ERROR_PARSER_NUMBER_CHAR,
 	TOML_ERROR_PARSER_NUMBER_RANGE,
 	TOML_ERROR_PARSER_STRING_QUOTES,
+	TOML_ERROR_PARSER_UNSUPPORTED,
 };
 
 struct TOML_Error {

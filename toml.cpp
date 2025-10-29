@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:51:12 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/28 18:54:14 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/10/29 19:58:57 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,6 +30,7 @@ static void			TOML_value_free(const TOML_Value& value) {
 		tbl->destroy();
 		delete tbl;
 	} break;
+	case TOML_VALUE_ARRAY_TABLES:
 	case TOML_VALUE_ARRAY: {
 		TOML_Array*		arr = value.Array;
 		for (i32 i = 0; i < arr->len; ++i) {
@@ -97,6 +98,18 @@ static void			TOML_error(TOML_Document& document, TOML_Error_Kind kind, const Po
 
 	document.errors.push(error);
 }
+static void			TOML_error(TOML_Document& document, TOML_Error_Kind kind, const TOML_Token& token) {
+	TOML_Error	error;
+
+	error.kind = kind;
+	error.pos = token.pos;
+
+	error.str = "";
+	error.token = token;
+	error.value = 0;
+
+	document.errors.push(error);
+}
 static void			TOML_error(TOML_Document& document, TOML_Error_Kind kind, const TOML_Token& token, const string_view& str) {
 	TOML_Error	error;
 
@@ -109,13 +122,13 @@ static void			TOML_error(TOML_Document& document, TOML_Error_Kind kind, const TO
 
 	document.errors.push(error);
 }
-static void			TOML_error(TOML_Document& document, TOML_Error_Kind kind, const TOML_Token& token) {
+static void			TOML_error(TOML_Document& document, TOML_Error_Kind kind, const Position& pos, const TOML_Token& token, const string_view& str) {
 	TOML_Error	error;
 
 	error.kind = kind;
-	error.pos = token.pos;
+	error.pos = pos;
 
-	error.str = "";
+	error.str = str;
 	error.token = token;
 	error.value = 0;
 
@@ -147,9 +160,9 @@ static TOML_Token	TOML_token_make(TOML_Token_Kind kind, const Position& pos) {
 static string_view	TOML_token_kind_string(const TOML_Token_Kind& kind) {
 	switch (kind) {
 		case TOML_TOKEN_EOF:
-			return ("<EOF>");
+			return ("<end of file>");
 		case TOML_TOKEN_EOL:
-			return ("<EOL> or \\n");
+			return ("\\n");
 
 		case TOML_TOKEN_EQUALS:
 			return ("=");
@@ -160,11 +173,6 @@ static string_view	TOML_token_kind_string(const TOML_Token_Kind& kind) {
 			return ("[");
 		case TOML_TOKEN_CSQUARE:
 			return ("]");
-
-		case TOML_TOKEN_OSQUARE_2X:
-			return ("[[");
-		case TOML_TOKEN_CSQUARE_2X:
-			return ("]]");
 
 		case TOML_TOKEN_OCURLY:
 			return ("{");
@@ -257,20 +265,8 @@ static TOML_Token	TOML_lexer_token(TOML_Document& document) {
 		kind = TOML_TOKEN_COMMA;
 	} else if (b == '[') {
 		kind = TOML_TOKEN_OSQUARE;
-		byte		b2 = TOML_lexer_peek(lexer);
-		if (b2 == b) {
-			TOML_lexer_next(lexer);
-
-			kind = TOML_TOKEN_OSQUARE_2X;
-		}
 	} else if (b == ']') {
 		kind = TOML_TOKEN_CSQUARE;
-		byte		b2 = TOML_lexer_peek(lexer);
-		if (b2 == b) {
-			TOML_lexer_next(lexer);
-
-			kind = TOML_TOKEN_CSQUARE_2X;
-		}
 	} else if (b == '"') {
 		b = TOML_lexer_next(lexer);
 		while (1) {
@@ -352,23 +348,47 @@ static b32			TOML_parser_done(TOML_Parser& parser) {
 static void			TOML_parser_advance(TOML_Parser& parser, b32 ignore_eol = 0) {
 	while (!TOML_parser_done(parser)) {
 		parser.token = parser.lexer->tokens[++parser.index];
-		if (ignore_eol && parser.token.kind == TOML_TOKEN_EOL) {
-			continue ;
+		if (!ignore_eol || parser.token.kind != TOML_TOKEN_EOL) {
+			break ;
 		}
-		break ;
 	}
 }
-static b32			TOML_parser_expect(TOML_Document& document, TOML_Parser& parser, TOML_Token_Kind kind, string_view category = "") {
+static b32			TOML_parser_expect(TOML_Document& document, TOML_Parser& parser, TOML_Token_Kind kind, string_view category = "", b32 ignore_eol = 0) {
 	TOML_Token	token = parser.token;
-	if (token.kind != kind && (token.kind != TOML_TOKEN_EOF && kind != TOML_TOKEN_EOL)) {
-		if (!category)
-			category = TOML_token_kind_string(kind);
-		TOML_error(document, TOML_ERROR_PARSER_EXPECT, token, category);
-		return (0);
+	if (kind == TOML_TOKEN_EOL) {
+		if (token.kind != kind && token.kind != TOML_TOKEN_EOF) {
+			if (!category)
+				category = TOML_token_kind_string(kind);
+			TOML_error(document, TOML_ERROR_PARSER_EXPECT, token, category);
+			return (0);
+		}
+	} else {
+		while (ignore_eol && parser.token.kind == TOML_TOKEN_EOL) {
+			TOML_parser_advance(parser);
+		}
+		token = parser.token;
+		if (token.kind != kind) {
+			if (!category)
+				category = TOML_token_kind_string(kind);
+			TOML_error(document, TOML_ERROR_PARSER_EXPECT, token, category);
+			return (0);
+		}
 	}
 	TOML_parser_advance(parser);
 	return (1);
 }
+static b32			TOML_parser_accept(TOML_Parser& parser, TOML_Token_Kind kind) {
+	TOML_Token	token = parser.token;
+	if (token.kind == kind) {
+		if (kind != TOML_TOKEN_EOF) {
+			parser.token = parser.lexer->tokens[++parser.index];
+		}
+		return (1);
+	}
+	return (0);
+}
+
+static TOML_Value	TOML_parse_value(TOML_Document& document, TOML_Parser& parser);
 
 static b32			TOML_parse_number_range_check(i64 number, i64 sign, byte d) {
 	i64	v = cast(i64)(d - '0');
@@ -451,6 +471,123 @@ static TOML_Value	TOML_parse_boolean(TOML_Document& document, TOML_Parser& parse
 	b32	boolean = (token.kind == TOML_TOKEN_TRUE);
 	return ((TOML_Value){ TOML_VALUE_BOOLEAN, token.pos, { .Boolean = boolean } });
 }
+static void			TOML_parse_array_recover(TOML_Parser& parser, b32 comma_delimits = 1) {
+	while (!TOML_parser_done(parser)) {
+		TOML_Token	token = parser.token;
+		if (token.kind == TOML_TOKEN_CSQUARE || token.kind == TOML_TOKEN_IDENT || (comma_delimits && token.kind == TOML_TOKEN_COMMA)) {
+			break ;
+		}
+		TOML_parser_advance(parser);
+	}
+}
+static TOML_Value	TOML_parse_array(TOML_Document& document, TOML_Parser& parser) {
+	TOML_Token	open = parser.token;
+	TOML_Value	nil = { TOML_VALUE_NIL, open.pos, { .Table = 0 } };
+	if (!TOML_parser_expect(document, parser, TOML_TOKEN_OSQUARE)) {
+		return (nil);
+	}
+
+	TOML_Array	array;
+	b32			comma_break = 0;
+	while (!TOML_parser_done(parser)) {
+		TOML_Token	eol_maybe = parser.token;
+		if (eol_maybe.kind == TOML_TOKEN_EOL) {
+			TOML_parser_advance(parser, /* ignore_eol = */ 1);
+		}
+
+		TOML_Token	csquare_maybe = parser.token;
+		if (csquare_maybe.kind == TOML_TOKEN_CSQUARE) {
+			break ;
+		}
+
+		TOML_Value	value = TOML_parse_value(document, parser);
+		if (value.kind == TOML_VALUE_NIL) {
+			TOML_parse_array_recover(parser);
+		} else {
+			array.push(value);
+		}
+
+		eol_maybe = parser.token;
+		if (eol_maybe.kind == TOML_TOKEN_EOL) {
+			TOML_parser_advance(parser, /* ignore_eol = */ 1);
+		}
+
+		TOML_Token	comma = parser.token;
+		if (comma.kind != TOML_TOKEN_COMMA) {
+			comma_break = true;
+			break ;
+		} else {
+			TOML_parser_advance(parser, /* ignore_eol = */ 1);
+		}
+	}
+
+	TOML_Token	close = parser.token;
+	if (!TOML_parser_expect(document, parser, TOML_TOKEN_CSQUARE, /* category = */ "", /* ignore_eol = */ 1)) {
+		if (comma_break) {
+			TOML_parse_array_recover(parser, /* comma_delimits = */ 0);
+			if (parser.token.kind == TOML_TOKEN_CSQUARE) {
+				TOML_parser_advance(parser);
+			}
+		}
+		array.free();
+		return (nil);
+	}
+	return ((TOML_Value){ TOML_VALUE_ARRAY, open.pos, { .Array = new TOML_Array(array) } });
+}
+static void			TOML_parse_table_recover(TOML_Parser& parser, b32 comma_delimits = 1) {
+	while (!TOML_parser_done(parser)) {
+		TOML_Token	token = parser.token;
+		if (token.kind == TOML_TOKEN_CCURLY || token.kind == TOML_TOKEN_IDENT || (comma_delimits && token.kind == TOML_TOKEN_COMMA)) {
+			break ;
+		}
+		TOML_parser_advance(parser);
+	}
+}
+static TOML_Value	TOML_parse_table(TOML_Document& document, TOML_Parser& parser) {
+	TOML_Token	open = parser.token;
+	TOML_Value	nil = { TOML_VALUE_NIL, open.pos, { .Table = 0 } };
+	if (!TOML_parser_expect(document, parser, TOML_TOKEN_OCURLY)) {
+		return (nil);
+	}
+
+	TOML_Table	table;
+	while (!TOML_parser_done(parser)) {
+		TOML_Token	token = parser.token;
+		if (token.kind == TOML_TOKEN_EOL) {
+			TOML_parser_advance(parser, /* ignore_eol = */ 1);
+			token = parser.token;
+		}
+		if (token.kind == TOML_TOKEN_CCURLY) {
+			break ;
+		}
+		TOML_Token	ident = parser.token;
+		b32			pair_ok = 0;
+		if (TOML_parser_expect(document, parser, TOML_TOKEN_IDENT, /* category = */ "", /* ignore_eol = */ 1)) {
+			if (TOML_parser_expect(document, parser, TOML_TOKEN_EQUALS)) {
+				TOML_Value	value = TOML_parse_value(document, parser);
+
+				pair_ok = (value.kind != TOML_VALUE_NIL);
+				/* TODO(xenobas): Do duplicate check */
+				if (pair_ok) {
+					table.set(ident.str, value);
+				}
+			}
+		}
+		if (!pair_ok) {
+			TOML_parse_table_recover(parser);
+		}
+		if (!TOML_parser_accept(parser, TOML_TOKEN_COMMA)) {
+			break ;
+		}
+	}
+
+	TOML_Token	close = parser.token;
+	if (!TOML_parser_expect(document, parser, TOML_TOKEN_CCURLY, /* category = */ "", /* ignore_eol = */ 1)) {
+		table.destroy();
+		return (nil);
+	}
+	return ((TOML_Value){ TOML_VALUE_TABLE, open.pos, { .Table = new TOML_Table(table) } });
+}
 static TOML_Value	TOML_parse_value(TOML_Document& document, TOML_Parser& parser) {
 	TOML_Token	token = parser.token;
 	if (token.kind == TOML_TOKEN_NUMBER) {
@@ -459,6 +596,10 @@ static TOML_Value	TOML_parse_value(TOML_Document& document, TOML_Parser& parser)
 		return (TOML_parse_string(document, parser));
 	} else if (token.kind == TOML_TOKEN_TRUE || token.kind == TOML_TOKEN_FALSE) {
 		return (TOML_parse_boolean(document, parser));
+	} else if (token.kind == TOML_TOKEN_OSQUARE) {
+		return (TOML_parse_array(document, parser));
+	} else if (token.kind == TOML_TOKEN_OCURLY) {
+		return (TOML_parse_table(document, parser));
 	}
 	TOML_error(document, TOML_ERROR_PARSER_EXPECT, token, "value");
 	return ((TOML_Value){ TOML_VALUE_NIL, token.pos, { 0 } });
@@ -473,12 +614,62 @@ static void			TOML_parse_stmt_recovery(TOML_Parser& parser) {
 }
 static void			TOML_parse_stmt(TOML_Document& document, TOML_Parser& parser) {
 	TOML_Token	token = parser.token;
-	if (token.kind == TOML_TOKEN_OSQUARE_2X) { // [[Array_of_Tables]]
-		TOML_parser_advance(parser);
-		return ;
-	}
-	if (token.kind == TOML_TOKEN_OSQUARE) { // [Table]
-		TOML_parser_advance(parser);
+	if (TOML_parser_accept(parser, TOML_TOKEN_OSQUARE)) { // [Table]
+		b32			array_of_tables = TOML_parser_accept(parser, TOML_TOKEN_OSQUARE); // [[Array of Tables]]
+		TOML_Token	token_key = parser.token;
+		if (!TOML_parser_expect(document, parser, TOML_TOKEN_IDENT)) {
+			TOML_parse_stmt_recovery(parser);
+			TOML_parser_expect(document, parser, TOML_TOKEN_EOL);
+			return ;
+		}
+		if (!TOML_parser_expect(document, parser, TOML_TOKEN_CSQUARE)) {
+			TOML_parse_stmt_recovery(parser);
+			TOML_parser_expect(document, parser, TOML_TOKEN_EOL);
+			return ;
+		}
+		if (array_of_tables && !TOML_parser_expect(document, parser, TOML_TOKEN_CSQUARE)) {
+			TOML_parse_stmt_recovery(parser);
+			TOML_parser_expect(document, parser, TOML_TOKEN_EOL);
+			return ;
+		}
+		if (!TOML_parser_expect(document, parser, TOML_TOKEN_EOL)) {
+			TOML_parse_stmt_recovery(parser);
+			if (parser.token.kind == TOML_TOKEN_EOL) {
+				TOML_parser_advance(parser);
+			}
+			return ;
+		}
+
+		if (!array_of_tables) {
+			TOML_error(document, TOML_ERROR_PARSER_UNSUPPORTED, token.pos, token_key, "[table]");
+			return ;
+		}
+		
+		/* Pick root value, and make sure it is an array, and insert a value in it */
+		TOML_Value&	root = document.root;
+		// new Table
+		b32 set_scope = 1;
+		if (root.Table->has(token_key.str)) {
+			TOML_Value&	container = root.Table->get(token_key.str);
+			if (container.kind == TOML_VALUE_ARRAY_TABLES) {
+				TOML_Value	table = { TOML_VALUE_TABLE, token.pos, { .Table = new TOML_Table } };
+				container.Array->push(table);
+			} else {
+				set_scope = 0;
+				TOML_error(document, TOML_ERROR_PARSER_SCOPE_KEY_DUP, token.pos, token_key, token_key.str);
+			}
+		} else {
+			TOML_Value	container = { TOML_VALUE_ARRAY_TABLES, token.pos, { .Array = new TOML_Array } };
+			TOML_Value	table = { TOML_VALUE_TABLE, token.pos, { .Table = new TOML_Table } };
+
+			container.Array->push(table);
+			root.Table->set(token_key.str, container);
+		}
+
+		if (set_scope) {
+			TOML_Value&	container = root.Table->get(token_key.str);
+			parser.scope = &(*container.Array)[container.Array->len - 1];
+		}
 		return ;
 	}
 	if (token.kind == TOML_TOKEN_IDENT) { // Key = Value
@@ -496,6 +687,10 @@ static void			TOML_parse_stmt(TOML_Document& document, TOML_Parser& parser) {
 			return ;
 		}
 		if (!TOML_parser_expect(document, parser, TOML_TOKEN_EOL)) {
+			TOML_parse_stmt_recovery(parser);
+			if (parser.token.kind == TOML_TOKEN_EOL) {
+				TOML_parser_advance(parser);
+			}
 			return ;
 		}
 
@@ -508,11 +703,68 @@ static void			TOML_parse_stmt(TOML_Document& document, TOML_Parser& parser) {
 
 		return ;
 	}
+	if (token.kind == TOML_TOKEN_EOL) {
+		TOML_parser_advance(parser, /* ignore_eol = */ 1);
+		return ;
+	}
 
 	TOML_error(document, TOML_ERROR_PARSER_EXPECT, token, "statement");
 	TOML_parse_stmt_recovery(parser);
 }
 
+static void			TOML_debug_value(const TOML_Value& value, i32 indent = 0, string_view key = "") {
+	printf("%*s%.*s", indent * 2, "", key.len, key.text);
+	if (key) {
+		printf(" = ");
+	}
+
+	switch (value.kind) {
+	case TOML_VALUE_BOOLEAN:
+		printf("%s\n", value.Boolean ? "true" : "false");
+		break ;
+	case TOML_VALUE_NUMBER:
+		printf("%ld\n", value.Number);
+		break ;
+	case TOML_VALUE_STRING: {
+		if (value.String == 0) {
+			printf("nil\n");
+			return ;
+		}
+		const TOML_String&	str = *value.String;
+		printf("\"%.*s\"\n", str.len, str.text);
+	} break ;
+	case TOML_VALUE_ARRAY_TABLES:
+	case TOML_VALUE_ARRAY: {
+		if (value.Array == 0) {
+			printf("nil\n");
+			return ;
+		}
+		const TOML_Array&	arr = *value.Array;
+		printf("%s %d elements\n", value.kind == TOML_VALUE_ARRAY ? "array" : "tables array", arr.len);
+		for (i32 i = 0; i < arr.len; ++i) {
+			TOML_debug_value(arr[i], indent + 1);
+		}
+	} break ;
+	case TOML_VALUE_TABLE: {
+		if (value.Table == 0) {
+			printf("nil\n");
+			return ;
+		}
+		const TOML_Table&		tbl = *value.Table;
+		printf("table %d entries\n", tbl.count);
+		for (i32 i = 0; i < tbl.cap; ++i) {
+			const TOML_Table::hash_table_item&	pair = tbl.items[i];
+			if (!pair.used()) {
+				continue ;
+			}
+			TOML_debug_value(pair.value, indent + 1, pair.key);
+		}
+	} break ;
+	case TOML_VALUE_NIL:
+	default:
+		printf("nil\n");
+	}
+}
 static void			TOML_step_parse(TOML_Document& document) {
 	if (document.errors.len != 0) {
 		return ;
@@ -528,6 +780,8 @@ static void			TOML_step_parse(TOML_Document& document) {
 	while (!TOML_parser_done(document.parser)) {
 		TOML_parse_stmt(document, document.parser);
 	}
+
+	TOML_debug_value(document.root);
 }
 
 TOML_Document		TOML_parse_file(const string_view& file) {
