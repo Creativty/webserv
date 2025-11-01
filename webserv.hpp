@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/31 14:48:29 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/01 17:54:55 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -152,15 +152,15 @@ struct TOML_Document {
 
 struct WEBSERV_URI {
 	/* Commented outs are unused, since WEBSERV does not have a proxy mode where the members are needed */
-	string_view				path;
-	hash_table<string_view>	query;
+	dynamic_array<string_view>	path;
+	hash_table<string_view>		query;
 
-	/* string_view			domain; */
-	/* u16					port; */
-	/* string_view			protocol; */
+	/* string_view				domain; */
+	/* u16						port; */
+	/* string_view				protocol; */
 
-	string_view				str;
-	b32						ok;
+	string_view					str;
+	b32							ok;
 };
 
 enum WEBSERV_Method {
@@ -268,7 +268,7 @@ TOML_Document		TOML_parse_file(const string_view& file);
 
 void				WEBSERV_uri_delete(WEBSERV_URI& uri);
 WEBSERV_URI			WEBSERV_uri_decode(const string_view& str);
-string_view			WEBSERV_uri_encode(const WEBSERV_URI& uri);
+string_view			WEBSERV_uri_encode(const WEBSERV_URI& uri, b32 write_trailing_slash = 0);
 
 void				WEBSERV_config_delete(WEBSERV_Config& config);
 WEBSERV_Config		WEBSERV_config_parse(const TOML_Document& toml);

@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:45:19 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/01 15:29:50 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/01 16:22:19 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -44,7 +44,10 @@ i32	main(i32 argc, cstring argv[]) {
 		return (4);
 	}
 
-	WEBSERV_URI	uri = WEBSERV_uri_decode("/Hello%20World?test&good&test=123&question=Are%20You%Bork%20Gay%3f#");
+	WEBSERV_URI	uri = WEBSERV_uri_decode("/Hello%20World/123?test&good&test=123&question=Are%20You%Bork%20Gay%3f#");
+	string_view	str = WEBSERV_uri_encode(uri);
+	printf("String: \"%.*s\"\n", str.len, str.text);
+	str.free();
 	WEBSERV_uri_delete(uri);
 
 	TOML_delete(document);
