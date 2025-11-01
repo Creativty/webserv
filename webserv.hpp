@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/29 19:44:38 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/10/31 14:48:29 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -150,6 +150,19 @@ struct TOML_Document {
 	b32							ok;
 };
 
+struct WEBSERV_URI {
+	/* Commented outs are unused, since WEBSERV does not have a proxy mode where the members are needed */
+	string_view				path;
+	hash_table<string_view>	query;
+
+	/* string_view			domain; */
+	/* u16					port; */
+	/* string_view			protocol; */
+
+	string_view				str;
+	b32						ok;
+};
+
 enum WEBSERV_Method {
 	WEBSERV_METHOD_INVALID,
 
@@ -199,13 +212,13 @@ struct WEBSERV_Route {
 	 * C++ doesn't allow non trivial constructor in union types
 	 * So we do this abomination instead
 	 */
-	WEBSERV_Route_Basic		basic;
-	WEBSERV_Route_Redirect	redirect;
-	WEBSERV_Route_Upload	upload;
-	WEBSERV_Route_CGI		cgi;
+	WEBSERV_Route_Basic		Basic;
+	WEBSERV_Route_Redirect	Redirect;
+	WEBSERV_Route_Upload	Upload;
+	WEBSERV_Route_CGI		CGI;
 };
 
-struct WEBSERV_Config {
+struct WEBSERV_Instance {
 	dynamic_array<WEBSERV_Interface>	interfaces;
 
 	u32									request_body_max;
@@ -216,29 +229,47 @@ struct WEBSERV_Config {
 	hash_table<WEBSERV_Route>			routes;
 };
 
-typedef dynamic_array<WEBSERV_Config>	WEBSERV_Config_Array;
+enum WEBSERV_Config_Error {
+	WEBSERV_CONFIG_ERROR_INVALID,
+
+	WEBSERV_CONFIG_ERROR_KEY_UNKNOWN,
+	WEBSERV_CONFIG_ERROR_KEY_DISALLOWED,
+	WEBSERV_CONFIG_ERROR_TYPE_MISMATCH,
+};
+typedef struct WEBSERV_Document  WEBSERV_Document;
+struct WEBSERV_Config {
+	dynamic_array<WEBSERV_Instance>		instances;
+
+	TOML_Document						toml;
+	dynamic_array<WEBSERV_Config_Error>	errors;
+};
 
 extern string_view		CLI_exec_path;
 extern b32				CLI_is_tty;
 
-b32				OS_read_file(const string_view path, dynamic_array<byte>& out_data);
-b32				OS_stat_file(const string_view& path, struct stat* buf = 0);
-b32				OS_access_file(const string_view& _path, i32 flags = F_OK);
-        		
-#define			CLI_debug(...) CLI_debug_internal(__FILE__, __LINE__, __VA_ARGS__)
-void			CLI_debug_internal(const char* file, i32 line, const char *fmt, ...);
-void			CLI_show_help(FILE* stream);
-void			CLI_show_extra(const char* prefix, const char* fmt, ...);
-void			CLI_show_error_file_ext(string_view file_path);
-void			CLI_show_error_file_access(string_view file_path);
-void			CLI_show_error_file_mode(string_view file_path, mode_t mode);
-void			CLI_show_error_syntax(const Position pos, const char *fmt, ...);
-void			CLI_show_error_config(const Position pos, const char *fmt, ...);
-void			CLI_show_errors_toml_parse(const TOML_Document& document);
+b32					OS_read_file(const string_view path, dynamic_array<byte>& out_data);
+b32					OS_stat_file(const string_view& path, struct stat* buf = 0);
+b32					OS_access_file(const string_view& _path, i32 flags = F_OK);
+        			
+#define				CLI_debug(...) CLI_debug_internal(__FILE__, __LINE__, __VA_ARGS__)
+void				CLI_debug_internal(const char* file, i32 line, const char *fmt, ...);
+void				CLI_show_help(FILE* stream);
+void				CLI_show_extra(const char* prefix, const char* fmt, ...);
+void				CLI_show_error_file_ext(string_view file_path);
+void				CLI_show_error_file_access(string_view file_path);
+void				CLI_show_error_file_mode(string_view file_path, mode_t mode);
+void				CLI_show_error_syntax(const Position pos, const char *fmt, ...);
+void				CLI_show_error_config(const Position pos, const char *fmt, ...);
+void				CLI_show_errors_toml_parse(const TOML_Document& document);
 
-TOML_Document	TOML_make(const string_view& file);
-void			TOML_delete(TOML_Document& document);
-TOML_Document	TOML_parse_file(const string_view& file);
+TOML_Document		TOML_make(const string_view& file);
+void				TOML_delete(TOML_Document& document);
+TOML_Document		TOML_parse_file(const string_view& file);
 
-WEBSERV_Config_Array	WEBSERV_parse_document(const TOML_Document document);
+void				WEBSERV_uri_delete(WEBSERV_URI& uri);
+WEBSERV_URI			WEBSERV_uri_decode(const string_view& str);
+string_view			WEBSERV_uri_encode(const WEBSERV_URI& uri);
+
+void				WEBSERV_config_delete(WEBSERV_Config& config);
+WEBSERV_Config		WEBSERV_config_parse(const TOML_Document& toml);
 #endif

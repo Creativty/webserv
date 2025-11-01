@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/16 17:16:15 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/19 16:20:46 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/11/01 15:07:00 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,15 +15,15 @@
 #include "base.hpp"
 template <typename T>
 struct hash_table {
-	struct hash_table_item {
+	struct item {
 		T			value;
 		string_view	key;
 
-		hash_table_item(string_view key, T value): value(value), key(string_view::alloc(key)) { };
-		hash_table_item(void): value(), key() { };
-		~hash_table_item(void) { };
-		hash_table_item(const hash_table_item& item): value(item.value), key(item.key) { };
-		hash_table_item& operator=(const hash_table_item& item) {
+		item(string_view key, T value): value(value), key(string_view::alloc(key)) { };
+		item(void): value(), key() { };
+		~item(void) { };
+		item(const item& item): value(item.value), key(item.key) { };
+		item& operator=(const item& item) {
 			if (this != &item) {
 				this->value = item.value;
 				this->key = item.key;
@@ -35,6 +35,7 @@ struct hash_table {
 			return ((bool)this->key);
 		};
 	};
+	typedef struct item	hash_table_item;
 
 	hash_table_item*	items;
 	i32					count;
@@ -71,14 +72,14 @@ struct hash_table {
 		hash_table_item*		new_items = new hash_table_item[new_cap]();
 		hash_table_item*		old_items = this->items;
 		for (i32 i = 0; i < this->cap; ++i) {
-			hash_table_item&	item = old_items[i];
-			if (!item.used())
+			hash_table_item&	iter = old_items[i];
+			if (!iter.used())
 				continue ;
 
-			size_t index = this->hash(item.key, (size_t)new_cap);
+			size_t index = this->hash(iter.key, (size_t)new_cap);
 			while (new_items[index].used())
 				index = (index + 1ul) % (size_t)new_cap;
-			new_items[index] = item;
+			new_items[index] = iter;
 		}
 		delete[] old_items;
 

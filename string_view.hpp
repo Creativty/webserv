@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/16 09:16:21 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/26 17:19:29 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/11/01 14:46:56 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -39,14 +39,20 @@ struct string_view {
 	char&				operator[](unsigned long long index);
 	const char&			operator[](unsigned long long index) const;
 
-	bool				has_prefix(const string_view& prefix) const;
-	bool				has_suffix(const string_view& suffix) const;
-
 	string_view			slice(i32 begin, i32 end) const;
+	string_view			slice(i32 begin) const;
 	std::string			to_string(void) const;
 
 	void				free(void);
 	static string_view	alloc(const string_view& view);
+
+	bool				has_prefix(const string_view& prefix) const;
+	bool				has_suffix(const string_view& suffix) const;
+	bool				has(const string_view& str) const;
+	int					index(const string_view& str) const;
+	int					index(const string_view& str, i32 skip) const;
+
+	b32					split_iter(const string_view& sep, string_view& slot);
 };
 std::ostream&	operator<<(std::ostream& stream, const string_view& view);
 #endif /* STRING_VIEW_HPP */

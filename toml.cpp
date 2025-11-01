@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:51:12 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/29 19:58:57 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/01 15:32:00 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -712,7 +712,7 @@ static void			TOML_parse_stmt(TOML_Document& document, TOML_Parser& parser) {
 	TOML_parse_stmt_recovery(parser);
 }
 
-static void			TOML_debug_value(const TOML_Value& value, i32 indent = 0, string_view key = "") {
+static void			TOML_value_debug(const TOML_Value& value, i32 indent = 0, string_view key = "") {
 	printf("%*s%.*s", indent * 2, "", key.len, key.text);
 	if (key) {
 		printf(" = ");
@@ -742,7 +742,7 @@ static void			TOML_debug_value(const TOML_Value& value, i32 indent = 0, string_v
 		const TOML_Array&	arr = *value.Array;
 		printf("%s %d elements\n", value.kind == TOML_VALUE_ARRAY ? "array" : "tables array", arr.len);
 		for (i32 i = 0; i < arr.len; ++i) {
-			TOML_debug_value(arr[i], indent + 1);
+			TOML_value_debug(arr[i], indent + 1);
 		}
 	} break ;
 	case TOML_VALUE_TABLE: {
@@ -757,7 +757,7 @@ static void			TOML_debug_value(const TOML_Value& value, i32 indent = 0, string_v
 			if (!pair.used()) {
 				continue ;
 			}
-			TOML_debug_value(pair.value, indent + 1, pair.key);
+			TOML_value_debug(pair.value, indent + 1, pair.key);
 		}
 	} break ;
 	case TOML_VALUE_NIL:
@@ -765,7 +765,10 @@ static void			TOML_debug_value(const TOML_Value& value, i32 indent = 0, string_v
 		printf("nil\n");
 	}
 }
+
 static void			TOML_step_parse(TOML_Document& document) {
+	unused(TOML_value_debug); /* NOTE(xenobas): To avoid unused static function error */
+
 	if (document.errors.len != 0) {
 		return ;
 	}
@@ -780,8 +783,6 @@ static void			TOML_step_parse(TOML_Document& document) {
 	while (!TOML_parser_done(document.parser)) {
 		TOML_parse_stmt(document, document.parser);
 	}
-
-	TOML_debug_value(document.root);
 }
 
 TOML_Document		TOML_parse_file(const string_view& file) {
