@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/16 09:16:21 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/01 14:46:56 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/03 16:50:59 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -33,6 +33,7 @@ struct string_view {
 	bool				operator==(const string_view& view) const;
 	bool				operator==(const char* text) const;
 	bool				operator!=(const string_view& view) const;
+	b32					eq_insensitive(const string_view& view) const;
 
 	char&				operator[](i32 index);
 	const char&			operator[](i32 index) const;
@@ -51,6 +52,9 @@ struct string_view {
 	bool				has(const string_view& str) const;
 	int					index(const string_view& str) const;
 	int					index(const string_view& str, i32 skip) const;
+
+	string_view			trim_left(void) const;
+	string_view			trim_right(void) const;
 
 	b32					split_iter(const string_view& sep, string_view& slot);
 };

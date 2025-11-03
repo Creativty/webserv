@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/01 17:54:55 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/03 17:39:06 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -244,8 +244,37 @@ struct WEBSERV_Config {
 	dynamic_array<WEBSERV_Config_Error>	errors;
 };
 
-extern string_view		CLI_exec_path;
-extern b32				CLI_is_tty;
+typedef hash_table<string_view>	HTTP_Headers;
+
+enum HTTP_Request_Cursor_Stage {
+	HTTP_REQUEST_CURSOR_STAGE_METHOD,
+	HTTP_REQUEST_CURSOR_STAGE_URI,
+	HTTP_REQUEST_CURSOR_STAGE_VERSION,
+	HTTP_REQUEST_CURSOR_STAGE_HEADERS,
+	HTTP_REQUEST_CURSOR_STAGE_BODY,
+	HTTP_REQUEST_CURSOR_STAGE_BODY_CHUNKED,
+
+	HTTP_REQUEST_CURSOR_STAGE_ERROR,
+	HTTP_REQUEST_CURSOR_STAGE_DONE,
+};
+struct HTTP_Request {
+	WEBSERV_Method				method;
+	WEBSERV_URI					uri;
+
+	HTTP_Headers				headers;
+	b32							chunked;
+	i64							content_length;
+
+	i32							body_offset;
+	i32							body_length;
+
+	dynamic_array<byte>			buff;
+	i32							buff_cursor_index;
+	HTTP_Request_Cursor_Stage	buff_cursor_stage;
+};
+
+extern string_view	CLI_exec_path;
+extern b32			CLI_is_tty;
 
 b32					OS_read_file(const string_view path, dynamic_array<byte>& out_data);
 b32					OS_stat_file(const string_view& path, struct stat* buf = 0);
@@ -266,10 +295,21 @@ TOML_Document		TOML_make(const string_view& file);
 void				TOML_delete(TOML_Document& document);
 TOML_Document		TOML_parse_file(const string_view& file);
 
+WEBSERV_URI			WEBSERV_uri_make(const string_view& str);
 void				WEBSERV_uri_delete(WEBSERV_URI& uri);
 WEBSERV_URI			WEBSERV_uri_decode(const string_view& str);
 string_view			WEBSERV_uri_encode(const WEBSERV_URI& uri, b32 write_trailing_slash = 0);
 
+WEBSERV_Method		WEBSERV_method_make(const string_view& str);
+b32					WEBSERV_http_version_supported(const string_view& str);
+
 void				WEBSERV_config_delete(WEBSERV_Config& config);
 WEBSERV_Config		WEBSERV_config_parse(const TOML_Document& toml);
+
+HTTP_Request		HTTP_request_make(void);
+void				HTTP_request_delete(HTTP_Request& req);
+b32					HTTP_request_is_error(const HTTP_Request& req);
+b32					HTTP_request_is_closed(const HTTP_Request& req);
+void				HTTP_request_close(HTTP_Request& req);
+b32					HTTP_request_read(HTTP_Request& req, const byte* data, i32 size);
 #endif

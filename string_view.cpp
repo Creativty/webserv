@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/16 09:19:09 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/01 15:23:26 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/03 17:30:33 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -45,6 +45,12 @@ string_view&			string_view::operator=(const char* text) {
 	return (*this);
 };
 
+static char				char_lower(char c) {
+	if (c >= 'A' && c <= 'Z') {
+		c ^= (2 << 4);
+	}
+	return (c);
+}
 bool					string_view::operator==(const string_view& view) const {
 	if (view.len != this->len)
 		return (false);
@@ -59,6 +65,16 @@ bool					string_view::operator==(const char* text) const {
 }
 bool					string_view::operator!=(const string_view& view) const {
 	return (!(*this == view));
+}
+b32						string_view::eq_insensitive(const string_view& view) const {
+	for (i32 i = 0; i < this->len && i < view.len; ++i) {
+		char	lc = char_lower((*this)[i]);
+		char	rc = char_lower(( view)[i]);
+		if (lc != rc) {
+			return (0);
+		}
+	}
+	return (this->len == view.len);
 }
 
 char&					string_view::operator[](unsigned long long index) {
@@ -155,24 +171,12 @@ bool					string_view::has_suffix(const string_view& suffix) const {
 	return (true);
 };
 bool					string_view::has(const string_view& str) const {
-	for (i32 i = 0; i < this->len - str.len; ++i) {
-		bool	match = true;
-		for (i32 j = 0; match && j < str.len; ++j) {
-			if ((*this)[i + j] != str[j]) {
-				match = false;
-				break ;
-			}
-		}
-		if (match) {
-			return (true);
-		}
-	}
-	return (false);
+	return (this->index(str) >= 0);
 }
 i32						string_view::index(const string_view& str) const {
 	for (i32 i = 0; i < this->len; ++i) {
 		i32	j = 0;
-		while (j < str.len) {
+		while (j < str.len && i + j < this->len) {
 			if ((*this)[i + j] != str[j]) {
 				break ;
 			}
@@ -189,7 +193,7 @@ i32						string_view::index(const string_view& str, i32 skip) const {
 	i32	skip_limit = skip;
 	for (i32 i = 0; i < this->len; ++i) {
 		i32	j = 0;
-		while (j < str.len) {
+		while (j < str.len && i + j < this->len) {
 			if ((*this)[i + j] != str[j]) {
 				break ;
 			}
@@ -205,6 +209,30 @@ i32						string_view::index(const string_view& str, i32 skip) const {
 	return (-1);
 }
 
+static b32				match_space(byte b) {
+	return (b == 0x20 || b == 0x09 || b == 0x0a || b == 0x0b || b == 0x0c || b == 0x0d);
+}
+string_view				string_view::trim_left(void) const {
+	i32	left = 0;
+	while (left < this->len) {
+		if (!match_space((*this)[left])) {
+			break ;
+		}
+		++left;
+	}
+	return (this->slice(left));
+}
+string_view				string_view::trim_right(void) const {
+	i32	right = this->len - 1;
+	while (right > 0) {
+		if (!match_space((*this)[right])) {
+			break ;
+		}
+		--right;
+	}
+	return (this->slice(0, right + 1));
+}
+
 b32						string_view::split_iter(const string_view& sep, string_view& slot) {
 	if (this->len == 0) {
 		return (0);
@@ -218,6 +246,10 @@ b32						string_view::split_iter(const string_view& sep, string_view& slot) {
 	}
 
 	slot = this->slice(0, index);
-	*this = this->slice(index + sep.len);
+	if (index + sep.len >= this->len) {
+		*this = string_view();
+	} else {
+		*this = this->slice(index + sep.len);
+	}
 	return (1);
 }

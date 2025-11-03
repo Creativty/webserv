@@ -6,14 +6,14 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 16:30:27 by xenobas           #+#    #+#             */
-/*   Updated: 2025/11/01 18:05:21 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/03 09:48:58 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "webserv.hpp"
 #include "string_builder.hpp"
 
-static WEBSERV_URI	WEBSERV_uri_make(const string_view& str) {
+WEBSERV_URI			WEBSERV_uri_make(const string_view& str) {
 	WEBSERV_URI	uri;
 
 	uri.path = dynamic_array<string_view>();

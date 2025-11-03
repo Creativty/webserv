@@ -6,11 +6,53 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:45:19 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/01 16:22:19 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/03 14:26:25 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "webserv.hpp"
+#include <cstdlib>
+#include <ctime>
+
+i32	TEST_http(void) {
+	std::srand((unsigned int)std::time(0));
+
+	const string_view	string =
+		"GET / HTTP/1.1\r\n" // 16 bytes
+		"Content-Length: 0\r\n" // 19 bytes
+		"\r\n"; // 2 bytes
+		// 37 bytes
+	HTTP_Request	req = HTTP_request_make();
+
+	for (i32 cursor = 0; cursor < string.len; ) {
+		i32		read_len = std::rand() % (string.len - cursor);
+		if (read_len == 0) {
+			read_len = 1;
+		}
+		byte*	read_bytes = cast(byte*)&string.text[cursor];
+
+		// printf("%-4d bytes: \"%.*s\"\n", read_len, read_len, (char*)read_bytes);
+		HTTP_request_read(req, read_bytes, read_len);
+		cursor += read_len;
+	}
+
+	if (HTTP_request_is_error(req)) {
+		fprintf(stderr, "An error has occurred during read.\n");
+	} else if (!HTTP_request_is_closed(req)) {
+		fprintf(stderr, "Request did not close even after all bytes were read.\n");
+	}
+
+	HTTP_request_delete(req);
+	return (0);
+}
+i32	TEST_uri(void) {
+	WEBSERV_URI	uri = WEBSERV_uri_decode("/Hello%20World/123?test&good&test=123&question=Are%20You%Bork%20Gay%3f#");
+	string_view	str = WEBSERV_uri_encode(uri);
+	printf("String: \"%.*s\"\n", str.len, str.text);
+	str.free();
+	WEBSERV_uri_delete(uri);
+	return (0);
+}
 
 i32	main(i32 argc, cstring argv[]) {
 	CLI_exec_path = argv[0];
@@ -44,11 +86,11 @@ i32	main(i32 argc, cstring argv[]) {
 		return (4);
 	}
 
-	WEBSERV_URI	uri = WEBSERV_uri_decode("/Hello%20World/123?test&good&test=123&question=Are%20You%Bork%20Gay%3f#");
-	string_view	str = WEBSERV_uri_encode(uri);
-	printf("String: \"%.*s\"\n", str.len, str.text);
-	str.free();
-	WEBSERV_uri_delete(uri);
+
+	TEST_http();
+#if 0
+	TEST_uri();
+#endif
 
 	TOML_delete(document);
 	return (0);

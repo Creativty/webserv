@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/16 17:16:15 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/01 15:07:00 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/03 15:39:44 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -41,17 +41,23 @@ struct hash_table {
 	i32					count;
 	i32					cap;
 
-	hash_table(i32 cap = 0): items(0), count(0), cap(0) {
+	b32					case_insensitive; /* could be a u8 flag */
+
+	hash_table(i32 cap = 0): items(0), count(0), cap(0), case_insensitive(0) {
 		if (cap > 0)
 			this->resize(cap);
 	};
 	~hash_table(void) { };
-	hash_table(const hash_table& table): items(table.items), count(table.count), cap(table.cap) { };
+	hash_table(const hash_table& table) {
+		(*this) = table;
+	};
 	hash_table&	operator=(const hash_table& table) {
 		if (this != &table) {
 			this->items = table.items;
 			this->count = table.count;
 			this->cap = table.cap;
+
+			this->case_insensitive = table.case_insensitive;
 		}
 		return (*this);
 	};
@@ -61,7 +67,11 @@ struct hash_table {
 			throw std::runtime_error("Cannot hash when cap is set to zero");
 		size_t _hash = 0x811c9dc5;
 		for (i32 i = 0; i < key.len; ++i) {
-			_hash ^= (size_t)key[i];
+			char	b = key[i];
+			if (case_insensitive && b >= 'A' && b <= 'Z') {
+				b ^= (2 << 4);
+			}
+			_hash ^= (size_t)b;
 			_hash *= 0x01000193;
 		}
 		return (_hash & (cap - 1ul));
@@ -97,6 +107,9 @@ struct hash_table {
 		this->items = 0;
 		this->count = 0;
 		this->cap = 0;
+	}
+	void		free(void) { /* NOTE(xenobas): Alias for destroy(void) */
+		this->destroy();
 	}
 
 	void		set(const string_view& key, const T& value) {

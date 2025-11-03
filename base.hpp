@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/17 15:56:46 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/28 18:03:58 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/03 14:14:10 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,6 +17,7 @@
 
 #define cast(T) (T)
 #define unused(V) ((void)(V))
+#define count_of(V) (sizeof(V) / sizeof(V[0]))
 
 typedef int8_t		i8;
 typedef int16_t		i16;
