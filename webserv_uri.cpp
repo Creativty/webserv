@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 16:30:27 by xenobas           #+#    #+#             */
-/*   Updated: 2025/11/03 19:31:03 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/04 12:46:28 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -160,7 +160,7 @@ static void			WEBSERV_uri_encoded_write(string_builder& builder, const string_vi
 	}
 }
 
-static void			WEBSERV_uri_debug(const WEBSERV_URI uri) {
+static void			WEBSERV_uri_debug(const WEBSERV_URI& uri) {
 	printf("String: \"%.*s\"\n", uri.str.len, uri.str.text);
 	printf("Path: [ ");
 	for	(i32 i = 0; i < uri.path.len; ++i) {

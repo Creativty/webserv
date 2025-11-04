@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/04 09:11:56 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/04 14:33:28 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -252,25 +252,30 @@ enum HTTP_Request_Stage {
 	HTTP_REQUEST_STAGE_VERSION,
 	HTTP_REQUEST_STAGE_HEADERS,
 	HTTP_REQUEST_STAGE_BODY,
-	HTTP_REQUEST_STAGE_CHUNKS,
+	HTTP_REQUEST_STAGE_CHUNK,
+	HTTP_REQUEST_STAGE_CHUNK_DATA,
 
 	HTTP_REQUEST_STAGE_ERROR,
 	HTTP_REQUEST_STAGE_DONE,
 };
+struct HTTP_Chunk {
+	i32	index;
+	i32	size;
+};
 struct HTTP_Request {
-	WEBSERV_Method		method;
-	WEBSERV_URI			uri;
+	WEBSERV_Method				method;
+	WEBSERV_URI					uri;
 
-	HTTP_Headers		headers;
-	b32					chunked;
-	i64					content_length;
+	HTTP_Headers				headers;
+	b32							chunked;
+	i64							content_length;
 
-	i32					body_index;
-	i32					body_length;
+	dynamic_array<HTTP_Chunk>	chunks;
+	HTTP_Chunk					chunk;
 
-	dynamic_array<byte>	buff;
-	i32					buff_index;
-	HTTP_Request_Stage	buff_stage;
+	dynamic_array<byte>			buff;
+	i32							buff_index;
+	HTTP_Request_Stage			buff_stage;
 };
 
 extern string_view	CLI_exec_path;
@@ -312,4 +317,6 @@ b32					HTTP_request_is_error(const HTTP_Request& req);
 b32					HTTP_request_is_closed(const HTTP_Request& req);
 void				HTTP_request_close(HTTP_Request& req);
 b32					HTTP_request_read(HTTP_Request& req, const byte* data, i32 size);
+
+void				HTTP_request_debug(HTTP_Request& req);
 #endif
