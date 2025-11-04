@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 18:33:49 by xenobas           #+#    #+#             */
-/*   Updated: 2025/11/03 17:48:45 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/04 10:18:32 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -26,12 +26,12 @@ HTTP_Request		HTTP_request_make(void) {
 	req.chunked = 0;
 	req.content_length = -1;
 
-	req.body_offset = -1;
+	req.body_index = -1;
 	req.body_length =  0;
 
 	req.buff = dynamic_array<byte>();
-	req.buff_cursor_index = 0;
-	req.buff_cursor_stage = HTTP_REQUEST_CURSOR_STAGE_METHOD;
+	req.buff_index = 0;
+	req.buff_stage = HTTP_REQUEST_STAGE_METHOD;
 	return (req);
 }
 void				HTTP_request_delete(HTTP_Request& req) {
@@ -52,17 +52,20 @@ void				HTTP_request_delete(HTTP_Request& req) {
 
 b32					HTTP_request_is_closed(const HTTP_Request& req) {
 	return (
-		req.buff_cursor_stage == HTTP_REQUEST_CURSOR_STAGE_DONE
-		|| req.buff_cursor_stage == HTTP_REQUEST_CURSOR_STAGE_ERROR
+		req.buff_stage == HTTP_REQUEST_STAGE_DONE
+		|| req.buff_stage == HTTP_REQUEST_STAGE_ERROR
 	);
 }
 b32					HTTP_request_is_error(const HTTP_Request& req) {
-	return (req.buff_cursor_stage == HTTP_REQUEST_CURSOR_STAGE_ERROR);
+	return (req.buff_stage == HTTP_REQUEST_STAGE_ERROR);
+}
+static b32			HTTP_request_is_stage_body(const HTTP_Request& req) {
+	return (req.buff_stage == HTTP_REQUEST_STAGE_BODY || req.buff_stage == HTTP_REQUEST_STAGE_CHUNKS);
 }
 
 b32					HTTP_request_read(HTTP_Request& req, const byte* data, i32 size) {
 	if (HTTP_request_is_closed(req) || size == 0  || data == 0) {
-		req.buff_cursor_stage = HTTP_REQUEST_CURSOR_STAGE_ERROR;
+		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
 		return (0);
 	}
 
@@ -70,10 +73,10 @@ b32					HTTP_request_read(HTTP_Request& req, const byte* data, i32 size) {
 	return (HTTP_request_read_internal(req));
 }
 void				HTTP_request_close(HTTP_Request& req) {
-	if (HTTP_request_is_closed(req)) {
-		req.buff_cursor_stage = HTTP_REQUEST_CURSOR_STAGE_ERROR;
+	if (HTTP_request_is_closed(req) || !HTTP_request_is_stage_body(req)) {
+		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
 	} else {
-		req.buff_cursor_stage = HTTP_REQUEST_CURSOR_STAGE_DONE;
+		req.buff_stage = HTTP_REQUEST_STAGE_DONE;
 	}
 }
 
@@ -120,10 +123,10 @@ static i64			HTTP_parse_i64(const string_view& str, i32 fallback = -1) {
 }
 
 static void			HTTP_request_read_stage_method(HTTP_Request& req) {
-	if (req.buff_cursor_index >= req.buff.len)
+	if (req.buff_index >= req.buff.len)
 		return ;
 
-	string_view	str((char*)&req.buff[req.buff_cursor_index], req.buff.len - req.buff_cursor_index);
+	string_view	str((char*)&req.buff[req.buff_index], req.buff.len - req.buff_index);
 	string_view	sep(" ");
 
 	i32	idx_end = str.index(sep);
@@ -132,20 +135,20 @@ static void			HTTP_request_read_stage_method(HTTP_Request& req) {
 	}
 
 	string_view	str_method = str.slice(0, idx_end);
-	req.buff_cursor_index += idx_end + sep.len;
+	req.buff_index += idx_end + sep.len;
 	
 	req.method = WEBSERV_method_make(str_method);
 	if (req.method == WEBSERV_METHOD_INVALID) {
-		req.buff_cursor_stage = HTTP_REQUEST_CURSOR_STAGE_ERROR;
+		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
 	} else {
-		req.buff_cursor_stage = HTTP_REQUEST_CURSOR_STAGE_URI;
+		req.buff_stage = HTTP_REQUEST_STAGE_URI;
 	}
 }
 static void			HTTP_request_read_stage_uri(HTTP_Request& req) {
-	if (req.buff_cursor_index >= req.buff.len)
+	if (req.buff_index >= req.buff.len)
 		return ;
 
-	string_view	str((char*)&req.buff[req.buff_cursor_index], req.buff.len - req.buff_cursor_index);
+	string_view	str((char*)&req.buff[req.buff_index], req.buff.len - req.buff_index);
 	string_view	sep(" ");
 
 	i32	idx_end = str.index(sep);
@@ -154,20 +157,20 @@ static void			HTTP_request_read_stage_uri(HTTP_Request& req) {
 	}
 
 	string_view	str_uri = str.slice(0, idx_end);
-	req.buff_cursor_index += idx_end + sep.len;
+	req.buff_index += idx_end + sep.len;
 	
 	req.uri = WEBSERV_uri_decode(str_uri);
 	if (!req.uri.ok) {
-		req.buff_cursor_stage = HTTP_REQUEST_CURSOR_STAGE_ERROR;
+		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
 	} else {
-		req.buff_cursor_stage = HTTP_REQUEST_CURSOR_STAGE_VERSION;
+		req.buff_stage = HTTP_REQUEST_STAGE_VERSION;
 	}
 }
 static void			HTTP_request_read_stage_version(HTTP_Request& req) {
-	if (req.buff_cursor_index >= req.buff.len)
+	if (req.buff_index >= req.buff.len)
 		return ;
 
-	string_view	str((char*)&req.buff[req.buff_cursor_index], req.buff.len - req.buff_cursor_index);
+	string_view	str((char*)&req.buff[req.buff_index], req.buff.len - req.buff_index);
 	string_view	sep("\r\n");
 
 	i32	idx_end = str.index(sep);
@@ -176,12 +179,12 @@ static void			HTTP_request_read_stage_version(HTTP_Request& req) {
 	}
 
 	string_view	str_version = str.slice(0, idx_end);
-	req.buff_cursor_index += idx_end + sep.len;
+	req.buff_index += idx_end + sep.len;
 
 	if (WEBSERV_http_version_supported(str_version)) {
-		req.buff_cursor_stage = HTTP_REQUEST_CURSOR_STAGE_HEADERS;
+		req.buff_stage = HTTP_REQUEST_STAGE_HEADERS;
 	} else {
-		req.buff_cursor_stage = HTTP_REQUEST_CURSOR_STAGE_ERROR;
+		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
 	}
 }
 static void			HTTP_request_read_stage_headers_special(HTTP_Request& req, const string_view& name, const string_view& value) {
@@ -190,16 +193,21 @@ static void			HTTP_request_read_stage_headers_special(HTTP_Request& req, const s
 		if (req.content_length < 0) {
 			req.content_length = -1;
 		}
+		return ;
 	}
 	if (name.eq_insensitive("transfer-encoding")) {
-		req.chunked = (value == "chunked");
+		req.chunked = value.eq_insensitive("chunked");
+		if (!req.chunked) {
+			req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
+		}
+		return ;
 	}
 }
 static void			HTTP_request_read_stage_headers(HTTP_Request& req) {
-	if (req.buff_cursor_index >= req.buff.len)
+	if (req.buff_index >= req.buff.len)
 		return ;
 
-	string_view	str((char*)&req.buff[req.buff_cursor_index], req.buff.len - req.buff_cursor_index);
+	string_view	str((char*)&req.buff[req.buff_index], req.buff.len - req.buff_index);
 	string_view	sep("\r\n");
 
 	i32	idx_end = str.index(sep);
@@ -208,15 +216,15 @@ static void			HTTP_request_read_stage_headers(HTTP_Request& req) {
 	}
 
 	string_view	str_header = str.slice(0, idx_end);
-	req.buff_cursor_index += idx_end + sep.len;
+	req.buff_index += idx_end + sep.len;
 	if (str_header == "") {
-		req.buff_cursor_stage = req.chunked ? HTTP_REQUEST_CURSOR_STAGE_BODY_CHUNKED : HTTP_REQUEST_CURSOR_STAGE_BODY;
+		req.buff_stage = req.chunked ? HTTP_REQUEST_STAGE_CHUNKS : HTTP_REQUEST_STAGE_BODY;
 		return ;
 	}
 
 	i32	idx_name_end = str_header.index(":");
 	if (idx_name_end == -1) {
-		req.buff_cursor_stage = HTTP_REQUEST_CURSOR_STAGE_ERROR;
+		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
 		return ;
 	}
 	
@@ -227,37 +235,37 @@ static void			HTTP_request_read_stage_headers(HTTP_Request& req) {
 	HTTP_request_read_stage_headers_special(req, str_name, str_value);
 }
 static void			HTTP_request_read_stage_body(HTTP_Request& req) {
-	i32	rem = req.buff.len - req.buff_cursor_index;
+	i32	rem = req.buff.len - req.buff_index;
 	req.body_length += rem;
 
-	if (req.body_offset < 0) {
-		req.body_offset = req.buff_cursor_index;
+	if (req.body_index < 0) {
+		req.body_index = req.buff_index;
 	}
 
-	req.buff_cursor_index += rem;
-	if (req.content_length >= 0 && req.buff_cursor_index - req.body_offset >= req.content_length) {
+	req.buff_index += rem;
+	if (req.content_length >= 0 && req.buff_index - req.body_index >= req.content_length) {
 		HTTP_request_close(req);
 	}
 }
 
 static b32			HTTP_request_read_internal(HTTP_Request& req) {
-	if (req.buff_cursor_index >= req.buff.len) {
+	if (req.buff_index >= req.buff.len) {
 		return (1);
 	}
 
-	if (req.buff_cursor_stage == HTTP_REQUEST_CURSOR_STAGE_METHOD) {
+	if (req.buff_stage == HTTP_REQUEST_STAGE_METHOD) {
 		HTTP_request_read_stage_method(req);
 	}
-	if (req.buff_cursor_stage == HTTP_REQUEST_CURSOR_STAGE_URI) {
+	if (req.buff_stage == HTTP_REQUEST_STAGE_URI) {
 		HTTP_request_read_stage_uri(req);
 	}
-	if (req.buff_cursor_stage == HTTP_REQUEST_CURSOR_STAGE_VERSION) {
+	if (req.buff_stage == HTTP_REQUEST_STAGE_VERSION) {
 		HTTP_request_read_stage_version(req);
 	}
-	if (req.buff_cursor_stage == HTTP_REQUEST_CURSOR_STAGE_HEADERS) {
+	if (req.buff_stage == HTTP_REQUEST_STAGE_HEADERS) {
 		HTTP_request_read_stage_headers(req);
 	}
-	if (req.buff_cursor_stage == HTTP_REQUEST_CURSOR_STAGE_BODY) {
+	if (req.buff_stage == HTTP_REQUEST_STAGE_BODY) {
 		HTTP_request_read_stage_body(req);
 	}
 	return (!HTTP_request_is_error(req));

@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/03 17:39:06 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/04 09:11:56 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -246,31 +246,31 @@ struct WEBSERV_Config {
 
 typedef hash_table<string_view>	HTTP_Headers;
 
-enum HTTP_Request_Cursor_Stage {
-	HTTP_REQUEST_CURSOR_STAGE_METHOD,
-	HTTP_REQUEST_CURSOR_STAGE_URI,
-	HTTP_REQUEST_CURSOR_STAGE_VERSION,
-	HTTP_REQUEST_CURSOR_STAGE_HEADERS,
-	HTTP_REQUEST_CURSOR_STAGE_BODY,
-	HTTP_REQUEST_CURSOR_STAGE_BODY_CHUNKED,
+enum HTTP_Request_Stage {
+	HTTP_REQUEST_STAGE_METHOD,
+	HTTP_REQUEST_STAGE_URI,
+	HTTP_REQUEST_STAGE_VERSION,
+	HTTP_REQUEST_STAGE_HEADERS,
+	HTTP_REQUEST_STAGE_BODY,
+	HTTP_REQUEST_STAGE_CHUNKS,
 
-	HTTP_REQUEST_CURSOR_STAGE_ERROR,
-	HTTP_REQUEST_CURSOR_STAGE_DONE,
+	HTTP_REQUEST_STAGE_ERROR,
+	HTTP_REQUEST_STAGE_DONE,
 };
 struct HTTP_Request {
-	WEBSERV_Method				method;
-	WEBSERV_URI					uri;
+	WEBSERV_Method		method;
+	WEBSERV_URI			uri;
 
-	HTTP_Headers				headers;
-	b32							chunked;
-	i64							content_length;
+	HTTP_Headers		headers;
+	b32					chunked;
+	i64					content_length;
 
-	i32							body_offset;
-	i32							body_length;
+	i32					body_index;
+	i32					body_length;
 
-	dynamic_array<byte>			buff;
-	i32							buff_cursor_index;
-	HTTP_Request_Cursor_Stage	buff_cursor_stage;
+	dynamic_array<byte>	buff;
+	i32					buff_index;
+	HTTP_Request_Stage	buff_stage;
 };
 
 extern string_view	CLI_exec_path;

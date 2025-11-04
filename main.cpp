@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:45:19 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/03 14:26:25 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/04 10:14:47 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,30 +19,33 @@ i32	TEST_http(void) {
 
 	const string_view	string =
 		"GET / HTTP/1.1\r\n" // 16 bytes
-		"Content-Length: 0\r\n" // 19 bytes
-		"\r\n"; // 2 bytes
-		// 37 bytes
-	HTTP_Request	req = HTTP_request_make();
+		"Content-Length: 14\r\n" // 19 bytes
+		"\r\n" // 2 bytes
+		"{ \"key\": 123 }" // 14 bytes
+		;
+	for (i32 _ = 0; _ < 100; ++_) {
+		HTTP_Request	req = HTTP_request_make();
 
-	for (i32 cursor = 0; cursor < string.len; ) {
-		i32		read_len = std::rand() % (string.len - cursor);
-		if (read_len == 0) {
-			read_len = 1;
+		for (i32 cursor = 0; cursor < string.len; ) {
+			i32		read_len = std::rand() % (string.len - cursor);
+			byte*	read_bytes = cast(byte*)&string.text[cursor];
+			if (read_len == 0) {
+				read_len = 1;
+			}
+
+			cursor += read_len;
+			HTTP_request_read(req, read_bytes, read_len);
 		}
-		byte*	read_bytes = cast(byte*)&string.text[cursor];
+		// HTTP_request_close(req);
 
-		// printf("%-4d bytes: \"%.*s\"\n", read_len, read_len, (char*)read_bytes);
-		HTTP_request_read(req, read_bytes, read_len);
-		cursor += read_len;
+		if (HTTP_request_is_error(req)) {
+			fprintf(stderr, "An error has occurred during read.\n");
+		} else if (!HTTP_request_is_closed(req)) {
+			fprintf(stderr, "Request did not close even after all bytes were read.\n");
+		}
+
+		HTTP_request_delete(req);
 	}
-
-	if (HTTP_request_is_error(req)) {
-		fprintf(stderr, "An error has occurred during read.\n");
-	} else if (!HTTP_request_is_closed(req)) {
-		fprintf(stderr, "Request did not close even after all bytes were read.\n");
-	}
-
-	HTTP_request_delete(req);
 	return (0);
 }
 i32	TEST_uri(void) {

@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 16:30:27 by xenobas           #+#    #+#             */
-/*   Updated: 2025/11/03 09:48:58 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/03 19:31:03 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -228,7 +228,6 @@ WEBSERV_URI			WEBSERV_uri_decode(const string_view& str) {
 
 		uri.ok = 1;
 	}
-	WEBSERV_uri_debug(uri);
 	return (uri);
 }
 string_view			WEBSERV_uri_encode(const WEBSERV_URI& uri, b32 write_trailing_slash) {
