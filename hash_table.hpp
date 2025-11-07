@@ -6,13 +6,22 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/16 17:16:15 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/03 15:39:44 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/06 12:58:05 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef   HASH_TABLE_HPP
 #define   HASH_TABLE_HPP
 #include "base.hpp"
+
+#define for_table_begin(TABLE, TABLE_TYPE, TABLE_ITEM) \
+	for (i32 TABLE_ITEM##_index = 0; TABLE_ITEM##_index < (TABLE).cap; ++TABLE_ITEM##_index) { \
+		TABLE_TYPE::item&	TABLE_ITEM = (TABLE).items[TABLE_ITEM##_index]; \
+		if (!TABLE_ITEM.used()) { \
+			continue ; \
+		}
+#define for_table_end }
+
 template <typename T>
 struct hash_table {
 	struct item {

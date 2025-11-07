@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:51:12 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/01 15:32:00 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/07 11:02:45 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,16 +19,13 @@ static void			TOML_value_free(const TOML_Value& value) {
 
 	switch (value.kind) {
 	case TOML_VALUE_TABLE: {
-		TOML_Table*		tbl = value.Table;
-		for (i32 i = 0; i < tbl->cap; ++i) {
-			TOML_Table::hash_table_item& item = tbl->items[i];
-			if (!item.used()) {
-				continue ;
-			}
-			TOML_value_free(item.value);
-		}
-		tbl->destroy();
-		delete tbl;
+		TOML_Table&		tbl = *value.Table;
+		for_table_begin(tbl, TOML_Table, entry) {
+			TOML_value_free(entry.value);
+		} for_table_end ;
+		tbl.free();
+
+		delete value.Table;
 	} break;
 	case TOML_VALUE_ARRAY_TABLES:
 	case TOML_VALUE_ARRAY: {
@@ -237,14 +234,24 @@ static byte			TOML_lexer_next(TOML_Tokenizer& lexer) {
 }
 static b32			TOML_lexer_walk_until_next(TOML_Tokenizer& lexer) {
 	byte	b = 0;
+	b32		comment = 0;
 	while (lexer.source.len > lexer.pos.index) {
 		b = TOML_lexer_peek(lexer);
-		if (!TOML_match_whitespace(b)) {
-			break ;
+		if (b == '#') {
+			comment = 1;
+		}
+		if (comment) {
+			if (b == '\n') {
+				break ;
+			}
+		} else {
+			if (!TOML_match_whitespace(b)) {
+				break ;
+			}
 		}
 		TOML_lexer_next(lexer);
 	}
-	return (b != 0);
+	return (b != 0 && lexer.source.len > lexer.pos.index);
 }
 static TOML_Token	TOML_lexer_token(TOML_Document& document) {
 	TOML_Tokenizer&	lexer = document.lexer;
@@ -268,7 +275,6 @@ static TOML_Token	TOML_lexer_token(TOML_Document& document) {
 	} else if (b == ']') {
 		kind = TOML_TOKEN_CSQUARE;
 	} else if (b == '"') {
-		b = TOML_lexer_next(lexer);
 		while (1) {
 			b = TOML_lexer_peek(lexer);
 			if (b == '"' || b == '\n' || b == 9) {
@@ -750,15 +756,13 @@ static void			TOML_value_debug(const TOML_Value& value, i32 indent = 0, string_v
 			printf("nil\n");
 			return ;
 		}
+
 		const TOML_Table&		tbl = *value.Table;
+
 		printf("table %d entries\n", tbl.count);
-		for (i32 i = 0; i < tbl.cap; ++i) {
-			const TOML_Table::hash_table_item&	pair = tbl.items[i];
-			if (!pair.used()) {
-				continue ;
-			}
-			TOML_value_debug(pair.value, indent + 1, pair.key);
-		}
+		for_table_begin(tbl, const TOML_Table, entry) {
+			TOML_value_debug(entry.value, indent + 1, entry.key);
+		} for_table_end ;
 	} break ;
 	case TOML_VALUE_NIL:
 	default:

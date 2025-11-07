@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 18:33:49 by xenobas           #+#    #+#             */
-/*   Updated: 2025/11/04 14:53:00 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/07 11:04:35 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -36,19 +36,15 @@ HTTP_Request		HTTP_request_make(void) {
 	return (req);
 }
 void				HTTP_request_delete(HTTP_Request& req) {
-	req.buff.free();
-
 	WEBSERV_uri_delete(req.uri);
 
-	for (i32 i = 0; i < req.headers.cap; ++i) {
-		HTTP_Headers::item	header = req.headers.items[i];
-		if (!header.used()) {
-			continue ;
-		}
-
+	for_table_begin(req.headers, HTTP_Headers, header) {
 		header.value.free();
-	}
+	} for_table_end ;
 	req.headers.free();
+
+	req.chunks.free();
+	req.buff.free();
 
 	req = HTTP_request_make();
 }
@@ -107,28 +103,19 @@ void				HTTP_request_debug(HTTP_Request& req) {
 					printf(" is empty");
 				}
 				printf("\n");
-				for (i32 i = 0; i < uri.query.cap; ++i) {
-					const hash_table<string_view>::item&	iter = uri.query.items[i];
-					if (!iter.used()) {
-						continue ;
-					}
 
-					printf("        \"%.*s\" = \"%.*s\"\n", iter.key.len, iter.key.text, iter.value.len, iter.value.text);
-				}
+				for_table_begin(uri.query, const hash_table<string_view>, param) {
+					printf("        \"%.*s\" = \"%.*s\"\n", param.key.len, param.key.text, param.value.len, param.value.text);
+				} for_table_end ;
 			}
 		}
 		{ /* Headers */
 			const HTTP_Headers& headers = req.headers;
 
 			printf("    Headers \n");
-			for (i32 i = 0; i < headers.cap; ++i) {
-				const HTTP_Headers::item&	iter = headers.items[i];
-				if (!iter.used()) {
-					continue ;
-				}
-
-				printf("        \"%.*s\" = \"%.*s\"\n", iter.key.len, iter.key.text, iter.value.len, iter.value.text);
-			}
+			for_table_begin(headers, const HTTP_Headers, header) {
+				printf("        \"%.*s\" = \"%.*s\"\n", header.key.len, header.key.text, header.value.len, header.value.text);
+			} for_table_end ;
 		}
 		{ /* Body */
 			char	buff[64] = { 0 };

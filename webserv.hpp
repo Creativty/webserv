@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/04 14:33:28 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/07 10:19:20 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,8 +23,11 @@
 #include <cstdarg>
 
 #include <fcntl.h>
+#include <netdb.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 
 struct Position {
 	i32			index;
@@ -56,13 +59,11 @@ enum TOML_Token_Kind {
 	TOML_TOKEN_NUMBER, // [0-9]+
 	TOML_TOKEN_STRING, // ".*"
 };
-
 struct TOML_Token {
 	TOML_Token_Kind	kind;
 	string_view		str;
 	Position		pos;
 };
-
 struct TOML_Tokenizer {
 	dynamic_array<TOML_Token>	tokens;
 
@@ -78,18 +79,29 @@ typedef string_view					TOML_String;
 typedef dynamic_array<TOML_Value>	TOML_Array;
 typedef hash_table<TOML_Value>		TOML_Table;
 
+#define TOML_VALUE_KINDS \
+	TOML_VALUE_KIND(NIL, "nil") \
+	TOML_VALUE_KIND(BOOLEAN, "boolean") \
+	TOML_VALUE_KIND(NUMBER, "number") \
+	TOML_VALUE_KIND(STRING, "string") \
+	TOML_VALUE_KIND(ARRAY, "array") \
+	TOML_VALUE_KIND(ARRAY_TABLES, "array of tables") \
+	TOML_VALUE_KIND(TABLE, "table")
+
 enum TOML_Value_Kind {
-	TOML_VALUE_NIL,
-
-	TOML_VALUE_BOOLEAN,
-	TOML_VALUE_NUMBER,
-	TOML_VALUE_STRING,
-
-	TOML_VALUE_ARRAY,
-	TOML_VALUE_ARRAY_TABLES,
-	TOML_VALUE_TABLE,
+#define TOML_VALUE_KIND(NAME, ...) TOML_VALUE_##NAME,
+	TOML_VALUE_KINDS
+#undef TOML_VALUE_KIND
+// TOML_VALUE_NIL,
+// 
+// TOML_VALUE_BOOLEAN,
+// TOML_VALUE_NUMBER,
+// TOML_VALUE_STRING,
+// 
+// TOML_VALUE_ARRAY,
+// TOML_VALUE_ARRAY_TABLES,
+// TOML_VALUE_TABLE,
 };
-
 struct TOML_Value {
 	TOML_Value_Kind	kind;
 	Position		pos;
@@ -102,7 +114,6 @@ struct TOML_Value {
 		TOML_Table*		Table;
 	};
 };
-
 struct TOML_Parser {
 	i32				index;
 	TOML_Token		token;
@@ -127,7 +138,6 @@ enum TOML_Error_Kind {
 	TOML_ERROR_PARSER_STRING_QUOTES,
 	TOML_ERROR_PARSER_UNSUPPORTED,
 };
-
 struct TOML_Error {
 	TOML_Error_Kind	kind;
 	Position		pos;
@@ -136,7 +146,6 @@ struct TOML_Error {
 	TOML_Token		token;
 	TOML_Value*		value;
 };
-
 struct TOML_Document {
 	TOML_Value					root;
 	dynamic_array<TOML_Error>	errors;
@@ -162,7 +171,6 @@ struct WEBSERV_URI {
 	string_view					str;
 	b32							ok;
 };
-
 enum WEBSERV_Method {
 	WEBSERV_METHOD_INVALID,
 
@@ -171,6 +179,14 @@ enum WEBSERV_Method {
 	WEBSERV_METHOD_PUT,
 
 	WEBSERV_METHOD_COUNT,
+};
+struct WEBSERV_Interface {
+	u16	port;
+	u32	address;
+};
+union WEBSERV_Address {
+	u32	blob;
+	u8	bytes[4];
 };
 
 enum WEBSERV_Route_Kind {
@@ -181,27 +197,17 @@ enum WEBSERV_Route_Kind {
 	WEBSERV_ROUTE_UPLOAD,
 	WEBSERV_ROUTE_CGI,
 };
-
-struct WEBSERV_Interface {
-	u16	port;
-	u32	address;
-};
-
 struct WEBSERV_Route_Basic {
 	b32	directory_list;
 };
-
 struct WEBSERV_Route_Redirect {
 	string_view	location;
 };
-
 struct WEBSERV_Route_Upload {
 };
-
 struct WEBSERV_Route_CGI {
 	hash_table<string_view>		env;
 };
-
 struct WEBSERV_Route {
 	string_view			pattern;
 	WEBSERV_Method		methods_whitelist;
@@ -221,6 +227,9 @@ struct WEBSERV_Route {
 struct WEBSERV_Instance {
 	dynamic_array<WEBSERV_Interface>	interfaces;
 
+	u16									port;
+	WEBSERV_Address						addr;
+
 	u32									request_body_max;
 
 	string_view							error_4xx;
@@ -229,19 +238,48 @@ struct WEBSERV_Instance {
 	hash_table<WEBSERV_Route>			routes;
 };
 
-enum WEBSERV_Config_Error {
-	WEBSERV_CONFIG_ERROR_INVALID,
+#define CONFIG_ERROR_KINDS \
+	CONFIG_ERROR_KIND(INVALID, "invalid") \
+	CONFIG_ERROR_KIND(ROOT_TYPE, "root type") \
+	CONFIG_ERROR_KIND(ROOT_DATA, "root data") \
+	CONFIG_ERROR_KIND(KEY_UNKNOWN, "key unknown") \
+	CONFIG_ERROR_KIND(KEY_DISALLOWED, "key disallowed") \
+	CONFIG_ERROR_KIND(TYPE_MISMATCH, "type mismatch") \
+	CONFIG_ERROR_KIND(PORT_RANGE, "port range") \
+	CONFIG_ERROR_KIND(STRING_EMPTY, "string empty") \
+	CONFIG_ERROR_KIND(VALUE_INVALID, "value invalid") \
+	CONFIG_ERROR_KIND(INSTANCE_EMPTY, "instance empty")
 
-	WEBSERV_CONFIG_ERROR_KEY_UNKNOWN,
-	WEBSERV_CONFIG_ERROR_KEY_DISALLOWED,
-	WEBSERV_CONFIG_ERROR_TYPE_MISMATCH,
+enum WEBSERV_Config_Error_Kind {
+#define CONFIG_ERROR_KIND(NAME, ...) WEBSERV_CONFIG_ERROR_##NAME,
+	CONFIG_ERROR_KINDS
+#undef CONFIG_ERROR_KIND
+// WEBSERV_CONFIG_ERROR_INVALID,
+// 
+// WEBSERV_CONFIG_ERROR_ROOT_TYPE,
+// WEBSERV_CONFIG_ERROR_ROOT_DATA,
+// 
+// WEBSERV_CONFIG_ERROR_KEY_UNKNOWN,
+// WEBSERV_CONFIG_ERROR_KEY_DISALLOWED,
+// WEBSERV_CONFIG_ERROR_TYPE_MISMATCH,
 };
-typedef struct WEBSERV_Document  WEBSERV_Document;
+
+struct WEBSERV_Config_Error {
+	WEBSERV_Config_Error_Kind	kind;
+	Position					pos;
+
+	string_view					str;
+	TOML_Token					token;
+	TOML_Value*					value;
+};
+typedef struct WEBSERV_Document	WEBSERV_Document;
 struct WEBSERV_Config {
 	dynamic_array<WEBSERV_Instance>		instances;
 
-	TOML_Document						toml;
+	TOML_Document						document;
 	dynamic_array<WEBSERV_Config_Error>	errors;
+
+	b32									ok;
 };
 
 typedef hash_table<string_view>	HTTP_Headers;
@@ -294,7 +332,8 @@ void				CLI_show_error_file_access(string_view file_path);
 void				CLI_show_error_file_mode(string_view file_path, mode_t mode);
 void				CLI_show_error_syntax(const Position pos, const char *fmt, ...);
 void				CLI_show_error_config(const Position pos, const char *fmt, ...);
-void				CLI_show_errors_toml_parse(const TOML_Document& document);
+void				CLI_show_errors_toml(const TOML_Document& document);
+void				CLI_show_errors_config(const WEBSERV_Config& config);
 
 TOML_Document		TOML_make(const string_view& file);
 void				TOML_delete(TOML_Document& document);

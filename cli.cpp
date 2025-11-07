@@ -6,11 +6,23 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:16:13 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/29 18:52:32 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/07 10:20:54 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "webserv.hpp"
+
+static const char*	webserv_config_error_kind_strings[] = {
+#define CONFIG_ERROR_KIND(NAME, STRING, ...) STRING,
+	CONFIG_ERROR_KINDS
+#undef CONFIG_ERROR_KIND
+};
+
+static const char*	toml_value_kind_strings[] = {
+#define TOML_VALUE_KIND(NAME, STRING, ...) STRING,
+	TOML_VALUE_KINDS
+#undef TOML_VALUE_KIND
+};
 
 string_view		CLI_exec_path = "<CLI_exec_path>";
 b32				CLI_is_tty = 0;
@@ -94,17 +106,6 @@ void			CLI_show_error_syntax(const Position pos, const char* fmt, ...) {
 	fprintf(stderr, "\n");
 	va_end(args);
 }
-void			CLI_show_error_config(const Position pos, const char* fmt, ...) {
-	va_list	args;
-	va_start(args, fmt);
-	if (CLI_is_tty) {
-		fprintf(stderr, "%.*s:%d:%d: " TERMINAL_COLOR_RED "Config Error" TERMINAL_STYLE_RESET ": ", pos.file.len, pos.file.text, pos.col, pos.row);
-	} else {
-		fprintf(stderr, "%.*s:%d:%d: Config Error: ", pos.file.len, pos.file.text, pos.col, pos.row);
-	}
-	vfprintf(stderr, fmt, args);
-	va_end(args);
-}
 
 static void		CLI_show_error_toml_line(const TOML_Document& document, const Position& pos) {
 	if (!CLI_is_tty)
@@ -150,7 +151,7 @@ static void		CLI_show_error_toml_line(const TOML_Document& document, const Posit
 	}
 	fprintf(stderr, "^\n");
 }
-void			CLI_show_errors_toml_parse(const TOML_Document& document) {
+void			CLI_show_errors_toml(const TOML_Document& document) {
 	const dynamic_array<TOML_Error>&	errors = document.errors;
 	for (i32 i = 0; i < errors.len; ++i) {
 		const TOML_Error&	err = errors[i];
@@ -219,6 +220,67 @@ void			CLI_show_errors_toml_parse(const TOML_Document& document) {
 		default: {
 			CLI_show_error_syntax(err.pos, "Unknown error %d", err.kind);
 		} break;
+		}
+	}
+}
+
+void			CLI_show_error_config(const char* fmt, ...) {
+	va_list	args;
+	va_start(args, fmt);
+	if (CLI_is_tty) {
+		fprintf(stderr, TERMINAL_COLOR_RED "Config Error" TERMINAL_STYLE_RESET ": ");
+	} else {
+		fprintf(stderr, "Config Error: ");
+	}
+	vfprintf(stderr, fmt, args);
+	fprintf(stderr, "\n");
+	va_end(args);
+}
+void			CLI_show_error_config(const Position pos, const char* fmt, ...) {
+	va_list	args;
+	va_start(args, fmt);
+	if (CLI_is_tty) {
+		fprintf(stderr, "%.*s:%d:%d: " TERMINAL_COLOR_RED "Config Error" TERMINAL_STYLE_RESET ": ", pos.file.len, pos.file.text, pos.col, pos.row);
+	} else {
+		fprintf(stderr, "%.*s:%d:%d: Config Error: ", pos.file.len, pos.file.text, pos.col, pos.row);
+	}
+	vfprintf(stderr, fmt, args);
+	fprintf(stderr, "\n");
+	va_end(args);
+}
+void			CLI_show_errors_config(const WEBSERV_Config& config) {
+	const dynamic_array<WEBSERV_Config_Error>&	errors = config.errors;
+	for (i32 i = 0; i < errors.len; ++i) {
+		const WEBSERV_Config_Error& err = errors[i];
+		if (err.kind == WEBSERV_CONFIG_ERROR_ROOT_TYPE) {
+			CLI_show_error_config(err.pos, "Document is not a table");
+		} else if (err.kind == WEBSERV_CONFIG_ERROR_ROOT_DATA) {
+			CLI_show_error_config(err.pos, "Document is empty");
+		} else if (err.kind == WEBSERV_CONFIG_ERROR_KEY_UNKNOWN) {
+			CLI_show_error_config(err.pos, "Unrecognized key \"%.*s\"", err.str.len, err.str.text);
+			CLI_show_error_toml_line(config.document, err.pos);
+		} else if (err.kind == WEBSERV_CONFIG_ERROR_KEY_DISALLOWED) {
+			CLI_show_error_config(err.pos, "Disallowed key, because %.*s", err.str.len, err.str.text);
+			CLI_show_error_toml_line(config.document, err.pos);
+		} else if (err.kind == WEBSERV_CONFIG_ERROR_TYPE_MISMATCH) {
+			const char*	type_str = toml_value_kind_strings[err.value->kind];
+			CLI_show_error_config(err.pos, "Expected value of type \"%.*s\", Got \"%s\"", err.str.len, err.str.text, type_str);
+			CLI_show_error_toml_line(config.document, err.pos);
+		} else if (err.kind == WEBSERV_CONFIG_ERROR_INSTANCE_EMPTY) {
+			CLI_show_error_config(err.pos, "Empty instance");
+			CLI_show_error_toml_line(config.document, err.pos);
+		} else if (err.kind == WEBSERV_CONFIG_ERROR_PORT_RANGE) {
+			CLI_show_error_config(err.pos, "port value out of range, must be between 0 and 65535");
+			CLI_show_error_toml_line(config.document, err.pos);
+		} else if (err.kind == WEBSERV_CONFIG_ERROR_STRING_EMPTY) {
+			CLI_show_error_config(err.pos, "Expected \"%.*s\", got an empty string value", err.str.len, err.str.text);
+			CLI_show_error_toml_line(config.document, err.pos);
+		} else if (err.kind == WEBSERV_CONFIG_ERROR_VALUE_INVALID) {
+			CLI_show_error_config(err.pos, "Invalid value is not a proper \"%.*s\"", err.str.len, err.str.text);
+			CLI_show_error_toml_line(config.document, err.pos);
+		} else {
+			const char*	error_str = webserv_config_error_kind_strings[err.kind];
+			CLI_show_error_config(err.pos, "TODO: Error \"%s\" reporting is unimplemented", error_str);
 		}
 	}
 }

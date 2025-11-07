@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/16 09:19:09 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/03 17:30:33 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/07 10:18:15 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -207,6 +207,31 @@ i32						string_view::index(const string_view& str, i32 skip) const {
 		}
 	}
 	return (-1);
+}
+i32						string_view::count(char ch) const {
+	i32	n = 0;
+	for (i32 i = 0; i < this->len; ++i) {
+		if ((*this)[i] == ch) {
+			++n;
+		}
+	}
+	return (n);
+}
+i32						string_view::count(const string_view& str) const {
+	i32	n = 0;
+	for (i32 i = 0; i < this->len; ++i) {
+		i32	j = 0;
+		while (j < str.len && i + j < this->len) {
+			if ((*this)[i + j] != str[j]) {
+				break ;
+			}
+			++j;
+		}
+		if (j == str.len) {
+			++n;
+		}
+	}
+	return (n);
 }
 
 static b32				match_space(byte b) {

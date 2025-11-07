@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:45:19 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/04 14:57:46 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/06 09:43:01 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -63,7 +63,7 @@ i32	TEST_http_chunks(void) {
 
 	HTTP_Request	req = HTTP_request_make();
 
-	{ /* Read message */
+	{ /* Read message line and headers */
 		i32		read_len = message.len;
 		byte*	read_bytes = cast(byte*)message.text;
 		HTTP_request_read(req, read_bytes, read_len);
@@ -122,18 +122,25 @@ i32	main(i32 argc, cstring argv[]) {
 
 	TOML_Document	document = TOML_parse_file(path_toml);
 	if (!document.ok) {
-		CLI_show_errors_toml_parse(document);
+		CLI_show_errors_toml(document);
 
 		TOML_delete(document);
 		return (4);
 	}
 
+	WEBSERV_Config	config = WEBSERV_config_parse(document);
+	if (!config.ok) {
+		CLI_show_errors_config(config);
+
+		WEBSERV_config_delete(config);
+		return (8);
+	}
 
 	TEST_http_chunks();
 #if 0
 	TEST_uri();
 #endif
 
-	TOML_delete(document);
+	WEBSERV_config_delete(config);
 	return (0);
 }

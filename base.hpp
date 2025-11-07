@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/17 15:56:46 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/03 14:14:10 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/06 13:50:23 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -35,5 +35,14 @@ typedef const char*	cstring;
 
 #define I64_MIN (-9223372036854775807ll)
 #define I64_MAX (+9223372036854775807ll)
+
+template <typename T>
+void	MEM_zero(T& value) {
+	u64		count = sizeof(T);
+	byte*	bytes = cast(byte*)(&value);
+	for (u64 i = 0; i < count; ++i) {
+		bytes[i] = 0;
+	}
+}
 
 #endif

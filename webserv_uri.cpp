@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 16:30:27 by xenobas           #+#    #+#             */
-/*   Updated: 2025/11/04 12:46:28 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/07 11:00:39 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,14 +30,9 @@ void				WEBSERV_uri_delete(WEBSERV_URI& uri) {
 	}
 	uri.path.free();
 
-	for (i32 i = 0; i < uri.query.cap; ++i) {
-		hash_table<string_view>::hash_table_item&	item = uri.query.items[i];
-		if (!item.used()) {
-			continue ;
-		}
-
-		item.value.free();
-	}
+	for_table_begin(uri.query, hash_table<string_view>, param) {
+		param.value.free();
+	} for_table_end ;
 	uri.query.destroy();
 }
 
@@ -171,14 +166,9 @@ static void			WEBSERV_uri_debug(const WEBSERV_URI& uri) {
 	}
 	printf(" ]\n");
 	printf("Query Table:\n");
-	for (i32 i = 0; i < uri.query.cap; ++i) {
-		hash_table<string_view>::item	iter = uri.query.items[i];
-		if (!iter.used()) {
-			continue ;
-		}
-
-		printf("  %.*s = %.*s\n", iter.key.len, iter.key.text, iter.value.len, iter.value.text);
-	}
+	for_table_begin(uri.query, hash_table<string_view>, param) {
+		printf("  %.*s = %.*s\n", param.key.len, param.key.text, param.value.len, param.value.text);
+	} for_table_end ;
 }
 
 WEBSERV_URI			WEBSERV_uri_decode(const string_view& str) {
@@ -252,21 +242,18 @@ string_view			WEBSERV_uri_encode(const WEBSERV_URI& uri, b32 write_trailing_slas
 			builder.write('?');
 		}
 		u32	count = 0;
-		for (i32 i = 0; i < uri.query.cap; ++i) {
-			hash_table<string_view>::item&	item = uri.query.items[i];
-			if (!item.used()) {
-				continue ;
-			}
-
-			if (count++ > 0) {
+		for_table_begin(uri.query, const hash_table<string_view>, param) {
+			if (count > 0) {
 				builder.write('&');
 			}
-			WEBSERV_uri_encoded_write(builder, item.key);
-			if (item.value) {
+			++count;
+
+			WEBSERV_uri_encoded_write(builder, param.key);
+			if (param.value) {
 				builder.write('=');
-				WEBSERV_uri_encoded_write(builder, item.value);
+				WEBSERV_uri_encoded_write(builder, param.value);
 			}
-		}
+		} for_table_end ;
 	}
 	return (builder.to_string());
 }
