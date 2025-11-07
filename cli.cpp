@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:16:13 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/07 10:20:54 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/07 19:33:29 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -262,6 +262,8 @@ void			CLI_show_errors_config(const WEBSERV_Config& config) {
 		} else if (err.kind == WEBSERV_CONFIG_ERROR_KEY_DISALLOWED) {
 			CLI_show_error_config(err.pos, "Disallowed key, because %.*s", err.str.len, err.str.text);
 			CLI_show_error_toml_line(config.document, err.pos);
+		} else if (err.kind == WEBSERV_CONFIG_ERROR_KEY_REQUIRED) {
+			CLI_show_error_config(err.pos, "Missing required key \"%.*s\"", err.str.len, err.str.text);
 		} else if (err.kind == WEBSERV_CONFIG_ERROR_TYPE_MISMATCH) {
 			const char*	type_str = toml_value_kind_strings[err.value->kind];
 			CLI_show_error_config(err.pos, "Expected value of type \"%.*s\", Got \"%s\"", err.str.len, err.str.text, type_str);
@@ -278,6 +280,21 @@ void			CLI_show_errors_config(const WEBSERV_Config& config) {
 		} else if (err.kind == WEBSERV_CONFIG_ERROR_VALUE_INVALID) {
 			CLI_show_error_config(err.pos, "Invalid value is not a proper \"%.*s\"", err.str.len, err.str.text);
 			CLI_show_error_toml_line(config.document, err.pos);
+		} else if (err.kind == WEBSERV_CONFIG_ERROR_ROUTE_TYPE) {
+			const TOML_Value*	value = err.value;
+			b32					value_segfault = (value != 0 && value->String != 0);
+
+			CLI_show_error_config(err.pos, "Unknown route type \"%.*s\"", value_segfault ? value->String->len : 6, value ? value->String->text : "(null)");
+			CLI_show_error_toml_line(config.document, err.pos);
+
+			char	buff[512] = { 0 };
+			i32		index = 0;
+			index += std::snprintf(&buff[index], 512 - index, "\"%s\", ", "server"); // BASIC
+			index += std::snprintf(&buff[index], 512 - index, "\"%s\", ", "redirect"); // REDIRECT
+			index += std::snprintf(&buff[index], 512 - index, "\"%s\", ", "upload"); // UPLOAD
+			index += std::snprintf(&buff[index], 512 - index, "\"%s\"", "cgi"); // CGI
+
+			CLI_show_extra("Hint", "Must be one of the following options { %s }", buff);
 		} else {
 			const char*	error_str = webserv_config_error_kind_strings[err.kind];
 			CLI_show_error_config(err.pos, "TODO: Error \"%s\" reporting is unimplemented", error_str);

@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/07 10:19:20 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/07 19:37:53 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -174,9 +174,9 @@ struct WEBSERV_URI {
 enum WEBSERV_Method {
 	WEBSERV_METHOD_INVALID,
 
-	WEBSERV_METHOD_GET,
-	WEBSERV_METHOD_POST,
-	WEBSERV_METHOD_PUT,
+	WEBSERV_METHOD_GET = 1,
+	WEBSERV_METHOD_POST = 2,
+	WEBSERV_METHOD_PUT = 4,
 
 	WEBSERV_METHOD_COUNT,
 };
@@ -196,9 +196,12 @@ enum WEBSERV_Route_Kind {
 	WEBSERV_ROUTE_REDIRECT,
 	WEBSERV_ROUTE_UPLOAD,
 	WEBSERV_ROUTE_CGI,
+
+	WEBSERV_ROUTE_COUNT,
 };
 struct WEBSERV_Route_Basic {
-	b32	directory_list;
+	string_view	directory;
+	b32			directory_list;
 };
 struct WEBSERV_Route_Redirect {
 	string_view	location;
@@ -209,10 +212,10 @@ struct WEBSERV_Route_CGI {
 	hash_table<string_view>		env;
 };
 struct WEBSERV_Route {
-	string_view			pattern;
-	WEBSERV_Method		methods_whitelist;
+	string_view				path;
+	WEBSERV_Method			methods_whitelist;
 
-	WEBSERV_Route_Kind	kind;
+	WEBSERV_Route_Kind		kind;
 
 	/* NOTE(xenobas):
 	 * C++ doesn't allow non trivial constructor in union types
@@ -244,10 +247,12 @@ struct WEBSERV_Instance {
 	CONFIG_ERROR_KIND(ROOT_DATA, "root data") \
 	CONFIG_ERROR_KIND(KEY_UNKNOWN, "key unknown") \
 	CONFIG_ERROR_KIND(KEY_DISALLOWED, "key disallowed") \
+	CONFIG_ERROR_KIND(KEY_REQUIRED, "key required") \
 	CONFIG_ERROR_KIND(TYPE_MISMATCH, "type mismatch") \
 	CONFIG_ERROR_KIND(PORT_RANGE, "port range") \
 	CONFIG_ERROR_KIND(STRING_EMPTY, "string empty") \
 	CONFIG_ERROR_KIND(VALUE_INVALID, "value invalid") \
+	CONFIG_ERROR_KIND(ROUTE_TYPE, "route type") \
 	CONFIG_ERROR_KIND(INSTANCE_EMPTY, "instance empty")
 
 enum WEBSERV_Config_Error_Kind {

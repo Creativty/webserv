@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 18:33:49 by xenobas           #+#    #+#             */
-/*   Updated: 2025/11/07 11:04:35 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/07 11:18:09 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -201,6 +201,7 @@ static i64			HTTP_parse_i64(const string_view& str, i32 fallback = -1) {
 	}
 	return (fail ? fallback : (n * s));
 }
+
 static b32			HTTP_hex_match(char c) {
 	if (c >= 'A' && c <= 'Z') {
 		c ^= (2 << 4);
