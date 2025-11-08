@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:51:12 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/07 11:02:45 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/08 15:11:04 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -430,7 +430,7 @@ static TOML_Value	TOML_parse_number(TOML_Document& document, TOML_Parser& parser
 		index++;
 	}
 	while (index < str.len) {
-		byte	b = str[index];
+		byte	b = (byte)str[index];
 		if (b < '0' || b > '9') {
 			TOML_error(document, TOML_ERROR_PARSER_NUMBER_CHAR, token);
 			return (nil);

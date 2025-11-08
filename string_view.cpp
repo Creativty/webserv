@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/16 09:19:09 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/07 10:18:15 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/08 15:11:41 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -240,7 +240,7 @@ static b32				match_space(byte b) {
 string_view				string_view::trim_left(void) const {
 	i32	left = 0;
 	while (left < this->len) {
-		if (!match_space((*this)[left])) {
+		if (!match_space(cast(byte)(*this)[left])) {
 			break ;
 		}
 		++left;
@@ -250,7 +250,7 @@ string_view				string_view::trim_left(void) const {
 string_view				string_view::trim_right(void) const {
 	i32	right = this->len - 1;
 	while (right > 0) {
-		if (!match_space((*this)[right])) {
+		if (!match_space(cast(byte)(*this)[right])) {
 			break ;
 		}
 		--right;

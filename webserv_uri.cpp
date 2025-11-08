@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 16:30:27 by xenobas           #+#    #+#             */
-/*   Updated: 2025/11/07 11:00:39 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/08 15:13:58 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -75,8 +75,8 @@ static char			WEBSERV_hex_repr(u8 n) {
 
 static b32			WEBSERV_uri_write_byte(string_builder& builder, const string_view& view) {
 	if (view.len == 3) {
-		u8 lb = cast(u8)WEBSERV_hex_value(view[1]) << 4;
-		u8 rb = cast(u8)WEBSERV_hex_value(view[2]);
+		u8 lb = cast(u8)((WEBSERV_hex_value(cast(byte)view[1])) << (4 * 1));
+		u8 rb = cast(u8)((WEBSERV_hex_value(cast(byte)view[2])) << (4 * 0));
 		byte ascii = cast(byte)(lb | rb);
 		builder.write(cast(char)ascii);
 		return (1);

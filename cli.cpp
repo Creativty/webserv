@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:16:13 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/07 19:33:29 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/08 15:39:00 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -288,11 +288,11 @@ void			CLI_show_errors_config(const WEBSERV_Config& config) {
 			CLI_show_error_toml_line(config.document, err.pos);
 
 			char	buff[512] = { 0 };
-			i32		index = 0;
-			index += std::snprintf(&buff[index], 512 - index, "\"%s\", ", "server"); // BASIC
-			index += std::snprintf(&buff[index], 512 - index, "\"%s\", ", "redirect"); // REDIRECT
-			index += std::snprintf(&buff[index], 512 - index, "\"%s\", ", "upload"); // UPLOAD
-			index += std::snprintf(&buff[index], 512 - index, "\"%s\"", "cgi"); // CGI
+			u64		index = 0;
+			index += cast(u64)std::snprintf(&buff[index], 512ul - index, "\"%s\", ", "server"); // BASIC
+			index += cast(u64)std::snprintf(&buff[index], 512ul - index, "\"%s\", ", "redirect"); // REDIRECT
+			index += cast(u64)std::snprintf(&buff[index], 512ul - index, "\"%s\", ", "upload"); // UPLOAD
+			index += cast(u64)std::snprintf(&buff[index], 512ul - index, "\"%s\"", "cgi"); // CGI
 
 			CLI_show_extra("Hint", "Must be one of the following options { %s }", buff);
 		} else {
