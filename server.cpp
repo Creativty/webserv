@@ -17,16 +17,20 @@
 #include <sys/wait.h>
 #include <cstdlib>
 
+<<<<<<< HEAD
 /*TODO:
 * - ADD QUERY_STRING to environment variables
 * - remove space from content-type
 * - 
 */
 
+=======
+>>>>>>> ef9d4fe9ff648b15d3184695d63fba32df3aa624
 static std::map<int, int> cgi_map;
 static std::map<int, std::string> htmlStatus;
 
 
+<<<<<<< HEAD
 
 
 /* TODO(XENOBAS):
@@ -105,6 +109,10 @@ std::string statusCode(int code){
 
 void	http_respond_html(int fd, int code, std::string type, const std::string &data) {
 	std::string	response_line = "HTTP/1.0 " + statusCode(code) + "\r\n";
+=======
+void	http_respond_html(int fd, std::string status, std::string type, const std::string &data) {
+	std::string	response_line = "HTTP/1.0 " + status + "\r\n";
+>>>>>>> ef9d4fe9ff648b15d3184695d63fba32df3aa624
 	std::string	headers = "Content-Type: " + type + "\r\n"
 		"\r\n";
 	std::cout << "client_fd in http_respond: " << fd << std::endl;
@@ -264,16 +272,12 @@ std::string generateRandomFileName(std::string ext){
     return oss.str();
 }
 
-
-
 std::string	getMethod(http::HTTP_Method method){
 	if (method == http::HTTP_METHOD_DELETE) return "DELETE";
 	if (method == http::HTTP_METHOD_POST) return "POST";
 	if (method == http::HTTP_METHOD_GET) return "GET";
 	return "";
 }
-
-
 
 void PrepareEnvirement(http::Request request){
 	if(setenv("REQUEST_METHOD", getMethod(request.method).c_str(), 1))
@@ -292,6 +296,7 @@ void PrepareEnvirement(http::Request request){
     }
 }
 
+<<<<<<< HEAD
 
 
 
@@ -310,6 +315,8 @@ bool isDirectory(std::string path){
 
 
 
+=======
+>>>>>>> ef9d4fe9ff648b15d3184695d63fba32df3aa624
 int methods(http::Request request, int new_socket, struct server server, int epfd){
     std::string path = url_decode(request.uri);
     bool file_ok;
@@ -471,13 +478,11 @@ int methods(http::Request request, int new_socket, struct server server, int epf
     return(0);
 }
 
-
 bool	is_first_connection(int fd, struct server *servers){
 	for (int i = 0; i < 3; i++)
 		if (fd == servers[i].fd) return 1;
 	return 0;
 }
-
 
 struct server get_server(struct server *servers, int port){
 	int i = 0;
@@ -597,8 +602,6 @@ int handle_requests(struct server *servers, int epfd, sockaddr_in address, size_
 	return (1);
 }
 
-
-
 /* TODO(XENOBAS): 
  * - We need a better way of error handling, Either we bow down to exceptions (hate it) or we just hand roll our own.
  * - int server(), can be inlined into the main function directly...
@@ -657,7 +660,6 @@ int	setup_servers(struct server *server, int num_server, toml::Config *config){
 	}
 	return(1);
 }
-
 
 void setup_config(toml::Config *config){
 
