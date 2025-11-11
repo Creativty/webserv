@@ -87,6 +87,22 @@ std::string GetDefaultPage()
 }
 
 
+enum HttpStatus {
+    OK = 200,
+    CREATED = 201,
+    BAD_REQUEST = 400,
+    UNAUTHORIZED = 401,
+    FORBIDDEN = 403,
+    NOT_FOUND = 404,
+    SERVER_ERROR = 500,
+	NO_CONTENT = 204,
+	METHOD_NOT_ALLOWED = 405,
+	MOVED_PERMANETLY = 301,
+	PAYLOAD_TOO_LARGE = 413,
+	NOT_IMPLEMENTED = 501,
+	PROCESSING = 102
+};
+
 
 std::string statusCode(int code){
 	if(code == 404) return "404 Not Found";
@@ -113,10 +129,11 @@ void	http_respond_html(int fd, int code, std::string type, const std::string &da
 
 	if (data.size())
 		::send(fd, data.c_str(), data.size(), MSG_DONTWAIT);
+	std::cout << response_line << headers << data << std::endl;
 }
 
 std::string getFileExtension(const std::string& type) {
-    if (type == " text/html")                	return ".html";
+    if (type == "  text/html")                	return ".html";
     if (type == " text/css")                 	return ".css";
     if (type == " application/javascript")   	return ".js";
     if (type == " application/json")         	return ".json";
@@ -308,13 +325,16 @@ bool isDirectory(std::string path){
 	return false;
 }
 
-
+bool fileExists(const std::string& filename) {
+    std::ifstream file(filename.c_str());
+    return file.good();
+}
 
 int methods(http::Request request, int new_socket, struct server server, int epfd){
     std::string path = url_decode(request.uri);
     bool file_ok;
 
-    if (request.uri.find("/favicon.ico") == 0) return(204);
+    if (request.uri.find("/favicon.ico") == 0) return(NO_CONTENT);
 
 
 
@@ -325,7 +345,9 @@ int methods(http::Request request, int new_socket, struct server server, int epf
 		path = path.substr(1);
 		server.config.cgi_path = server.config.cgi_path.substr(1);
 		std::cout << path << std::endl;
-		if (!dirExists(server.config.cgi_path)) return 500;
+		if (!dirExists(server.config.cgi_path)) return SERVER_ERROR;
+
+		if (!fileExists(path)) return NOT_FOUND;
 
 		std::string typ = " " + getContentType(path);
 		std::string ext = getFileExtension(typ);
@@ -335,7 +357,7 @@ int methods(http::Request request, int new_socket, struct server server, int epf
 			NULL
 		};
 		if (strlen(argv[0]) == 0){
-			return 501;
+			return NOT_IMPLEMENTED;
 		}
 
 		PrepareEnvirement(request);
@@ -343,11 +365,11 @@ int methods(http::Request request, int new_socket, struct server server, int epf
 		int inPipe[2], outPipe[2];
 		if (pipe(inPipe) == -1 || pipe(outPipe) == -1){
 			perror("pipe");
-			return 500;
+			return SERVER_ERROR;
 		}
 					
 		int pid = fork();
-		if (pid < 0) return(perror("fork"), 500);
+		if (pid < 0) return(perror("fork"), SERVER_ERROR);
 
 		if (pid == 0){
 			if (request.method == http::HTTP_METHOD_POST){
@@ -385,7 +407,7 @@ int methods(http::Request request, int new_socket, struct server server, int epf
 			epoll_ctl(epfd, EPOLL_CTL_ADD, outPipe[0], &ev);
 
 			cgi_map[outPipe[0]] = new_socket;
-			return 102;
+			return PROCESSING;
 		}
 	}
 
@@ -405,21 +427,21 @@ int methods(http::Request request, int new_socket, struct server server, int epf
 
 		if (!dirExists(dir)){
 			std::cout << "directory of uploads not exists \n";
-			return 500;
+			return SERVER_ERROR;
 		}
 		char oldDir[PATH_MAX];
-		if (getcwd(oldDir, sizeof(oldDir)) == NULL) return (perror("getcwd"),500);
+		if (getcwd(oldDir, sizeof(oldDir)) == NULL) return (perror("getcwd"), SERVER_ERROR);
 
 		std::cout << "oldDir: " << oldDir << std::endl;
 
 		if (chdir(dir.c_str()) == -1)
-			return (perror("chdir"), 500);
+			return (perror("chdir"), SERVER_ERROR);
 		else{
 
 			std::string fileName = generateRandomFileName(ext);
 			int fd = open(fileName.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
 			if (fd < 0)
-				return (perror("open file for upload"), 500);
+				return (perror("open file for upload"), SERVER_ERROR);
 			
 			std::cout << "file name: " << fileName << std::endl;
 			write(fd, request.body.c_str(), request.body.length());
@@ -428,7 +450,7 @@ int methods(http::Request request, int new_socket, struct server server, int epf
 			chdir(oldDir);
 		}
 		// close(new_socket);
-		return 201;
+		return CREATED;
     }
 
 
@@ -437,15 +459,15 @@ int methods(http::Request request, int new_socket, struct server server, int epf
 		path = url_decode(request.uri.substr(1));
         if (access(path.c_str(), F_OK)){
             std::cout << "ERROR: cannot open " << path << std::endl;
-			return 404;
+			return NOT_FOUND;
         }
 
 		if (remove(path.c_str())){
 			perror("remove");
-			return 403;
+			return FORBIDDEN;
 		}
 		// http_respond_html(new_socket, 204, "text/pain", "");
-		return(204);
+		return(NO_CONTENT);
     }
 
 
@@ -460,13 +482,13 @@ int methods(http::Request request, int new_socket, struct server server, int epf
             assert(file_ok && "could not load template html file");            
             http_respond_html(new_socket, 200, getContentType(path), res_file);
 			close(new_socket);
-			return (102);
+			return (PROCESSING);
         }
 		if (!path.length())
-        	return(200);// for default page
+        	return(OK);// for default page
 		if (isDirectory(path))
-			return (403);// forbidden (when the user wants to get directory not file)
-		return (404);
+			return (FORBIDDEN);// forbidden (when the user wants to get directory not file)
+		return (NOT_FOUND);
     }
     return(0);
 }
@@ -558,7 +580,7 @@ int handle_requests(struct server *servers, int epfd, sockaddr_in address, size_
 					http::Request request;
 					http::Parse_Error error = http::parse_request(message, request);
 					if (error != http::PARSE_ERROR_NONE) {
-						http_respond_html(fd,400, "text/html", "");
+						http_respond_html(fd, BAD_REQUEST, "text/html", "");
 						close(fd);
 						continue;
 						// std::cout << "Could not parse request because of " << error << std::endl;
@@ -570,8 +592,9 @@ int handle_requests(struct server *servers, int epfd, sockaddr_in address, size_
 
 					// if (status != 200){
 					epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
-					if(status != 102){
-						http_respond_html(fd,status, "text/html", htmlStatus[status]);
+					if(status != PROCESSING){
+						std::cout << htmlStatus[status] << std::endl;
+						http_respond_html(fd, status, "text/html", htmlStatus[status]);
 						close(fd);
 					}
 
