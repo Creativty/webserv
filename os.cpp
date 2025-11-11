@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 17:02:26 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/28 15:14:27 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/11 16:18:36 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -39,7 +39,7 @@ b32		OS_read_file(const string_view _path, dynamic_array<byte>& out_data) {
 		out_data.clear();
 		while (!stream.eof()) {
 			byte	buff[512] = { 0 };
-			stream.read((char*)buff, 512);
+			stream.read((char*)buff, 511);
 
 			i32		buff_len = cstring_len(cast(cstring)buff);
 			out_data.push(buff_len, buff);
