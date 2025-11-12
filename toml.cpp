@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:51:12 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/08 15:11:04 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/11/12 13:57:34 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -59,7 +59,7 @@ TOML_Document		TOML_make(const string_view& file) {
 	document.lexer = (TOML_Tokenizer){ dynamic_array<TOML_Token>(), { 0, 1, 1, file }, "" };
 
 	document.file = file;
-	document.bytes = dynamic_array<byte>();
+	document.string = string_view();
 
 	document.ok = false;
 	return (document);
@@ -67,7 +67,7 @@ TOML_Document		TOML_make(const string_view& file) {
 void				TOML_delete(TOML_Document& document) {
 	TOML_value_free(document.root);
 	document.lexer.tokens.free();
-	document.bytes.free();
+	document.string.free();
 	document.errors.free();
 }
 
@@ -132,14 +132,14 @@ static void			TOML_error(TOML_Document& document, TOML_Error_Kind kind, const Po
 	document.errors.push(error);
 }
 
-static void			TOML_step_load_bytes(TOML_Document& document) {
+static void			TOML_step_load_string(TOML_Document& document) {
 	if (document.errors.len != 0) {
 		return ;
 	}
 
-	b32	ok = OS_read_file(document.file, document.bytes);
+	b32	ok = OS_read_file(document.file, document.string);
 	if (!ok) {
-		TOML_error(document, TOML_ERROR_LOAD_BYTES);
+		TOML_error(document, TOML_ERROR_LOAD_STRING);
 	}
 }
 
@@ -301,20 +301,40 @@ static TOML_Token	TOML_lexer_token(TOML_Document& document) {
 
 		kind = TOML_TOKEN_IDENT;
 	} else if (TOML_match_digit(b) || b == '-') {
-		b32	is_neg = (b == '-');
-		i32	count_trailing = 0;
+		i32	digits = 0;
+
+		b32	is_error_underscore = 0;
+		b32	is_trailing_underscore = (b == '-');
 		for (;;) {
 			b = TOML_lexer_peek(lexer);
 			if (TOML_match_digit(b)) {
-				count_trailing += 1;
+				digits += 1;
+				is_trailing_underscore = 0;
+
+				TOML_lexer_next(lexer);
+				continue ;
+			}
+			if (b == '_') {
+				if (is_trailing_underscore) {
+					is_error_underscore = 1;
+				}
+
+				is_trailing_underscore = 1;
 
 				TOML_lexer_next(lexer);
 				continue ;
 			}
 			break ;
 		}
+		if (is_trailing_underscore) {
+			is_error_underscore = 1;
+		}
 
-		if (!is_neg || count_trailing > 0) {
+		if (digits == 0) {
+			TOML_error(document, TOML_ERROR_TOKEN_NUMBER_DIGITS, pos);
+		} else if (is_error_underscore) {
+			TOML_error(document, TOML_ERROR_TOKEN_NUMBER_UNDERSCORE, pos);
+		} else {
 			kind = TOML_TOKEN_NUMBER;
 		}
 	} else {
@@ -324,6 +344,21 @@ static TOML_Token	TOML_lexer_token(TOML_Document& document) {
 	}
 
 	string_view	str = lexer.source.slice(pos.index, lexer.pos.index);
+	if (kind == TOML_TOKEN_IDENT) {
+		b32	has_non_digits = 0;
+		for (i32 i = 0; i < str.len; ++i) {
+			char	ch = str[i];
+			if (!((ch >= '0' && ch <= '9') || (ch == '_'))) {
+				has_non_digits = 1;
+				break ;
+			}
+		}
+		if (!has_non_digits) {
+			TOML_error(document, TOML_ERROR_TOKEN_NUMBER_UNDERSCORE, pos);
+
+			kind = TOML_TOKEN_NUMBER;
+		}
+	}
 	if (str == "true") {
 		kind = TOML_TOKEN_TRUE;
 	} else if (str == "false") {
@@ -337,7 +372,7 @@ static void			TOML_step_tokenize(TOML_Document& document) {
 		return ;
 	}
 
-	document.lexer.source = string_view((char*)document.bytes.data, document.bytes.len);
+	document.lexer.source = document.string;
 	while (TOML_lexer_walk_until_next(document.lexer)) {
 		TOML_Token	token = TOML_lexer_token(document);
 		document.lexer.tokens.push(token);
@@ -431,6 +466,10 @@ static TOML_Value	TOML_parse_number(TOML_Document& document, TOML_Parser& parser
 	}
 	while (index < str.len) {
 		byte	b = (byte)str[index];
+		if (b == '_') {
+			index++;
+			continue ;
+		}
 		if (b < '0' || b > '9') {
 			TOML_error(document, TOML_ERROR_PARSER_NUMBER_CHAR, token);
 			return (nil);
@@ -792,9 +831,9 @@ static void			TOML_step_parse(TOML_Document& document) {
 TOML_Document		TOML_parse_file(const string_view& file) {
 	TOML_Document	document = TOML_make(file);
 
-	TOML_step_load_bytes(document);
+	TOML_step_load_string(document);
 	if (document.errors.len == 0)
-		CLI_debug("TOML loaded %d bytes.", document.bytes.len);
+		CLI_debug("TOML loaded %d bytes.", document.string.len);
 
 	TOML_step_tokenize(document);
 	if (document.errors.len == 0)

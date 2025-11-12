@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:16:13 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/08 15:39:00 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/11/12 14:10:21 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,8 +24,8 @@ static const char*	toml_value_kind_strings[] = {
 #undef TOML_VALUE_KIND
 };
 
-string_view		CLI_exec_path = "<CLI_exec_path>";
 b32				CLI_is_tty = 0;
+string_view		CLI_exec_path = "<CLI_exec_path>";
 
 void			CLI_debug_internal(const char* file, i32 line, const char *fmt, ...) {
 #ifdef WEBSERV_DEBUG
@@ -80,7 +80,7 @@ void			CLI_show_error_file_ext(string_view file_path) {
 }
 void			CLI_show_error_file_access(string_view file_path) {
 	CLI_show_error_file("Could not access file at \"%.*s\"", file_path.len, file_path.text);
-	CLI_show_extra("Description", "%m");
+	CLI_show_extra("Reason", "%m");
 }
 void			CLI_show_error_file_mode(string_view file_path, mode_t mode) {
 	CLI_show_error_file("Input file path \"%.*s\" is not a regular file", file_path.len, file_path.text);
@@ -156,9 +156,18 @@ void			CLI_show_errors_toml(const TOML_Document& document) {
 	for (i32 i = 0; i < errors.len; ++i) {
 		const TOML_Error&	err = errors[i];
 		switch (err.kind) {
-		case TOML_ERROR_LOAD_BYTES: {
+		case TOML_ERROR_LOAD_STRING: {
 			string_view	file = document.file;
-			CLI_show_error_file("Could not load bytes from \"%.*s\"", file.len, file.text);
+			CLI_show_error_file("Could not load file \"%.*s\" contents", file.len, file.text);
+			CLI_show_extra("Reason", "%m");
+		} break;
+		case TOML_ERROR_TOKEN_NUMBER_UNDERSCORE: {
+			CLI_show_error_syntax(err.pos, "Invalid underscore usage in number");
+			CLI_show_error_toml_line(document, err.pos);
+		} break;
+		case TOML_ERROR_TOKEN_NUMBER_DIGITS: {
+			CLI_show_error_syntax(err.pos, "Missing number after sign");
+			CLI_show_error_toml_line(document, err.pos);
 		} break;
 		case TOML_ERROR_TOKEN_INVALID: {
 			char	b = document.lexer.source[err.pos.index];
@@ -274,12 +283,24 @@ void			CLI_show_errors_config(const WEBSERV_Config& config) {
 		} else if (err.kind == WEBSERV_CONFIG_ERROR_PORT_RANGE) {
 			CLI_show_error_config(err.pos, "port value out of range, must be between 0 and 65535");
 			CLI_show_error_toml_line(config.document, err.pos);
+		} else if (err.kind == WEBSERV_CONFIG_ERROR_REQUEST_BODY_MAX_RANGE) {
+			CLI_show_error_config(err.pos, "request_body_max value is out of range, must be between 0 and 65535");
+			CLI_show_error_toml_line(config.document, err.pos);
 		} else if (err.kind == WEBSERV_CONFIG_ERROR_STRING_EMPTY) {
 			CLI_show_error_config(err.pos, "Expected \"%.*s\", got an empty string value", err.str.len, err.str.text);
+			CLI_show_error_toml_line(config.document, err.pos);
+		} else if (err.kind == WEBSERV_CONFIG_ERROR_ERROR_FILE) {
+			CLI_show_error_config(err.pos, "File \"%.*s\" is inaccessible or does not end in \".html\"", err.str.len, err.str.text);
 			CLI_show_error_toml_line(config.document, err.pos);
 		} else if (err.kind == WEBSERV_CONFIG_ERROR_VALUE_INVALID) {
 			CLI_show_error_config(err.pos, "Invalid value is not a proper \"%.*s\"", err.str.len, err.str.text);
 			CLI_show_error_toml_line(config.document, err.pos);
+		} else if (err.kind == WEBSERV_CONFIG_ERROR_ROUTE_PATH_DUP) {
+			CLI_show_error_config(err.pos, "Route path \"%.*s\" is a duplicate", err.str.len, err.str.text);
+			CLI_show_error_toml_line(config.document, err.pos);
+
+			string_view	str = err.str;
+			str.free(); /* NOTE(xenobas): This was allocated specifically for error reporting */
 		} else if (err.kind == WEBSERV_CONFIG_ERROR_ROUTE_TYPE) {
 			const TOML_Value*	value = err.value;
 			b32					value_segfault = (value != 0 && value->String != 0);

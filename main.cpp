@@ -6,95 +6,13 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:45:19 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/06 09:43:01 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/12 13:58:54 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "webserv.hpp"
 #include <cstdlib>
 #include <ctime>
-
-i32	TEST_http(void) {
-	std::srand((unsigned int)std::time(0));
-
-	const string_view	string =
-		"POST /hello-world/?query=true HTTP/1.1\r\n" // 16 bytes
-		"Content-Length: 14\r\n" // 19 bytes
-		"\r\n" // 2 bytes
-		"{ \"key\": 123 }" // 14 bytes
-		;
-	for (i32 _i = 0; _i < 100; ++_i) {
-		HTTP_Request	req = HTTP_request_make();
-
-		for (i32 cursor = 0; cursor < string.len && !HTTP_request_is_error(req); ) {
-			i32		read_len = std::rand() % (string.len - cursor);
-			byte*	read_bytes = cast(byte*)&string.text[cursor];
-			if (read_len == 0) {
-				read_len = 1;
-			}
-
-			HTTP_request_read(req, read_bytes, read_len);
-
-			cursor += read_len;
-		}
-		if (!HTTP_request_is_closed(req)) {
-			HTTP_request_close(req);
-		}
-
-		HTTP_request_delete(req);
-	}
-	return (0);
-}
-i32	TEST_http_chunks(void) {
-	std::srand((unsigned int)std::time(0));
-
-	const string_view	message =
-		"GET / HTTP/1.1\r\n"
-		"Transfer-Encoding: chunked\r\n"
-		"\r\n"
-		;
-	const string_view	chunks[] = {
-		"18\r\nAsnrRXDtfmkyPdIYFqauxTWl",
-		"14\r\nnWpQjAZfhJtlxrEYGXLH",
-		"16\r\nKdAzpnvxoleYOCrmLMitRh",
-		"0\r\n",
-	};
-
-
-	HTTP_Request	req = HTTP_request_make();
-
-	{ /* Read message line and headers */
-		i32		read_len = message.len;
-		byte*	read_bytes = cast(byte*)message.text;
-		HTTP_request_read(req, read_bytes, read_len);
-	}
-	for (i32 i = 0; i < cast(i32)count_of(chunks); ++i) {
-		const string_view&	chunk = chunks[i];
-		i32		read_len = chunk.len;
-		byte*	read_bytes = cast(byte*)chunk.text;
-		HTTP_request_read(req, read_bytes, read_len);
-	}
-	if (HTTP_request_is_error(req)) {
-		fprintf(stderr, "An error has occurred while parsing\n");
-	}
-	else if (HTTP_request_is_closed(req)) {
-		fprintf(stderr, "Request has finished properly\n");
-	}
-	else {
-		fprintf(stderr, "Request did not automatically close\n");
-	}
-
-	HTTP_request_delete(req);
-	return (0);
-}
-i32	TEST_uri(void) {
-	WEBSERV_URI	uri = WEBSERV_uri_decode("/Hello%20World/123?test&good&test=123&question=Are%20You%Bork%20Gay%3f#");
-	string_view	str = WEBSERV_uri_encode(uri);
-	printf("String: \"%.*s\"\n", str.len, str.text);
-	str.free();
-	WEBSERV_uri_delete(uri);
-	return (0);
-}
 
 i32	main(i32 argc, cstring argv[]) {
 	CLI_exec_path = argv[0];
@@ -135,11 +53,6 @@ i32	main(i32 argc, cstring argv[]) {
 		WEBSERV_config_delete(config);
 		return (8);
 	}
-
-	TEST_http_chunks();
-#if 0
-	TEST_uri();
-#endif
 
 	WEBSERV_config_delete(config);
 	return (0);

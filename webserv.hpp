@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/07 19:37:53 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/12 14:04:30 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -124,10 +124,12 @@ struct TOML_Parser {
 enum TOML_Error_Kind {
 	TOML_ERROR_INVALID,
 
-	TOML_ERROR_LOAD_BYTES,
+	TOML_ERROR_LOAD_STRING,
 
 	/* Tokenizer */
 	TOML_ERROR_TOKEN_INVALID,
+	TOML_ERROR_TOKEN_NUMBER_DIGITS,
+	TOML_ERROR_TOKEN_NUMBER_UNDERSCORE,
 	TOML_ERROR_TOKEN_UNTERMINATED,
 
 	/* Parser */
@@ -154,7 +156,7 @@ struct TOML_Document {
 	TOML_Parser					parser;
 
 	string_view					file;
-	dynamic_array<byte>			bytes;
+	string_view					string;
 
 	b32							ok;
 };
@@ -207,14 +209,18 @@ struct WEBSERV_Route_Redirect {
 	string_view	location;
 };
 struct WEBSERV_Route_Upload {
+	string_view	directory;
+	i32			max_file_size;
 };
 struct WEBSERV_Route_CGI {
+	hash_table<string_view>		interpreters;
 	hash_table<string_view>		env;
 };
 struct WEBSERV_Route {
 	string_view				path;
 	WEBSERV_Method			methods_whitelist;
 
+	b32						cascade;
 	WEBSERV_Route_Kind		kind;
 
 	/* NOTE(xenobas):
@@ -228,7 +234,7 @@ struct WEBSERV_Route {
 };
 
 struct WEBSERV_Instance {
-	dynamic_array<WEBSERV_Interface>	interfaces;
+	dynamic_array<WEBSERV_Interface>	interfaces; /* UNUSED */
 
 	u16									port;
 	WEBSERV_Address						addr;
@@ -250,9 +256,12 @@ struct WEBSERV_Instance {
 	CONFIG_ERROR_KIND(KEY_REQUIRED, "key required") \
 	CONFIG_ERROR_KIND(TYPE_MISMATCH, "type mismatch") \
 	CONFIG_ERROR_KIND(PORT_RANGE, "port range") \
+	CONFIG_ERROR_KIND(REQUEST_BODY_MAX_RANGE, "request_body_max range") \
 	CONFIG_ERROR_KIND(STRING_EMPTY, "string empty") \
 	CONFIG_ERROR_KIND(VALUE_INVALID, "value invalid") \
 	CONFIG_ERROR_KIND(ROUTE_TYPE, "route type") \
+	CONFIG_ERROR_KIND(ROUTE_PATH_DUP, "route path duplicate") \
+	CONFIG_ERROR_KIND(ERROR_FILE, "error html file") \
 	CONFIG_ERROR_KIND(INSTANCE_EMPTY, "instance empty")
 
 enum WEBSERV_Config_Error_Kind {
@@ -324,7 +333,7 @@ struct HTTP_Request {
 extern string_view	CLI_exec_path;
 extern b32			CLI_is_tty;
 
-b32					OS_read_file(const string_view path, dynamic_array<byte>& out_data);
+b32					OS_read_file(const string_view path, string_view& text);
 b32					OS_stat_file(const string_view& path, struct stat* buf = 0);
 b32					OS_access_file(const string_view& _path, i32 flags = F_OK);
         			

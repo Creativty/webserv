@@ -6,12 +6,13 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 17:02:26 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/11 16:18:36 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/12 13:54:10 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "base.hpp"
 #include "string_view.hpp"
+#include "string_builder.hpp"
 #include "dynamic_array.hpp"
 
 #include <string>
@@ -20,34 +21,55 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <fcntl.h>
 
-static i32	cstring_len(cstring str) {
-	i32	len = 0;
-	if (str != 0) {
-		while (str[len]) {
-			len++;
-		}
+static void	MEM_copy(byte* src, i32 src_len, byte* dst, i32 dst_len) {
+	if (src == 0 || dst == 0) {
+		return ;
 	}
-	return (len);
+
+	for (i32 i = 0; i < src_len && i < dst_len; ++i) {
+		dst[i] = src[i];
+	}
 }
 
-b32		OS_read_file(const string_view _path, dynamic_array<byte>& out_data) {
-	std::string		path = _path.to_string();
-	std::ifstream	stream(path.c_str(), std::ios::in | std::ios::binary);
+// static i32	cstring_len(cstring str) {
+// 	i32	len = 0;
+// 	if (str != 0) {
+// 		while (str[len]) {
+// 			len++;
+// 		}
+// 	}
+// 	return (len);
+// }
 
-	if (stream.good()) {
-		out_data.clear();
-		while (!stream.eof()) {
-			byte	buff[512] = { 0 };
-			stream.read((char*)buff, 511);
+b32		OS_read_file(const string_view path, string_view& text) {
+	byte	path_cstr[512] = { 0 };
+	MEM_copy((byte*)path.text, path.len, path_cstr, 511);
 
-			i32		buff_len = cstring_len(cast(cstring)buff);
-			out_data.push(buff_len, buff);
-			if (buff_len != 512 - 1)
-				out_data.push(0);
-		}
+	i32		fd = open((char*)path_cstr, O_RDONLY);
+	if (fd < 0) {
+		return (0);
 	}
-	return (!(!stream.fail() && stream.eof()));
+
+	string_builder	b;
+	b32				ok = 1;
+	while (ok) {
+		char	buff[512] = { 0 };
+		i32		buff_n = cast(i32)read(fd, buff, 511);
+		if (buff_n <  0) {
+			ok = 0;
+		}
+		if (buff_n <= 0) {
+			break ;
+		}
+
+		string_view	buff_str(buff, buff_n);
+		b.write(buff_str);
+	}
+
+	text = b.to_string();
+	return (close(fd), ok);
 }
 
 b32		OS_stat_file(const string_view& _path, struct stat* buf = 0) {

@@ -1,12 +1,14 @@
+# Binary file
+webserv
+
 # Intermediary files
 *.d
 *.o
 
+# Configuration files
+*.toml
+!configs/*.toml
+
 # Editor specific files
 tags
 .vscode/
-
-*.toml
-http
-toml
-webserv
