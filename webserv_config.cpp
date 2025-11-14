@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:42:31 by xenobas           #+#    #+#             */
-/*   Updated: 2025/11/14 16:24:43 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/14 17:16:15 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -449,8 +449,11 @@ static void				WEBSERV_route_parse_basic_directory(Parser_Context& ctx, WEBSERV_
 		return ;
 	}
 
-	/* TODO(xenobas): directory checks */
 	const string_view&	directory = *value.String;
+	if (!OS_test_dir_read(directory)) {
+		context_error(DIR_RO, value.pos, string_view::alloc(directory));
+		return ;
+	}
 	basic.directory = string_view::alloc(directory);
 }
 static void				WEBSERV_route_parse_basic_directory_list(Parser_Context& ctx, WEBSERV_Route_Basic& basic, const TOML_Value& value) {
@@ -483,8 +486,11 @@ static void				WEBSERV_route_parse_upload_directory(Parser_Context& ctx, WEBSERV
 		return ;
 	}
 
-	/* TODO(xenobas): directory checks */
 	const string_view&	directory = *value.String;
+	if (!OS_test_dir_read_write(directory)) {
+		context_error(DIR_RW, value.pos, string_view::alloc(directory));
+		return ;
+	}
 	upload.directory = string_view::alloc(directory);
 }
 static void				WEBSERV_route_parse_upload_max_file_size(Parser_Context& ctx, WEBSERV_Route_Upload& upload, const TOML_Value& value) {

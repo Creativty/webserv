@@ -6,13 +6,15 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:45:19 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/12 13:58:54 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/14 18:37:09 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "webserv.hpp"
 #include <cstdlib>
 #include <ctime>
+
+#include <iostream>
 
 i32	main(i32 argc, cstring argv[]) {
 	CLI_exec_path = argv[0];
@@ -52,6 +54,25 @@ i32	main(i32 argc, cstring argv[]) {
 
 		WEBSERV_config_delete(config);
 		return (8);
+	}
+
+	{
+		const WEBSERV_Instance&	instance = config.instances[0];
+		const char				*paths[] = {
+			"/",
+			"/index.html",
+			"/images/1337.jpeg",
+			"/upload/Hyello.jpeg",
+			"/assets/images/1337", /* Redirect */
+			"/assets/images/1337.jpeg", /* Server */
+		};
+
+		for (i32 i = 0; i < cast(i32)count_of(paths); ++i) {
+			const string_view	key = WEBSERV_http_route_pick(instance, paths[i]);
+			std::cout << "path = " << string_view(paths[i]) << std::endl;
+			std::cout << "\troute_key = " << key << std::endl;
+			std::cout << std::endl;
+		}
 	}
 
 	WEBSERV_config_delete(config);

@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/12 14:04:30 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/14 18:22:05 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -262,6 +262,8 @@ struct WEBSERV_Instance {
 	CONFIG_ERROR_KIND(ROUTE_TYPE, "route type") \
 	CONFIG_ERROR_KIND(ROUTE_PATH_DUP, "route path duplicate") \
 	CONFIG_ERROR_KIND(ERROR_FILE, "error html file") \
+	CONFIG_ERROR_KIND(DIR_RO, "directory unreadable") \
+	CONFIG_ERROR_KIND(DIR_RW, "directory unreadable/unwritable") \
 	CONFIG_ERROR_KIND(INSTANCE_EMPTY, "instance empty")
 
 enum WEBSERV_Config_Error_Kind {
@@ -336,6 +338,10 @@ extern b32			CLI_is_tty;
 b32					OS_read_file(const string_view path, string_view& text);
 b32					OS_stat_file(const string_view& path, struct stat* buf = 0);
 b32					OS_access_file(const string_view& _path, i32 flags = F_OK);
+
+b32					OS_test_file_read(const string_view& path, b32 strict_regular = 0);
+b32					OS_test_dir_read(const string_view& path, b32 strict_regular = 0);
+b32					OS_test_dir_read_write(const string_view& path, b32 strict_regular = 0);
         			
 #define				CLI_debug(...) CLI_debug_internal(__FILE__, __LINE__, __VA_ARGS__)
 void				CLI_debug_internal(const char* file, i32 line, const char *fmt, ...);
@@ -363,6 +369,8 @@ b32					WEBSERV_http_version_supported(const string_view& str);
 
 void				WEBSERV_config_delete(WEBSERV_Config& config);
 WEBSERV_Config		WEBSERV_config_parse(const TOML_Document& toml);
+
+const string_view	WEBSERV_http_route_pick(const WEBSERV_Instance& instance, const string_view& path);
 
 HTTP_Request		HTTP_request_make(void);
 void				HTTP_request_delete(HTTP_Request& req);

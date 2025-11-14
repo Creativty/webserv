@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:16:13 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/12 14:10:21 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/14 17:14:10 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -316,6 +316,18 @@ void			CLI_show_errors_config(const WEBSERV_Config& config) {
 			index += cast(u64)std::snprintf(&buff[index], 512ul - index, "\"%s\"", "cgi"); // CGI
 
 			CLI_show_extra("Hint", "Must be one of the following options { %s }", buff);
+		} else if (err.kind == WEBSERV_CONFIG_ERROR_DIR_RO) {
+			string_view	str = err.str;
+			CLI_show_error_config(err.pos, "Directory \"%.*s\" either doesn't exist or isn't allowed to be read", str.len, str.text);
+			CLI_show_error_toml_line(config.document, err.pos);
+
+			str.free();
+		} else if (err.kind == WEBSERV_CONFIG_ERROR_DIR_RW) {
+			string_view	str = err.str;
+			CLI_show_error_config(err.pos, "Directory \"%.*s\" either doesn't exist, isn't allowed to be read, or cannot be written", str.len, str.text);
+			CLI_show_error_toml_line(config.document, err.pos);
+
+			str.free();
 		} else {
 			const char*	error_str = webserv_config_error_kind_strings[err.kind];
 			CLI_show_error_config(err.pos, "TODO: Error \"%s\" reporting is unimplemented", error_str);

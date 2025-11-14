@@ -9,16 +9,16 @@ routes = [
 
 		type = "Server",
 		props = {
-			directory = "/var/www/siteweb/",
+			directory = "www",
 			directory_list = false,
 		},
 	},
 	{
-		path = "/assets",
+		path = "/images",
 
 		type = "Server",
 		props = {
-			directory = "/use/data/images/",
+			directory = "www/assets/images",
 			directory_list = true,
 		},
 	},
@@ -27,17 +27,17 @@ routes = [
 
 		type = "Upload",
 		props = {
-			directory = "/usr/data/images",
+			directory = "www/assets/images",
 			max_file_size = 256_000, # bytes
 		},
 	},
 	{
-		path = "/redirect",
+		path = "/assets/images/1337",
 		cascade_disable = true,
 
 		type = "Redirect",
 		props = {
-			location = "https://youtu.be/01E4rBz8lTg"
+			location = "/assets/images/1337.jpeg"
 		},
 	},
 ]
