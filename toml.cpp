@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:51:12 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/12 13:57:34 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/14 16:40:35 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -301,7 +301,7 @@ static TOML_Token	TOML_lexer_token(TOML_Document& document) {
 
 		kind = TOML_TOKEN_IDENT;
 	} else if (TOML_match_digit(b) || b == '-') {
-		i32	digits = 0;
+		i32	digits = TOML_match_digit(b) ? 1 : 0;
 
 		b32	is_error_underscore = 0;
 		b32	is_trailing_underscore = (b == '-');
@@ -498,7 +498,6 @@ static TOML_Value	TOML_parse_string(TOML_Document& document, TOML_Parser& parser
 		return (nil);
 	}
 
-	/* NOTE(xenobas): this is completely and utterly retarded */
 	string_view		slice = str.slice(1, str.len - 1);
 	string_view*	string = new string_view(string_view::alloc(slice));
 	return ((TOML_Value){ TOML_VALUE_STRING, token.pos, { .String = string } });
@@ -605,22 +604,31 @@ static TOML_Value	TOML_parse_table(TOML_Document& document, TOML_Parser& parser)
 		if (token.kind == TOML_TOKEN_CCURLY) {
 			break ;
 		}
-		TOML_Token	ident = parser.token;
-		b32			pair_ok = 0;
-		if (TOML_parser_expect(document, parser, TOML_TOKEN_IDENT, /* category = */ "", /* ignore_eol = */ 1)) {
+
+		b32			ok = 0;
+		string_view	key = parser.token.str;
+		if (TOML_parser_expect(document, parser, TOML_TOKEN_IDENT, /* category = */ "key", /* ignore_eol = */ 1)) {
 			if (TOML_parser_expect(document, parser, TOML_TOKEN_EQUALS)) {
 				TOML_Value	value = TOML_parse_value(document, parser);
 
-				pair_ok = (value.kind != TOML_VALUE_NIL);
-				/* TODO(xenobas): Do duplicate check */
-				if (pair_ok) {
-					table.set(ident.str, value);
+				b32	is_nil = (value.kind == TOML_VALUE_NIL);
+				b32	is_dup = !is_nil && table.has(key);
+				ok = !(is_nil || is_dup);
+
+				if (is_dup) {
+					ok = false;
+					TOML_error(document, TOML_ERROR_PARSER_SCOPE_KEY_DUP, token, key);
+
+					TOML_value_free(value);
+				} else if (!is_nil) {
+					table.set(key, value);
 				}
 			}
 		}
-		if (!pair_ok) {
+		if (!ok) {
 			TOML_parse_table_recover(parser);
 		}
+
 		if (!TOML_parser_accept(parser, TOML_TOKEN_COMMA)) {
 			break ;
 		}

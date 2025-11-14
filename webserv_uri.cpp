@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 16:30:27 by xenobas           #+#    #+#             */
-/*   Updated: 2025/11/08 15:13:58 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/11/14 16:29:33 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -193,8 +193,9 @@ WEBSERV_URI			WEBSERV_uri_decode(const string_view& str) {
 
 		string_view	comp;
 		while (view_path.split_iter("/", comp)) {
-			if (comp.len == 0)
+			if (comp.len == 0) {
 				continue ;
+			}
 			string_view	node = WEBSERV_uri_decode_comp(comp);
 			uri.path.push(node);
 		}
@@ -238,10 +239,10 @@ string_view			WEBSERV_uri_encode(const WEBSERV_URI& uri, b32 write_trailing_slas
 		}
 
 		/* SECTION: Query */
+		u32	count = 0;
 		if (uri.query.count > 0) {
 			builder.write('?');
 		}
-		u32	count = 0;
 		for_table_begin(uri.query, const hash_table<string_view>, param) {
 			if (count > 0) {
 				builder.write('&');

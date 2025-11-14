@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 18:33:49 by xenobas           #+#    #+#             */
-/*   Updated: 2025/11/07 11:18:09 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/14 16:23:02 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -49,7 +49,7 @@ void				HTTP_request_delete(HTTP_Request& req) {
 	req = HTTP_request_make();
 }
 void				HTTP_request_debug(HTTP_Request& req) {
-	printf("=== HTTP_Request BEGIN ===\n");
+	printf("=== HTTP_Request  BEGIN ===\n");
 		{ /* Parsing status */
 			char	buff[64] = { 0 };
 			if (HTTP_request_is_error(req)) {
@@ -122,11 +122,15 @@ void				HTTP_request_debug(HTTP_Request& req) {
 			if (req.content_length >= 0) {
 				snprintf(buff, 64, "content length %ld bytes", req.content_length);
 			} else {
-				snprintf(buff, 64, "connection-close-bounded bytes");
+				snprintf(buff, 64, "connection-close-bound bytes");
 			}
-			printf("    TODO: Chunks printing\n");
+
+			for (i32 i = 0; i < req.chunks.len; ++i) {
+				const HTTP_Chunk&	chunk = req.chunks[i];
+				printf("chunk containing %d %s starts at %d", chunk.size, chunk.size == 1 ? "byte" : "bytes", chunk.index);
+			}
 		}
-	printf("=== HTTP_Request  END  ===\n");
+	printf("=== HTTP_Request   END  ===\n");
 }
 
 b32					HTTP_request_is_closed(const HTTP_Request& req) {
