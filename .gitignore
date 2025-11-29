@@ -12,3 +12,5 @@ webserv
 # Editor specific files
 tags
 .vscode/
+
+*.old

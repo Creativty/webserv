@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/14 18:22:05 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/11/29 11:00:06 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -380,4 +380,6 @@ void				HTTP_request_close(HTTP_Request& req);
 b32					HTTP_request_read(HTTP_Request& req, const byte* data, i32 size);
 
 void				HTTP_request_debug(HTTP_Request& req);
+
+b32					WEBSERV_main(const WEBSERV_Config& config);
 #endif
