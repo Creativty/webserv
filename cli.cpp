@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:16:13 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/14 17:14:10 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/08 14:33:11 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -293,7 +293,7 @@ void			CLI_show_errors_config(const WEBSERV_Config& config) {
 			CLI_show_error_config(err.pos, "File \"%.*s\" is inaccessible or does not end in \".html\"", err.str.len, err.str.text);
 			CLI_show_error_toml_line(config.document, err.pos);
 		} else if (err.kind == WEBSERV_CONFIG_ERROR_VALUE_INVALID) {
-			CLI_show_error_config(err.pos, "Invalid value is not a proper \"%.*s\"", err.str.len, err.str.text);
+			CLI_show_error_config(err.pos, "Invalid value is not a valid \"%.*s\"", err.str.len, err.str.text);
 			CLI_show_error_toml_line(config.document, err.pos);
 		} else if (err.kind == WEBSERV_CONFIG_ERROR_ROUTE_PATH_DUP) {
 			CLI_show_error_config(err.pos, "Route path \"%.*s\" is a duplicate", err.str.len, err.str.text);

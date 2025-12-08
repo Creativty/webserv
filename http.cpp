@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 18:33:49 by xenobas           #+#    #+#             */
-/*   Updated: 2025/11/14 17:29:27 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/08 14:18:07 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -64,6 +64,24 @@ void				HTTP_request_debug(HTTP_Request& req) {
 		{ /* Method */
 			char	buff[64] = { 0 };
 			switch (req.method) {
+			case WEBSERV_METHOD_PATCH:
+				snprintf(buff, 64, "PATCH");
+				break ;
+			case WEBSERV_METHOD_TRACE:
+				snprintf(buff, 64, "TRACE");
+				break ;
+			case WEBSERV_METHOD_OPTIONS:
+				snprintf(buff, 64, "OPTIONS");
+				break ;
+			case WEBSERV_METHOD_CONNECT:
+				snprintf(buff, 64, "CONNECT");
+				break ;
+			case WEBSERV_METHOD_HEAD:
+				snprintf(buff, 64, "HEAD");
+				break ;
+			case WEBSERV_METHOD_DELETE:
+				snprintf(buff, 64, "DELETE");
+				break ;
 			case WEBSERV_METHOD_PUT:
 				snprintf(buff, 64, "PUT");
 				break ;
@@ -72,9 +90,6 @@ void				HTTP_request_debug(HTTP_Request& req) {
 				break ;
 			case WEBSERV_METHOD_GET:
 				snprintf(buff, 64, "GET");
-				break ;
-			case WEBSERV_METHOD_COUNT:
-				snprintf(buff, 64, "COUNT/UNREACHABLE");
 				break ;
 			case WEBSERV_METHOD_INVALID:
 			default:

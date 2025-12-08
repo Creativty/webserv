@@ -1,0 +1,34 @@
+[[instance]]
+port = 8080
+host = "0.0.0.0"
+routes = [
+	{
+		path = "/images",
+		type = "Server",
+		methods = [ "GET", "HEAD" ],
+
+		props = {
+			directory = "www/assets/images",
+			directory_list = true,
+		},
+	},
+	{
+		path = "/assets",
+
+		type = "Server",
+		props = {
+			directory = "www/assets",
+			directory_list = true,
+		},
+	},
+	{
+		path = "/upload",
+		methods = [ "POST", "PUT" ],
+
+		type = "Upload",
+		props = {
+			directory = "www/assets/images",
+			max_file_size = 256_000, # bytes
+		},
+	},
+]

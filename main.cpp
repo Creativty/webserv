@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:45:19 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/29 11:00:25 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/08 14:44:38 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -52,23 +52,42 @@ i32	main(i32 argc, cstring argv[]) {
 		return (8);
 	}
 
-	#if 0
+	#if 1
 	{
-		const WEBSERV_Instance&	instance = config.instances[0];
-		const char				*paths[] = {
+		const char*				paths[] = {
 			"/",
 			"/index.html",
 			"/images/1337.jpeg",
-			"/upload/Hyello.jpeg",
+			"/images/1337.jpeg",
+			"/upload",
+			"/upload",
 			"/assets/images/1337", /* Redirect */
 			"/assets/images/1337.jpeg", /* Server */
 		};
+		WEBSERV_Method			methods[] = {
+			WEBSERV_METHOD_GET,
+			WEBSERV_METHOD_GET,
+			WEBSERV_METHOD_GET,
+			WEBSERV_METHOD_POST,
+			WEBSERV_METHOD_GET,
+			WEBSERV_METHOD_POST,
+			WEBSERV_METHOD_GET,
+			WEBSERV_METHOD_HEAD,
+		};
 
+		const WEBSERV_Instance&	instance = config.instances[0];
 		for (i32 i = 0; i < cast(i32)count_of(paths); ++i) {
 			const string_view	key = WEBSERV_http_route_pick(instance, paths[i]);
-			std::cout << "path = " << string_view(paths[i]) << std::endl;
-			std::cout << "\troute_key = " << key << std::endl;
-			std::cout << std::endl;
+			printf("path \"%-24s\" ", paths[i]);
+			if (!key) {
+				printf("key not found\n");
+			} else {
+				printf("key \"%.*s\" was found ", key.len, key.text);
+
+				const WEBSERV_Route&	route = instance.routes.get(key);
+				b32						method_ok = WEBSERV_http_route_method_test(route, methods[i]);
+				printf("method is %s\n", method_ok ? "allowed" : "forbidden");
+			}
 		}
 	}
 	#endif

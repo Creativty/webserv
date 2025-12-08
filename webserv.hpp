@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/29 11:00:06 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/08 14:40:27 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -174,13 +174,17 @@ struct WEBSERV_URI {
 	b32							ok;
 };
 enum WEBSERV_Method {
-	WEBSERV_METHOD_INVALID,
+	WEBSERV_METHOD_INVALID	= 0,
 
-	WEBSERV_METHOD_GET = 1,
-	WEBSERV_METHOD_POST = 2,
-	WEBSERV_METHOD_PUT = 4,
-
-	WEBSERV_METHOD_COUNT,
+	WEBSERV_METHOD_GET		= 1 << 0,
+	WEBSERV_METHOD_HEAD		= 1 << 1,
+	WEBSERV_METHOD_POST		= 1 << 2,
+	WEBSERV_METHOD_PUT		= 1 << 3,
+	WEBSERV_METHOD_DELETE	= 1 << 4,
+	WEBSERV_METHOD_CONNECT	= 1 << 5,
+	WEBSERV_METHOD_OPTIONS	= 1 << 6,
+	WEBSERV_METHOD_TRACE	= 1 << 7,
+	WEBSERV_METHOD_PATCH	= 1 << 8,
 };
 struct WEBSERV_Interface {
 	u16	port;
@@ -218,10 +222,10 @@ struct WEBSERV_Route_CGI {
 };
 struct WEBSERV_Route {
 	string_view				path;
-	WEBSERV_Method			methods_whitelist;
 
 	b32						cascade;
 	WEBSERV_Route_Kind		kind;
+	WEBSERV_Method			methods_whitelist;
 
 	/* NOTE(xenobas):
 	 * C++ doesn't allow non trivial constructor in union types
@@ -370,6 +374,7 @@ b32					WEBSERV_http_version_supported(const string_view& str);
 void				WEBSERV_config_delete(WEBSERV_Config& config);
 WEBSERV_Config		WEBSERV_config_parse(const TOML_Document& toml);
 
+b32					WEBSERV_http_route_method_test(const WEBSERV_Route& route, WEBSERV_Method method);
 const string_view	WEBSERV_http_route_pick(const WEBSERV_Instance& instance, const string_view& path);
 
 HTTP_Request		HTTP_request_make(void);
