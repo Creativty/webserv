@@ -3,208 +3,474 @@
 /*                                                        :::      ::::::::   */
 /*   http.cpp                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+        */
+/*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/07/17 17:21:41 by aindjare          #+#    #+#             */
-/*   Updated: 2025/07/20 16:19:55 by sennakhl         ###   ########.fr       */
+/*   Created: 2025/11/01 18:33:49 by xenobas           #+#    #+#             */
+/*   Updated: 2025/11/14 17:29:27 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-/* REFERENCES:
-* - https://www.rfc-editor.org/rfc/rfc1945
-* - https://github.com/laytan/odin-http
-*/
-
 #include "webserv.hpp"
 
-std::ostream&	operator<<(std::ostream& stream, const HTTP_Method& method) {
-	switch (method) {
-		case HTTP_METHOD_GET:
-			return (stream << "GET");
-		case HTTP_METHOD_POST:
-			return (stream << "POST");
-		case HTTP_METHOD_HEAD:
-			return (stream << "HEAD");
-		case HTTP_METHOD_DELETE:
-			return (stream << "DELETE");
-		case HTTP_METHOD_INVALID:
-			return (stream << "INVALID");
-		default:
-			return (stream << "ESPECIALLYINVALID");
-	}
+static b32			HTTP_request_read_internal(HTTP_Request& req);
+
+HTTP_Request		HTTP_request_make(void) {
+	HTTP_Request	req;
+
+	req.method = WEBSERV_METHOD_INVALID;
+	req.uri = WEBSERV_uri_make("");
+
+	req.headers = HTTP_Headers();
+	req.headers.case_insensitive = 1;
+
+	req.chunked = 0;
+	req.content_length = -1;
+
+	req.chunks = dynamic_array<HTTP_Chunk>();
+	req.chunk.index = -1;
+	req.chunk.size = 0;
+
+	req.buff = dynamic_array<byte>();
+	req.buff_index = 0;
+	req.buff_stage = HTTP_REQUEST_STAGE_METHOD;
+	return (req);
 }
+void				HTTP_request_delete(HTTP_Request& req) {
+	WEBSERV_uri_delete(req.uri);
 
-HTTP_Method	parse_method(const std::string& text) {
-	if (text == "GET") return (HTTP_METHOD_GET);
-	if (text == "POST") return (HTTP_METHOD_POST);
-	if (text == "HEAD") return (HTTP_METHOD_HEAD);
-	if (text == "DELETE") return (HTTP_METHOD_DELETE);
-	return (HTTP_METHOD_INVALID);
+	for_table_begin(req.headers, HTTP_Headers, header) {
+		header.value.free();
+	} for_table_end ;
+	req.headers.free();
+
+	req.chunks.free();
+	req.buff.free();
+
+	req = HTTP_request_make();
 }
-
-std::ostream&	operator<<(std::ostream& stream, const Parse_Error& error) {
-	switch (error) {
-		case PARSE_ERROR_NONE:
-			return (stream << "Parse_Error{ Success }");
-		case PARSE_ERROR_HEADER_MISSING_KEY:
-			return (stream << "Parse_Error{ Header entry has no field name }");
-		case PARSE_ERROR_NOT_DELIMITED:
-			return (stream << "Parse_Error{ Could not find \"\\r\\n\" }");
-		case PARSE_ERROR_NOT_ENOUGH_FIELDS:
-			return (stream << "Parse_Error{ Not enough fields }");
-		case PARSE_ERROR_SUCCESSIVE_SPACE:
-			return (stream << "Parse_Error{ Successive spaces found }");
-		case PARSE_ERROR_UNSUPPORTED_VERSION:
-			return (stream << "Parse_Error{ Unsupported version }");
-		case PARSE_ERROR_UNSUPPORTED_METHOD:
-			return (stream << "Parse_Error{ Unsupported method }");
-		case PARSE_ERROR_HEADER_SECTION_DELIMITER:
-			return (stream << "Parse_Error{ Headers section is not delimited with \"\\r\\n\" }");
-		case PARSE_ERROR_HEADER_ENTRY_INVALID_VALUE:
-			return (stream << "Parse_Error{ Invalid character, most likely a CTL }");
-		case PARSE_ERROR_HEADER_ENTRY_DELIMITER:
-			return (stream << "Parse_Error{ Header entry is not delimited with \"\\r\\n\" }");
-		case PARSE_ERROR_HEADER_ENTRY_INCOMPLETE:
-			return (stream << "Parse_Error{ Header entry is missing ':' }");
-		default:
-			return (stream << "Parse_Error{ Unknown " << error << " }");
-	}
-}
-
-Parse_Error	parse_request_line(Request& request, const std::string& msg) {
-	size_t	offset = 0, next_space = 0;
-	if (msg.find("  ") != std::string::npos) return (PARSE_ERROR_SUCCESSIVE_SPACE);
-
-	if ((next_space = msg.find(' ', next_space)) == std::string::npos) return (PARSE_ERROR_NOT_ENOUGH_FIELDS);
-	std::string	method = msg.substr(offset, next_space);
-	request.method = parse_method(method);
-	if (request.method == HTTP_METHOD_INVALID) return (PARSE_ERROR_UNSUPPORTED_METHOD);
-
-	offset = next_space + 1;
-	if ((next_space = msg.find(' ', offset)) == std::string::npos) return (PARSE_ERROR_NOT_ENOUGH_FIELDS);
-	request.uri = msg.substr(offset, next_space - offset);
-
-	offset = next_space + 1;
-	if ((next_space = msg.find("\r\n", offset)) == std::string::npos) return (PARSE_ERROR_NOT_DELIMITED);
-	request.version = msg.substr(offset, next_space - offset);
-	if (request.version != "HTTP/1.0" && request.version != "HTTP/1.1") return (PARSE_ERROR_UNSUPPORTED_VERSION);
-
-	return (PARSE_ERROR_NONE);
-}
-
-static bool	is_char(int c) {
-	return (c >= 0 && c <= 127);
-}
-
-static bool is_tspecial(char c) {
-	// tspecials      = '(' | ')' | '<' | '>' | '@' | ',' | ';' | ':' | '\' | '"' | '/' | '[' | ']' | '?' | '=' | '{' | '}' | SP | HT
-	static const char SET[] = { '(',  ')',  '<',  '>',  '@', ',',  ';',  ':',  '\\',  '"',  '/',  '[',  ']',  '?',  '=',  '{',  '}',  ' ',  '\t' };
-	for (size_t i = 0; i < sizeof(SET) / sizeof(SET[0]); i++)
-		if (SET[i] == c)
-			return (true);
-	return (false);
-}
-
-static bool	is_ctl(char c) {
-	// CTL            = <any US-ASCII control character (octets 0 - 31) and DEL (127)>
-	return (c == 127 || (c >= 0 && c <= 31));
-}
-
-Parse_Error	parse_request_headers(Request& request, const std::string& msg) {
-	(void)request;
-	std::string	rest = msg;
-	for (size_t begin = 0; !msg.substr(begin).empty();) {
-		rest = msg.substr(begin);
-		if (rest.find("\r\n") == 0) break ;
-		std::string	name;
-		{ // field-name
-			size_t count = 0;
-			const std::string& substr = msg.substr(begin);
-			while (count < substr.size()) {
-				if (!is_char(substr[count])) break ;
-				if (is_tspecial(substr[count])) break ;
-				if (is_ctl(substr[count])) break ;
-				count++;
+void				HTTP_request_debug(HTTP_Request& req) {
+	printf("=== HTTP_Request  BEGIN ===\n");
+		{ /* Parsing status */
+			char	buff[64] = { 0 };
+			if (HTTP_request_is_error(req)) {
+				snprintf(buff, 64, "has failed");
+			} else if (HTTP_request_is_closed(req)) {
+				snprintf(buff, 64, "is done");
+			} else {
+				snprintf(buff, 64, "is waiting for more bytes, thus incomplete");
 			}
-			if (count < 1) return (PARSE_ERROR_HEADER_MISSING_KEY);
-			name = msg.substr(begin, count);
-			begin += count;
+			printf("    Parsing %s\n", buff);
 		}
-		{ // ':'
-			const std::string& substr = msg.substr(begin);
-			if (substr.size() < 1 || substr[0] != ':') return (PARSE_ERROR_HEADER_ENTRY_INCOMPLETE);
-			begin++;
+		{ /* Method */
+			char	buff[64] = { 0 };
+			switch (req.method) {
+				case WEBSERV_METHOD_PUT:
+					snprintf(buff, 64, "PUT");
+					break ;
+				case WEBSERV_METHOD_DELETE:
+					snprintf(buff, 64, "DELETE");
+					break ;
+				case WEBSERV_METHOD_POST:
+					snprintf(buff, 64, "POST");
+					break ;
+				case WEBSERV_METHOD_GET:
+					snprintf(buff, 64, "GET");
+					break ;
+				case WEBSERV_METHOD_COUNT:
+					snprintf(buff, 64, "COUNT/UNREACHABLE");
+					break ;
+				case WEBSERV_METHOD_INVALID:
+				default:
+					snprintf(buff, 64, "UNKNOWN %d", req.method);
+					break ;
+			}
+			printf("    Method %s\n", buff);
 		}
-		std::string	value;
-		{ // [ field-value ]
-			size_t	count  = msg.substr(begin).find("\r\n");
-			if (count == std::string::npos) return (PARSE_ERROR_HEADER_ENTRY_DELIMITER);
-			value = msg.substr(begin, count);
-			{ // internal validation
-				size_t	i = 0;
-				while (i < value.size()) {
-					// field-content  = <the OCTETs making up the field-value and consisting of either *<any OCTET except CTLs, but including LWS> or combinations of 1*<any CHAR except CTLs>, tspecials>
-					if (value[i] == '"') { // quoted-string  = ( '"' *<any CHAR except '"' and CTLs, but including LWS> '"' )
-						size_t j = i++;
-						while (i < value.size()) {
-							if (!is_char(value[i])) break ;
-							if (is_ctl(value[i]) && value[i] != ' ' && value[i] != '\t') break ;
-							if (value[i] == '"') break ;
-							i++;
-						}
+		{ /* URI */
+			const WEBSERV_URI& uri = req.uri;
 
-						size_t count = i - j;
-						if (count <= 1 || value[i] != '"') i = j;
-						else {
-							i++;
-							continue ;
-						}
-					}
-					if (is_ctl(value[i])) return (PARSE_ERROR_HEADER_ENTRY_INVALID_VALUE);
-					i++;
+			{ /* Path */
+				printf("    Path");
+				if (uri.path.len == 0) {
+					printf(" is empty");
+				}
+				printf("\n");
+				for	(i32 i = 0; i < uri.path.len; ++i) {
+					printf("        \"%.*s\"\n", uri.path[i].len, uri.path[i].text);
 				}
 			}
-			begin += count;
+
+			{ /* Query */
+				printf("    Query");
+				if (uri.query.count == 0) {
+					printf(" is empty");
+				}
+				printf("\n");
+
+				for_table_begin(uri.query, const hash_table<string_view>, param) {
+					printf("        \"%.*s\" = \"%.*s\"\n", param.key.len, param.key.text, param.value.len, param.value.text);
+				} for_table_end ;
+			}
 		}
-		{ // CRLF
-			if (msg.substr(begin).find("\r\n") != 0) return (PARSE_ERROR_HEADER_ENTRY_DELIMITER);
-			begin += 2;
+		{ /* Headers */
+			const HTTP_Headers& headers = req.headers;
+
+			printf("    Headers \n");
+			for_table_begin(headers, const HTTP_Headers, header) {
+				printf("        \"%.*s\" = \"%.*s\"\n", header.key.len, header.key.text, header.value.len, header.value.text);
+			} for_table_end ;
 		}
-		request.headers[name] = value;
+		{ /* Body */
+			char	buff[64] = { 0 };
+			if (req.content_length >= 0) {
+				snprintf(buff, 64, "content length %ld bytes", req.content_length);
+			} else {
+				snprintf(buff, 64, "connection-close-bound bytes");
+			}
+
+			for (i32 i = 0; i < req.chunks.len; ++i) {
+				const HTTP_Chunk&	chunk = req.chunks[i];
+				printf("chunk containing %d %s starts at %d", chunk.size, chunk.size == 1 ? "byte" : "bytes", chunk.index);
+			}
+		}
+	printf("=== HTTP_Request   END  ===\n");
+}
+
+b32					HTTP_request_is_closed(const HTTP_Request& req) {
+	return (
+		req.buff_stage == HTTP_REQUEST_STAGE_DONE
+		|| req.buff_stage == HTTP_REQUEST_STAGE_ERROR
+	);
+}
+b32					HTTP_request_is_error(const HTTP_Request& req) {
+	return (req.buff_stage == HTTP_REQUEST_STAGE_ERROR);
+}
+static b32			HTTP_request_is_stage_body(const HTTP_Request& req) {
+	return (req.buff_stage == HTTP_REQUEST_STAGE_BODY || req.buff_stage == HTTP_REQUEST_STAGE_CHUNK);
+}
+
+b32					HTTP_request_read(HTTP_Request& req, const byte* data, i32 size) {
+	if (HTTP_request_is_closed(req) || size == 0  || data == 0) {
+		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
+		return (0);
 	}
-	if (rest == "\r\n")
-		return (PARSE_ERROR_NONE);
-	return (PARSE_ERROR_HEADER_SECTION_DELIMITER);
+
+	req.buff.push(size, data);
+	return (HTTP_request_read_internal(req));
+}
+void				HTTP_request_close(HTTP_Request& req) {
+	if (HTTP_request_is_closed(req) /* Already closed */
+		|| !HTTP_request_is_stage_body(req) /* Waiting for essential header bytes */
+		|| (req.content_length >= 0 && req.chunk.size != req.content_length) /* Mismatching expected length and received length */ ) {
+		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
+	} else {
+		req.buff_stage = HTTP_REQUEST_STAGE_DONE;
+	}
 }
 
-Parse_Error	parse_request(const std::string& msg, Request& request) {
-	size_t		count = 0, offset = 0;
-	Parse_Error error;
-	std::string	substr;
+static b32			HTTP_parse_i64_check(i64 number, i64 sign, i64 v, i64 base = 10) {
+	switch (sign) {
+	case +1: {
+		if (I64_MAX / base < number || (I64_MAX / base == number && I64_MAX % base < v)) {
+			return (false);
+		}
+	} break ;
+	case -1: {
+		if (-(I64_MIN / base) < number || (-(I64_MIN / base) == number && -(I64_MIN % base) < v)) {
+			return (false);
+		}
+	} break ;
+	}
+	return (sign == -1 || sign == +1);
+}
+static i64			HTTP_parse_i64(const string_view& str, i32 fallback = -1) {
+	i64	n = 0;
+	i64	s = 1;
 
-	count = msg.find("\r\n");
-	if (count == std::string::npos) return (PARSE_ERROR_NOT_DELIMITED);
-	else count = (count + 2) - offset;
-	substr = msg.substr(offset, count);
-	error = parse_request_line(request, substr); if (error != PARSE_ERROR_NONE) return (error);
-	offset += count;
-
-	count = msg.find("\r\n\r\n", offset);
-	if (count == std::string::npos) return (PARSE_ERROR_NOT_DELIMITED);
-	else count = (count + 4) - offset;
-	substr = msg.substr(offset, count); // std::cout << substr << std::endl;
-	error = parse_request_headers(request, substr); if (error != PARSE_ERROR_NONE) return (error);
-	offset += count;
-
-	// TODO(XENOBAS): Understand application/x-www-form-urlencoded
-	// TODO(XENOBAS): Content-Length
-	std::cout << "Offset: " << offset << ", Length: " << msg.size() << std::endl;
-	request.body = msg.substr(offset);
-	return (PARSE_ERROR_NONE);
+	i32	i = 0;
+	b32	fail = 0;
+	if (str.len > 0) {
+		if (str[i] == '-' || str[i] == '+') {
+			if (str[i] == '-') {
+				s = -1;
+			}
+			++i;
+		}
+	}
+	while (i < str.len && !fail) {
+		i64	v = cast(i64)(str[i] - '0');
+		if (str[i] < '0' || str[i] > '9' || !HTTP_parse_i64_check(n, s, v)) {
+			fail = 1;
+			break ;
+		}
+		n = (n * 10l) + v;
+		++i;
+	}
+	return (fail ? fallback : (n * s));
 }
 
-#ifdef TEST_HTTP_MAIN
-int	main(void) {
-	return (0);
+static b32			HTTP_hex_match(char c) {
+	if (c >= 'A' && c <= 'Z') {
+		c ^= (2 << 4);
+	}
+	return ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'));
 }
-#endif
+static u8			HTTP_hex_value(char c) {
+	if (c >= 'A' && c <= 'Z') {
+		c ^= (2 << 4);
+	}
+	if (c >= 'a' && c <= 'z') {
+		return (cast(u8)(c - 'a' + 10));
+	}
+	if (c >= '0' && c <= '9') {
+		return (cast(u8)(c - '0' +  0));
+	}
+	return (0u);
+}
+static i64			HTTP_parse_i64_hex(const string_view& str, i32 fallback = -1) {
+	i64	n = 0;
+	i64	s = 1;
+
+	i32	i = 0;
+	b32	fail = 0;
+	if (str.len > 0) {
+		if (str[i] == '-' || str[i] == '+') {
+			if (str[i] == '-') {
+				s = -1;
+			}
+			++i;
+		}
+	}
+	while (i < str.len && !fail) {
+		i64	v = HTTP_hex_value(str[i]);
+		if (!HTTP_hex_match(str[i]) || !HTTP_parse_i64_check(n, s, v, /* base = */ 16)) {
+			fail = 1;
+			break ;
+		}
+		n = (n * 16l) + v;
+		++i;
+	}
+	return (fail ? fallback : (n * s));
+}
+
+static void			HTTP_request_read_stage_method(HTTP_Request& req) {
+	if (req.buff_index >= req.buff.len)
+		return ;
+
+	string_view	str((char*)&req.buff[req.buff_index], req.buff.len - req.buff_index);
+	string_view	sep(" ");
+
+	i32	idx_end = str.index(sep);
+	if (idx_end == -1) {
+		return ;
+	}
+
+	string_view	str_method = str.slice(0, idx_end);
+	req.buff_index += idx_end + sep.len;
+	
+	req.method = WEBSERV_method_make(str_method);
+	if (req.method == WEBSERV_METHOD_INVALID) {
+		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
+	} else {
+		req.buff_stage = HTTP_REQUEST_STAGE_URI;
+	}
+}
+static void			HTTP_request_read_stage_uri(HTTP_Request& req) {
+	if (req.buff_index >= req.buff.len)
+		return ;
+
+	string_view	str((char*)&req.buff[req.buff_index], req.buff.len - req.buff_index);
+	string_view	sep(" ");
+
+	i32	idx_end = str.index(sep);
+	if (idx_end == -1) {
+		return ;
+	}
+
+	string_view	str_uri = str.slice(0, idx_end);
+	req.buff_index += idx_end + sep.len;
+	
+	req.uri = WEBSERV_uri_decode(str_uri);
+	if (!req.uri.ok) {
+		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
+	} else {
+		req.buff_stage = HTTP_REQUEST_STAGE_VERSION;
+	}
+}
+static void			HTTP_request_read_stage_version(HTTP_Request& req) {
+	if (req.buff_index >= req.buff.len)
+		return ;
+
+	string_view	str((char*)&req.buff[req.buff_index], req.buff.len - req.buff_index);
+	string_view	sep("\r\n");
+
+	i32	idx_end = str.index(sep);
+	if (idx_end == -1) {
+		return ;
+	}
+
+	string_view	str_version = str.slice(0, idx_end);
+	req.buff_index += idx_end + sep.len;
+
+	if (WEBSERV_http_version_supported(str_version)) {
+		req.buff_stage = HTTP_REQUEST_STAGE_HEADERS;
+	} else {
+		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
+	}
+}
+static void			HTTP_request_read_stage_headers_infix(HTTP_Request& req, const string_view& name, const string_view& value) {
+	if (name.eq_insensitive("Content-Length")) {
+		req.content_length = HTTP_parse_i64(value);
+		if (req.content_length < 0) {
+			req.content_length = -1;
+		}
+		return ;
+	}
+	if (name.eq_insensitive("Transfer-Encoding")) {
+		req.chunked = value.eq_insensitive("chunked");
+		if (!req.chunked) {
+			req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
+		}
+		return ;
+	}
+}
+static void			HTTP_request_read_stage_headers_postfix(HTTP_Request& req) {
+	if (req.chunked && req.content_length >= 0) {
+		req.chunked = 0;
+	}
+}
+static void			HTTP_request_read_stage_headers(HTTP_Request& req) {
+	if (req.buff_index >= req.buff.len)
+		return ;
+
+	string_view	str((char*)&req.buff[req.buff_index], req.buff.len - req.buff_index);
+	string_view	sep("\r\n");
+
+	i32	idx_end = str.index(sep);
+	if (idx_end == -1) {
+		return ;
+	}
+
+	string_view	str_header = str.slice(0, idx_end);
+	req.buff_index += idx_end + sep.len;
+	if (str_header == "") {
+		HTTP_request_read_stage_headers_postfix(req);
+		req.buff_stage = req.chunked ? HTTP_REQUEST_STAGE_CHUNK : HTTP_REQUEST_STAGE_BODY;
+		return ;
+	}
+
+	i32	idx_name_end = str_header.index(":");
+	if (idx_name_end == -1) {
+		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
+		return ;
+	}
+	
+	string_view	str_name = str_header.slice(0, idx_name_end).trim_right();
+	string_view	str_value = str_header.slice(idx_name_end + 1).trim_left();
+
+	req.headers.set(str_name, string_view::alloc(str_value));
+	HTTP_request_read_stage_headers_infix(req, str_name, str_value);
+	HTTP_request_read_stage_headers(req);
+}
+static void			HTTP_request_read_stage_body(HTTP_Request& req) {
+	i32	rem = req.buff.len - req.buff_index;
+	req.chunk.size += rem;
+
+	if (req.chunk.index < 0) {
+		req.chunk.index = req.buff_index;
+	}
+
+	req.buff_index += rem;
+	if (req.content_length >= 0 && req.buff_index - req.chunk.index >= req.content_length) {
+		HTTP_request_close(req);
+	}
+}
+
+static void			skip_sep(HTTP_Request& req){
+	string_view	sep("\r\n");
+	string_view	_str((char*)&req.buff[req.buff_index], req.buff.len - req.buff_index);
+	
+	i32	idx_end = _str.index(sep);
+	if (idx_end == 0) {
+		req.buff_index += sep.len;
+	}
+}
+
+
+static void			HTTP_request_read_stage_chunk(HTTP_Request& req) {
+	skip_sep(req);
+	if (req.buff_index >= req.buff.len)
+		return ;
+
+	string_view	str((char*)&req.buff[req.buff_index], req.buff.len - req.buff_index);
+	string_view	sep("\r\n");
+
+	i32	idx_end = str.index(sep);
+	if (idx_end == -1) {
+		return ;
+	}
+
+	string_view	str_chunk_size = str.slice(0, idx_end);
+	if (str_chunk_size.len == 0) {
+		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
+		return ;
+	}
+	for (i32 i = 0; i < str_chunk_size.len; ++i) {
+		if (!HTTP_hex_match(str_chunk_size[i])) {
+			req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
+			return ;
+		}
+	}
+
+	req.buff_index += idx_end + sep.len;
+
+	req.chunk.size = cast(i32)HTTP_parse_i64_hex(str_chunk_size);
+	req.chunk.index = req.buff_index;
+	if (req.chunk.size == 0) {
+		HTTP_request_close(req);
+		return ;
+	}
+
+	req.buff_stage = HTTP_REQUEST_STAGE_CHUNK_DATA;
+}
+static void			HTTP_request_read_stage_chunk_data(HTTP_Request& req) {
+	if (req.buff_index >= req.buff.len)
+		return ;
+
+	i32	buff_rem = req.buff.len - req.buff_index;
+	if (buff_rem >= req.chunk.size) {
+		req.chunks.push(req.chunk);
+
+		req.buff_index += req.chunk.size;
+		req.buff_stage  = HTTP_REQUEST_STAGE_CHUNK;
+	}
+}
+
+static b32			HTTP_request_read_internal(HTTP_Request& req) {
+	if (req.buff_index >= req.buff.len) {
+		return (1);
+	}
+
+	if (req.buff_stage == HTTP_REQUEST_STAGE_METHOD) {
+		HTTP_request_read_stage_method(req);
+	}
+	if (req.buff_stage == HTTP_REQUEST_STAGE_URI) {
+		HTTP_request_read_stage_uri(req);
+	}
+	if (req.buff_stage == HTTP_REQUEST_STAGE_VERSION) {
+		HTTP_request_read_stage_version(req);
+	}
+	if (req.buff_stage == HTTP_REQUEST_STAGE_HEADERS) {
+		HTTP_request_read_stage_headers(req);
+	}
+	if (req.buff_stage == HTTP_REQUEST_STAGE_BODY) {
+		HTTP_request_read_stage_body(req);
+	}
+	if (req.buff_stage == HTTP_REQUEST_STAGE_CHUNK) {
+		HTTP_request_read_stage_chunk(req);
+	}
+	if (req.buff_stage == HTTP_REQUEST_STAGE_CHUNK_DATA) {
+		HTTP_request_read_stage_chunk_data(req);
+	}
+	return (!HTTP_request_is_error(req));
+}

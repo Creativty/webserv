@@ -3,38 +3,40 @@
 #                                                         :::      ::::::::    #
 #    Makefile                                           :+:      :+:    :+:    #
 #                                                     +:+ +:+         +:+      #
-#    By: aindjare <marvin@42.fr>                    +#+  +:+       +#+         #
+#    By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
-#    Created: 2025/07/11 15:57:44 by aindjare          #+#    #+#              #
-#    Updated: 2025/07/19 15:31:22 by aindjare         ###   ########.fr        #
+#    Created: 2025/08/23 15:57:56 by aindjare          #+#    #+#              #
+#    Updated: 2025/11/20 09:50:38 by sennakhl         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
 NAME		:=	webserv
 SRCS		:=	$(wildcard *.cpp)
+INCS		:=	$(wildcard *.hpp)
 OBJS		:=	$(SRCS:.cpp=.o)
 DEPS		:=	$(OBJS:.o=.d)
 
 CXX			:=	c++
-CXXFLAGS	:=	-Wall -Wextra -Werror -Wconversion -std=c++98 -g -MMD -MP
+CXXFLAGS	:=	-Wall -Wextra -Werror -Wconversion -Wswitch-enum -std=c++98 -ggdb -MMD -MP $$WEBSERV_DEFINES -DWEBSERV_DEBUG
 
 all: $(NAME)
 
 clean:
-	$(RM) $(OBJS) $(DEPS)
+	$(RM) $(DEPS)
+	$(RM) $(OBJS)
 
 fclean: clean
 	$(RM) $(NAME)
 
 re: fclean all
 
-flags:
-	@echo $(CXXFLAGS)
+san: CXXFLAGS += -fsanitize=address
+san: fclean all
 
-$(NAME): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+$(NAME): $(INCS) $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $@	$(OBJS)
 
 -include $(DEPS)
 
-.PHONY: all clean fclean re flags
+.PHONY: all clean fclean re
 .SECONDARY: $(OBJS) $(DEPS)
