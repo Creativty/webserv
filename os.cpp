@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 17:02:26 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/08 16:37:35 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/11 17:37:52 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -38,7 +38,7 @@ b32			OS_read_file(const string_view path, string_view& text) {
 	MEM_copy((byte*)path.text, path.len, path_cstr, 511);
 
 	i32		fd = open((char*)path_cstr, O_RDONLY);
-	if (fd < 0) {
+	if (fd == -1) {
 		return (0);
 	}
 
@@ -47,10 +47,8 @@ b32			OS_read_file(const string_view path, string_view& text) {
 	while (ok) {
 		char	buff[512] = { 0 };
 		i32		buff_n = cast(i32)read(fd, buff, 511);
-		if (buff_n <  0) {
-			ok = 0;
-		}
 		if (buff_n <= 0) {
+			ok = (buff_n == 0);
 			break ;
 		}
 

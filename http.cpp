@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 18:33:49 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/11 17:17:38 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/11 17:36:27 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -168,12 +168,15 @@ b32					HTTP_request_read(HTTP_Request& req, const byte* data, i32 size) {
 	}
 
 	req.buff.push(size, data);
-	return (HTTP_request_read_internal(req));
+	b32	ok = HTTP_request_read_internal(req);
+	return (ok);
 }
 void				HTTP_request_close(HTTP_Request& req) {
-	if (HTTP_request_is_closed(req) /* Already closed */
-		|| !HTTP_request_is_stage_body(req) /* Waiting for essential header bytes */
-		|| (req.content_length >= 0 && req.chunk.size != req.content_length) /* Mismatching expected length and received length */ ) {
+	b32	is_closed = HTTP_request_is_closed(req);
+	b32	is_stage_essential = !HTTP_request_is_stage_body(req);
+	b32	is_length_insufficient = (req.content_length >= 0 && req.chunk.size != req.content_length);
+
+	if (is_closed || is_stage_essential || is_length_insufficient) {
 		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
 	} else {
 		req.buff_stage = HTTP_REQUEST_STAGE_DONE;
