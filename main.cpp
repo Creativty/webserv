@@ -58,6 +58,7 @@ i32	main(i32 argc, cstring argv[]) {
 		return (8);
 	}
 
+	if (false)
 	{
 		const WEBSERV_Instance&	instance = config.instances[0];
 		const char				*paths[] = {

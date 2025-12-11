@@ -347,11 +347,27 @@ bool fileExists(const std::string& filename) {
     return file.good();
 }
 
-u8* GetBody(HTTP_Request req){
+u8* read_one_chunk(HTTP_Request req){
+	HTTP_Chunk chunk = req.chunk;
+	byte* body = (byte *) calloc((u64)(chunk.size + 1), sizeof(byte));
+	if (!body) return NULL;
+	byte* buff = req.buff.data;
+	for (int i = 0, j = chunk.index; i < chunk.size; i++, j++){
+		body[i] = buff[j];
+	}
+	return body;
+}
+
+u8* GetBody(HTTP_Request req, i64 &l){
 	dynamic_array<HTTP_Chunk> chunks = req.chunks;
 	u64 len = 0;
 	u64 index = 0;
 	
+	if (!req.chunked){
+		l = req.chunk.size;
+		return (read_one_chunk(req));
+	}
+
 	for (int i = 0; i < chunks.len; i++)
 		len += (u64)chunks.data->size;
 
@@ -364,6 +380,7 @@ u8* GetBody(HTTP_Request req){
 			index++;
 		}
 	}
+	l = (i64)len;
 	return body;
 }
 
@@ -461,7 +478,8 @@ int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instan
 		if (getcwd(oldDir, sizeof(oldDir)) == NULL) 	return (perror("getcwd"), SERVER_ERROR);
 		if (chdir(dir.c_str()) == -1)					return (perror("chdir"), SERVER_ERROR);
 
-		u8* body = GetBody(request);
+		i64 len;
+		u8* body = GetBody(request, len);
 
 		std::string ext = getFileExtension(request.headers.get("Content-Type").to_string());
 		std::string fileName = generateRandomFileName(ext);
@@ -470,7 +488,7 @@ int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instan
 			return (perror("open file for upload"), SERVER_ERROR);
 		
 		std::cout << "file name: " << fileName << std::endl;
-		write(fd, body, strlen((const char *) body));
+		write(fd, body, (size_t)len);
 		close(fd);
 
 		chdir(oldDir);
@@ -534,7 +552,8 @@ struct WEBSERV_Instance get_server(dynamic_array<WEBSERV_Instance> instances, in
 }
 
 int handle_requests(dynamic_array<WEBSERV_Instance> instances, int epfd, sockaddr_in address, size_t addrlen){
-	HTTP_Request request = HTTP_request_make();
+	static std::map<int, HTTP_Request> fd_request;
+	// HTTP_Request request = HTTP_request_make();
 	while (true) {
 		struct epoll_event events[100];
 		int nfds = epoll_wait(epfd, events, 100, -1);
@@ -598,19 +617,24 @@ int handle_requests(dynamic_array<WEBSERV_Instance> instances, int epfd, sockadd
 				getsockname(fd, (sockaddr*)&local_addr, &len);
 				int port = ntohs(local_addr.sin_port);
 
-				std::cout << "Client came through port " << port << std::endl;
+				// std::cout << "buffer: " << buffer << std::endl;
+				std::cout << "valread: " << valread << std::endl;
 
 				
 
 				if (valread > 0) {
 					std::string	message(buffer, cast(size_t)valread);
-					//TODO:  every fd should be have a req
-					
+					HTTP_Request request;
+					if (fd_request.count(fd))
+						request = fd_request[fd];
+					else
+						fd_request[fd] = HTTP_request_make();
 
 					if (!HTTP_request_read(request, (const byte*) buffer, (i32) valread)){
 						epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
 						std::cout << htmlStatus[BAD_REQUEST] << std::endl;
 						http_respond_html(fd, BAD_REQUEST, "text/html", htmlStatus[BAD_REQUEST]);
+						fd_request.erase(fd);
 						close(fd);
 						break;
 					}
@@ -623,17 +647,20 @@ int handle_requests(dynamic_array<WEBSERV_Instance> instances, int epfd, sockadd
 					if(status != PROCESSING){
 						std::cout << htmlStatus[status] << std::endl;
 						http_respond_html(fd, status, "text/html", htmlStatus[status]);
+						fd_request.erase(fd);
 						close(fd);
 					}
 
 				} else {
 					std::cout << "No bytes are there to read" << std::endl;
 					http_respond_html(fd, BAD_REQUEST, "text/html", htmlStatus[BAD_REQUEST]);
+					fd_request.erase(fd);
+					close(fd);
 				}
 			}
 		}
 	}
-	HTTP_request_close(request);
+	// HTTP_request_close(request);
 	return (1);
 }
 
@@ -697,35 +724,11 @@ int	setup_servers(dynamic_array<WEBSERV_Instance> instances, int num_server){
 }
 
 
-// void setup_config(toml::Config *config){
-
-// 	config[0].port = 8080;
-// 	config[0].host = "127.0.0.1";
-// 	config[0].upload_dir = "upload";
-// 	config[0].cgi_path = "/CGI/";
-// 	config[0].cgi_scripts[".py"] = "/usr/bin/python3"; 
-// 	config[0].cgi_scripts[".php"] = "/usr/bin/php"; 
-	
-// 	config[1].port = 8081;
-// 	config[1].host = "127.0.0.1";
-// 	config[1].upload_dir = "upload1";
-// 	config[1].cgi_path = "/CGI/";
-	
-// 	config[2].port = 8082;
-// 	config[2].host = "127.0.0.1";
-// 	config[2].upload_dir = "upload2";
-// 	config[2].cgi_path = "/CGI/";
-// }
 
 int server(WEBSERV_Config	config) {
 	dynamic_array<WEBSERV_Instance> instances = config.instances;
 	int epfd = epoll_create1(0);
 	//TODO: check is epoll failed to create
-
-
-	// //TODO: for test
-	// struct toml::Config config[n_ser];
-	// setup_config(config);
 
 
 	setup_servers(instances, instances.len);
