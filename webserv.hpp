@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   webserv.hpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+        */
+/*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/01 15:15:19 by sennakhl         ###   ########.fr       */
+/*   Updated: 2025/12/11 18:16:13 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,7 +28,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/epoll.h>
 
 struct Position {
 	i32			index;
@@ -93,15 +92,6 @@ enum TOML_Value_Kind {
 #define TOML_VALUE_KIND(NAME, ...) TOML_VALUE_##NAME,
 	TOML_VALUE_KINDS
 #undef TOML_VALUE_KIND
-// TOML_VALUE_NIL,
-// 
-// TOML_VALUE_BOOLEAN,
-// TOML_VALUE_NUMBER,
-// TOML_VALUE_STRING,
-// 
-// TOML_VALUE_ARRAY,
-// TOML_VALUE_ARRAY_TABLES,
-// TOML_VALUE_TABLE,
 };
 struct TOML_Value {
 	TOML_Value_Kind	kind;
@@ -175,15 +165,17 @@ struct WEBSERV_URI {
 	b32							ok;
 };
 enum WEBSERV_Method {
-	WEBSERV_METHOD_INVALID,
+	WEBSERV_METHOD_INVALID	= 0,
 
-	
-	WEBSERV_METHOD_GET = 1,
-	WEBSERV_METHOD_POST = 2,
-	WEBSERV_METHOD_PUT = 4,
-	WEBSERV_METHOD_DELETE = 8,
-
-	WEBSERV_METHOD_COUNT,
+	WEBSERV_METHOD_GET		= 1 << 0,
+	WEBSERV_METHOD_HEAD		= 1 << 1,
+	WEBSERV_METHOD_POST		= 1 << 2,
+	WEBSERV_METHOD_PUT		= 1 << 3,
+	WEBSERV_METHOD_DELETE	= 1 << 4,
+	WEBSERV_METHOD_CONNECT	= 1 << 5,
+	WEBSERV_METHOD_OPTIONS	= 1 << 6,
+	WEBSERV_METHOD_TRACE	= 1 << 7,
+	WEBSERV_METHOD_PATCH	= 1 << 8,
 };
 struct WEBSERV_Interface {
 	u16	port;
@@ -221,10 +213,10 @@ struct WEBSERV_Route_CGI {
 };
 struct WEBSERV_Route {
 	string_view				path;
-	WEBSERV_Method			methods_whitelist;
 
 	b32						cascade;
 	WEBSERV_Route_Kind		kind;
+	WEBSERV_Method			methods_whitelist;
 
 	/* NOTE(xenobas):
 	 * C++ doesn't allow non trivial constructor in union types
@@ -249,7 +241,7 @@ struct WEBSERV_Instance {
 
 	hash_table<WEBSERV_Route>			routes;
 
-	int					fd;
+	i32									fd;
 };
 
 #define CONFIG_ERROR_KINDS \
@@ -275,14 +267,6 @@ enum WEBSERV_Config_Error_Kind {
 #define CONFIG_ERROR_KIND(NAME, ...) WEBSERV_CONFIG_ERROR_##NAME,
 	CONFIG_ERROR_KINDS
 #undef CONFIG_ERROR_KIND
-// WEBSERV_CONFIG_ERROR_INVALID,
-// 
-// WEBSERV_CONFIG_ERROR_ROOT_TYPE,
-// WEBSERV_CONFIG_ERROR_ROOT_DATA,
-// 
-// WEBSERV_CONFIG_ERROR_KEY_UNKNOWN,
-// WEBSERV_CONFIG_ERROR_KEY_DISALLOWED,
-// WEBSERV_CONFIG_ERROR_TYPE_MISMATCH,
 };
 
 struct WEBSERV_Config_Error {
@@ -359,6 +343,7 @@ void				CLI_show_error_syntax(const Position pos, const char *fmt, ...);
 void				CLI_show_error_config(const Position pos, const char *fmt, ...);
 void				CLI_show_errors_toml(const TOML_Document& document);
 void				CLI_show_errors_config(const WEBSERV_Config& config);
+void				CLI_show_error_runtime(const char* fmt, ...);
 
 TOML_Document		TOML_make(const string_view& file);
 void				TOML_delete(TOML_Document& document);
@@ -375,6 +360,7 @@ b32					WEBSERV_http_version_supported(const string_view& str);
 void				WEBSERV_config_delete(WEBSERV_Config& config);
 WEBSERV_Config		WEBSERV_config_parse(const TOML_Document& toml);
 
+b32					WEBSERV_http_route_method_test(const WEBSERV_Route& route, WEBSERV_Method method);
 const string_view	WEBSERV_http_route_pick(const WEBSERV_Instance& instance, const string_view& path);
 
 HTTP_Request		HTTP_request_make(void);
@@ -386,8 +372,6 @@ b32					HTTP_request_read(HTTP_Request& req, const byte* data, i32 size);
 
 void				HTTP_request_debug(HTTP_Request& req);
 
-
-// std::string getContentType(std::string path);
-// std::string getFileExtension(const std::string typ);
-int server(WEBSERV_Config	config);
+int					server(WEBSERV_Config config);
+b32					WEBSERV_main(const WEBSERV_Config& config);
 #endif

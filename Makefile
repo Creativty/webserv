@@ -3,10 +3,10 @@
 #                                                         :::      ::::::::    #
 #    Makefile                                           :+:      :+:    :+:    #
 #                                                     +:+ +:+         +:+      #
-#    By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+         #
+#    By: xenobas <rahimos.123@gmail.com>            +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
-#    Created: 2025/08/23 15:57:56 by aindjare          #+#    #+#              #
-#    Updated: 2025/11/20 09:50:38 by sennakhl         ###   ########.fr        #
+#    Created: 2025/12/11 18:03:31 by xenobas           #+#    #+#              #
+#    Updated: 2025/12/11 18:03:32 by xenobas          ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -17,7 +17,9 @@ OBJS		:=	$(SRCS:.cpp=.o)
 DEPS		:=	$(OBJS:.o=.d)
 
 CXX			:=	c++
-CXXFLAGS	:=	-Wall -Wextra -Werror -Wconversion -Wswitch-enum -std=c++98 -ggdb -MMD -MP $$WEBSERV_DEFINES -DWEBSERV_DEBUG
+CXXFLAGS	:=	-std=c++98 -ggdb -MMD -MP \
+				-DDEBUG \
+				-Wall -Wextra -Werror -Wconversion -Wswitch-enum 
 
 all: $(NAME)
 

@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 18:33:49 by xenobas           #+#    #+#             */
-/*   Updated: 2025/11/14 17:29:27 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/11 18:27:53 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -64,25 +64,37 @@ void				HTTP_request_debug(HTTP_Request& req) {
 		{ /* Method */
 			char	buff[64] = { 0 };
 			switch (req.method) {
-				case WEBSERV_METHOD_PUT:
-					snprintf(buff, 64, "PUT");
-					break ;
-				case WEBSERV_METHOD_DELETE:
-					snprintf(buff, 64, "DELETE");
-					break ;
-				case WEBSERV_METHOD_POST:
-					snprintf(buff, 64, "POST");
-					break ;
-				case WEBSERV_METHOD_GET:
-					snprintf(buff, 64, "GET");
-					break ;
-				case WEBSERV_METHOD_COUNT:
-					snprintf(buff, 64, "COUNT/UNREACHABLE");
-					break ;
-				case WEBSERV_METHOD_INVALID:
-				default:
-					snprintf(buff, 64, "UNKNOWN %d", req.method);
-					break ;
+			case WEBSERV_METHOD_PATCH:
+				snprintf(buff, 64, "PATCH");
+				break ;
+			case WEBSERV_METHOD_TRACE:
+				snprintf(buff, 64, "TRACE");
+				break ;
+			case WEBSERV_METHOD_OPTIONS:
+				snprintf(buff, 64, "OPTIONS");
+				break ;
+			case WEBSERV_METHOD_CONNECT:
+				snprintf(buff, 64, "CONNECT");
+				break ;
+			case WEBSERV_METHOD_HEAD:
+				snprintf(buff, 64, "HEAD");
+				break ;
+			case WEBSERV_METHOD_DELETE:
+				snprintf(buff, 64, "DELETE");
+				break ;
+			case WEBSERV_METHOD_PUT:
+				snprintf(buff, 64, "PUT");
+				break ;
+			case WEBSERV_METHOD_POST:
+				snprintf(buff, 64, "POST");
+				break ;
+			case WEBSERV_METHOD_GET:
+				snprintf(buff, 64, "GET");
+				break ;
+			case WEBSERV_METHOD_INVALID:
+			default:
+				snprintf(buff, 64, "UNKNOWN %d", req.method);
+				break ;
 			}
 			printf("    Method %s\n", buff);
 		}
@@ -146,7 +158,7 @@ b32					HTTP_request_is_error(const HTTP_Request& req) {
 	return (req.buff_stage == HTTP_REQUEST_STAGE_ERROR);
 }
 static b32			HTTP_request_is_stage_body(const HTTP_Request& req) {
-	return (req.buff_stage == HTTP_REQUEST_STAGE_BODY || req.buff_stage == HTTP_REQUEST_STAGE_CHUNK);
+	return (req.buff_stage == HTTP_REQUEST_STAGE_BODY || req.buff_stage == HTTP_REQUEST_STAGE_CHUNK_DATA);
 }
 
 b32					HTTP_request_read(HTTP_Request& req, const byte* data, i32 size) {
@@ -156,12 +168,15 @@ b32					HTTP_request_read(HTTP_Request& req, const byte* data, i32 size) {
 	}
 
 	req.buff.push(size, data);
-	return (HTTP_request_read_internal(req));
+	b32	ok = HTTP_request_read_internal(req);
+	return (ok);
 }
 void				HTTP_request_close(HTTP_Request& req) {
-	if (HTTP_request_is_closed(req) /* Already closed */
-		|| !HTTP_request_is_stage_body(req) /* Waiting for essential header bytes */
-		|| (req.content_length >= 0 && req.chunk.size != req.content_length) /* Mismatching expected length and received length */ ) {
+	b32	is_closed = HTTP_request_is_closed(req);
+	b32	is_stage_essential = !HTTP_request_is_stage_body(req);
+	b32	is_length_insufficient = (req.content_length >= 0 && req.chunk.size != req.content_length);
+
+	if (is_closed || is_stage_essential || is_length_insufficient) {
 		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
 	} else {
 		req.buff_stage = HTTP_REQUEST_STAGE_DONE;
@@ -319,14 +334,14 @@ static void			HTTP_request_read_stage_version(HTTP_Request& req) {
 	}
 }
 static void			HTTP_request_read_stage_headers_infix(HTTP_Request& req, const string_view& name, const string_view& value) {
-	if (name.eq_insensitive("Content-Length")) {
+	if (name.eq_insensitive("content-length")) {
 		req.content_length = HTTP_parse_i64(value);
 		if (req.content_length < 0) {
 			req.content_length = -1;
 		}
 		return ;
 	}
-	if (name.eq_insensitive("Transfer-Encoding")) {
+	if (name.eq_insensitive("transfer-encoding")) {
 		req.chunked = value.eq_insensitive("chunked");
 		if (!req.chunked) {
 			req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
@@ -339,16 +354,16 @@ static void			HTTP_request_read_stage_headers_postfix(HTTP_Request& req) {
 		req.chunked = 0;
 	}
 }
-static void			HTTP_request_read_stage_headers(HTTP_Request& req) {
+static b32			HTTP_request_read_stage_headers(HTTP_Request& req) {
 	if (req.buff_index >= req.buff.len)
-		return ;
+		return (0);
 
 	string_view	str((char*)&req.buff[req.buff_index], req.buff.len - req.buff_index);
 	string_view	sep("\r\n");
 
 	i32	idx_end = str.index(sep);
 	if (idx_end == -1) {
-		return ;
+		return (0);
 	}
 
 	string_view	str_header = str.slice(0, idx_end);
@@ -356,13 +371,13 @@ static void			HTTP_request_read_stage_headers(HTTP_Request& req) {
 	if (str_header == "") {
 		HTTP_request_read_stage_headers_postfix(req);
 		req.buff_stage = req.chunked ? HTTP_REQUEST_STAGE_CHUNK : HTTP_REQUEST_STAGE_BODY;
-		return ;
+		return (0);
 	}
 
 	i32	idx_name_end = str_header.index(":");
 	if (idx_name_end == -1) {
 		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
-		return ;
+		return (0);
 	}
 	
 	string_view	str_name = str_header.slice(0, idx_name_end).trim_right();
@@ -370,13 +385,13 @@ static void			HTTP_request_read_stage_headers(HTTP_Request& req) {
 
 	req.headers.set(str_name, string_view::alloc(str_value));
 	HTTP_request_read_stage_headers_infix(req, str_name, str_value);
-	HTTP_request_read_stage_headers(req);
+	return (1);
 }
 static void			HTTP_request_read_stage_body(HTTP_Request& req) {
 	i32	rem = req.buff.len - req.buff_index;
 	req.chunk.size += rem;
 
-	if (req.chunk.index < 0) {
+	if (req.chunk.index == -1) {
 		req.chunk.index = req.buff_index;
 	}
 
@@ -385,20 +400,7 @@ static void			HTTP_request_read_stage_body(HTTP_Request& req) {
 		HTTP_request_close(req);
 	}
 }
-
-static void			skip_sep(HTTP_Request& req){
-	string_view	sep("\r\n");
-	string_view	_str((char*)&req.buff[req.buff_index], req.buff.len - req.buff_index);
-	
-	i32	idx_end = _str.index(sep);
-	if (idx_end == 0) {
-		req.buff_index += sep.len;
-	}
-}
-
-
 static void			HTTP_request_read_stage_chunk(HTTP_Request& req) {
-	skip_sep(req);
 	if (req.buff_index >= req.buff.len)
 		return ;
 
@@ -426,24 +428,34 @@ static void			HTTP_request_read_stage_chunk(HTTP_Request& req) {
 
 	req.chunk.size = cast(i32)HTTP_parse_i64_hex(str_chunk_size);
 	req.chunk.index = req.buff_index;
-	if (req.chunk.size == 0) {
-		HTTP_request_close(req);
-		return ;
-	}
 
 	req.buff_stage = HTTP_REQUEST_STAGE_CHUNK_DATA;
 }
-static void			HTTP_request_read_stage_chunk_data(HTTP_Request& req) {
+static b32			HTTP_request_read_stage_chunk_data(HTTP_Request& req) {
 	if (req.buff_index >= req.buff.len)
-		return ;
+		return (0);
 
-	i32	buff_rem = req.buff.len - req.buff_index;
-	if (buff_rem >= req.chunk.size) {
+	string_view	end = "\r\n";
+	i32			buff_rem = req.buff.len - req.buff_index;
+	if (buff_rem >= req.chunk.size + end.len) {
+		for (i32 i = 0; i < end.len; ++i) { /* NOTE(xenobas): Validate chunk delimiter */
+			if (end[i] != req.buff[req.chunk.index + req.chunk.size + i]) {
+				req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
+				return (0);
+			}
+		}
 		req.chunks.push(req.chunk);
 
-		req.buff_index += req.chunk.size;
+		req.buff_index += req.chunk.size + end.len;
+		if (req.chunk.size == 0) { /* NOTE(xenobas): Close request only after seeing empty chunk body */
+			HTTP_request_close(req);
+			return (0);
+		}
+
 		req.buff_stage  = HTTP_REQUEST_STAGE_CHUNK;
+		return (1);
 	}
+	return (0);
 }
 
 static b32			HTTP_request_read_internal(HTTP_Request& req) {
@@ -460,17 +472,23 @@ static b32			HTTP_request_read_internal(HTTP_Request& req) {
 	if (req.buff_stage == HTTP_REQUEST_STAGE_VERSION) {
 		HTTP_request_read_stage_version(req);
 	}
+stage_read_headers:
 	if (req.buff_stage == HTTP_REQUEST_STAGE_HEADERS) {
-		HTTP_request_read_stage_headers(req);
+		if (HTTP_request_read_stage_headers(req)) {
+			goto stage_read_headers ;
+		}
 	}
 	if (req.buff_stage == HTTP_REQUEST_STAGE_BODY) {
 		HTTP_request_read_stage_body(req);
 	}
+stage_read_chunk:
 	if (req.buff_stage == HTTP_REQUEST_STAGE_CHUNK) {
 		HTTP_request_read_stage_chunk(req);
 	}
 	if (req.buff_stage == HTTP_REQUEST_STAGE_CHUNK_DATA) {
-		HTTP_request_read_stage_chunk_data(req);
+		if (HTTP_request_read_stage_chunk_data(req)) {
+			goto stage_read_chunk ;
+		}
 	}
 	return (!HTTP_request_is_error(req));
 }

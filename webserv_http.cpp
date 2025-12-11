@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 14:43:46 by xenobas           #+#    #+#             */
-/*   Updated: 2025/11/14 18:36:24 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/11 18:26:32 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,16 +16,34 @@ WEBSERV_Method			WEBSERV_method_make(const string_view& str) {
 	if (str == "GET") {
 		return (WEBSERV_METHOD_GET);
 	}
-	if (str == "DELETE") {
-		return (WEBSERV_METHOD_DELETE);
-	}
-	if (str == "PUT") {
-		return (WEBSERV_METHOD_PUT);
+	if (str == "HEAD") {
+		return (WEBSERV_METHOD_HEAD);
 	}
 	if (str == "POST") {
 		return (WEBSERV_METHOD_POST);
 	}
+	if (str == "PUT") {
+		return (WEBSERV_METHOD_PUT);
+	}
+	if (str == "DELETE") {
+		return (WEBSERV_METHOD_DELETE);
+	}
+	if (str == "CONNECT") {
+		return (WEBSERV_METHOD_CONNECT);
+	}
+	if (str == "OPTIONS") {
+		return (WEBSERV_METHOD_OPTIONS);
+	}
+	if (str == "TRACE") {
+		return (WEBSERV_METHOD_TRACE);
+	}
+	if (str == "PATCH") {
+		return (WEBSERV_METHOD_PATCH);
+	}
 	return (WEBSERV_METHOD_INVALID);
+}
+b32						WEBSERV_http_route_method_test(const WEBSERV_Route& route, WEBSERV_Method method) {
+	return (cast(b32)(method & route.methods_whitelist));
 }
 
 b32						WEBSERV_http_version_supported(const string_view& str) {

@@ -1,0 +1,78 @@
+[[instance]] # Basic server with a shortcutted /assets
+port = 8080
+host = "0.0.0.0"
+error_4xx = "configs/not_found.html"
+request_body_max = 512_000
+routes = [
+	{
+		path = "/",
+
+		type = "Server",
+		props = {
+			directory = "www",
+			directory_list = false,
+		},
+	},
+	{
+		path = "/assets",
+
+		type = "Server",
+		props = {
+			directory = "www/assets/images",
+			directory_list = true,
+		},
+	},
+	{
+		path = "/images",
+
+		type = "Server",
+		props = {
+			directory = "www/assets/images",
+			directory_list = true,
+		},
+	},
+	{
+		path = "/upload",
+
+		type = "Upload",
+		props = {
+			directory = "www/assets/images",
+			max_file_size = 256_000, # bytes
+		},
+	},
+	{
+		path = "/assets/images/1337",
+		cascade_disable = true,
+
+		type = "Redirect",
+		props = {
+			location = "/assets/images/1337.jpeg"
+		},
+	},
+]
+
+[[instance]] # CGI bins otherwise redirects to exposed server
+port = 8081
+host = "127.0.0.1"
+routes = [
+	{
+		path = "/",
+
+		type = "Redirect",
+		props = {
+			location = "http://localhost:8080",
+		},
+	},
+	{
+		path = "/cgi",
+		
+		type = "CGI",
+		props = {
+			interpreters = {
+				py = "python3",
+				c = "clang",
+				lua = "luajit",
+			},
+		}
+	}
+]

@@ -1,0 +1,7 @@
+[[instance]]
+port = 1337
+origins = [ "google.com ]
+upload = {
+	directory = "/var/www/",
+	name = abed",
+}
