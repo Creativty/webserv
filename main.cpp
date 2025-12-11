@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:45:19 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/08 14:44:38 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/11 17:30:48 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -52,7 +52,7 @@ i32	main(i32 argc, cstring argv[]) {
 		return (8);
 	}
 
-	#if 1
+	#if 0 /* TEST(xenobas): Route picker */
 	{
 		const char*				paths[] = {
 			"/",

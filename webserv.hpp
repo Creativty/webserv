@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/08 14:40:27 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/11 17:30:15 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -358,6 +358,7 @@ void				CLI_show_error_syntax(const Position pos, const char *fmt, ...);
 void				CLI_show_error_config(const Position pos, const char *fmt, ...);
 void				CLI_show_errors_toml(const TOML_Document& document);
 void				CLI_show_errors_config(const WEBSERV_Config& config);
+void				CLI_show_error_runtime(const char* fmt, ...);
 
 TOML_Document		TOML_make(const string_view& file);
 void				TOML_delete(TOML_Document& document);

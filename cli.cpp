@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:16:13 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/08 14:33:11 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/11 17:28:48 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,7 +28,7 @@ b32				CLI_is_tty = 0;
 string_view		CLI_exec_path = "<CLI_exec_path>";
 
 void			CLI_debug_internal(const char* file, i32 line, const char *fmt, ...) {
-#ifdef WEBSERV_DEBUG
+#ifdef DEBUG
 	va_list	args;
 	va_start(args, fmt);
 	fprintf(stdout, "%s:%d: Debug: ", file, line);
@@ -333,4 +333,17 @@ void			CLI_show_errors_config(const WEBSERV_Config& config) {
 			CLI_show_error_config(err.pos, "TODO: Error \"%s\" reporting is unimplemented", error_str);
 		}
 	}
+}
+
+void			CLI_show_error_runtime(const char* fmt, ...) {
+	va_list	args;
+	va_start(args, fmt);
+	if (CLI_is_tty) {
+		fprintf(stderr, TERMINAL_COLOR_RED "Runtime Error" TERMINAL_STYLE_RESET ": ");
+	} else {
+		fprintf(stderr, "Runtime Error: ");
+	}
+	vfprintf(stderr, fmt, args);
+	fprintf(stderr, "\n");
+	va_end(args);
 }
