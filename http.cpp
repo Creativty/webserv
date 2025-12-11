@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 18:33:49 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/10 14:03:30 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/11 17:17:38 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -388,7 +388,7 @@ static void			HTTP_request_read_stage_body(HTTP_Request& req) {
 	i32	rem = req.buff.len - req.buff_index;
 	req.chunk.size += rem;
 
-	if (req.chunk.index < 0) {
+	if (req.chunk.index == -1) {
 		req.chunk.index = req.buff_index;
 	}
 
