@@ -351,9 +351,8 @@ u8* read_one_chunk(HTTP_Request req){
 	HTTP_Chunk chunk = req.chunk;
 	byte* body = (byte *) calloc((u64)(chunk.size + 1), sizeof(byte));
 	if (!body) return NULL;
-	byte* buff = req.buff.data;
-	for (int i = 0, j = chunk.index; i < chunk.size; i++, j++){
-		body[i] = buff[j];
+	for (int i = 0; i < chunk.size; i++){
+		body[i] = req.buff[chunk.index + i];
 	}
 	return body;
 }
@@ -368,12 +367,19 @@ u8* GetBody(HTTP_Request req, i64 &l){
 		return (read_one_chunk(req));
 	}
 
+	// let's say we have 3 chunks
+	// format: [idx, size]
+	// elements: [0, 5], [7 3], [12, 5]
+	// chunks.len = 3
+	// chunks.data.size == chunks[0].size (ALWAYS, never changes)
+	// What you want is, chunks[i].size,
 	for (int i = 0; i < chunks.len; i++)
-		len += (u64)chunks.data->size;
+		len += (u64)chunks[i].size;
 
 	byte* body = (byte *) calloc((len + 1), sizeof(byte));
 	if (!body) return NULL;
 	for(int i = 0; i < chunks.len; i++){
+		// byte* buff = &req.buff[chunks[i].index]; (safer)
 		byte* buff = req.buff.data + chunks[i].index;
 		for (int j = 0; j < chunks[i].size && index <= len; j++){
 			body[index] = buff[j];
@@ -624,11 +630,11 @@ int handle_requests(dynamic_array<WEBSERV_Instance> instances, int epfd, sockadd
 
 				if (valread > 0) {
 					std::string	message(buffer, cast(size_t)valread);
-					HTTP_Request request;
-					if (fd_request.count(fd))
-						request = fd_request[fd];
-					else
+
+					if (fd_request.find(fd) == fd_request.end()) {
 						fd_request[fd] = HTTP_request_make();
+					}
+					HTTP_Request& request = fd_request[fd];
 
 					if (!HTTP_request_read(request, (const byte*) buffer, (i32) valread)){
 						epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
@@ -648,7 +654,7 @@ int handle_requests(dynamic_array<WEBSERV_Instance> instances, int epfd, sockadd
 						std::cout << htmlStatus[status] << std::endl;
 						http_respond_html(fd, status, "text/html", htmlStatus[status]);
 						fd_request.erase(fd);
-						close(fd);
+						close(fd);	
 					}
 
 				} else {

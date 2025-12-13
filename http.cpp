@@ -331,7 +331,7 @@ static void			HTTP_request_read_stage_version(HTTP_Request& req) {
 	}
 }
 static void			HTTP_request_read_stage_headers_infix(HTTP_Request& req, const string_view& name, const string_view& value) {
-	if (name.eq_insensitive("Content-Cength")) {
+	if (name.eq_insensitive("Content-Length")) {
 		req.content_length = HTTP_parse_i64(value);
 		if (req.content_length < 0) {
 			req.content_length = -1;
@@ -388,7 +388,7 @@ static void			HTTP_request_read_stage_body(HTTP_Request& req) {
 	i32	rem = req.buff.len - req.buff_index;
 	req.chunk.size += rem;
 
-	if (req.chunk.index <= 0) {// was '<' 
+	if (req.chunk.index == -1) {// was '<' 
 		req.chunk.index = req.buff_index;
 	}
 

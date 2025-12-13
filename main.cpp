@@ -19,7 +19,7 @@
 
 
 i32	main(i32 argc, cstring argv[]) {
-	CLI_exec_path = argv[0];
+ 	CLI_exec_path = argv[0];
 	CLI_is_tty = isatty(STDOUT_FILENO);
 
 	if (argc != 2 || string_view("--help") == argv[1]) {
