@@ -373,6 +373,5 @@ b32					HTTP_request_read(HTTP_Request& req, const byte* data, i32 size);
 
 void				HTTP_request_debug(HTTP_Request& req);
 
-int					server(WEBSERV_Config config);
-b32					WEBSERV_main(const WEBSERV_Config& config);
+int					server(WEBSERV_Config& config);
 #endif
