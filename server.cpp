@@ -516,6 +516,7 @@ int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instan
 			dup2(outPipe[1], STDOUT_FILENO);
 			close(outPipe[1]);
 
+            /* TODO(sennakhl): Check for permission */
 			execv(argv[0], argv);
 			perror("execv");
 			const char* err_msg = "Status: 500 Internal Server Error\r\n"
@@ -624,7 +625,7 @@ WEBSERV_Instance& get_server(dynamic_array<WEBSERV_Instance>& instances, u16 por
 int handle_requests(dynamic_array<WEBSERV_Instance>& instances, int epfd, struct sockaddr_in address, size_t addrlen){
 	std::map<int, HTTP_Request>	fd_request;
 
-	#define ITERATIONS_SECS 3 /* 3 seconds */
+	#define ITERATIONS_SECS 600 /* 3 seconds */
 	#define ITERATIONS ((ITERATIONS_SECS * 1000) / 41)
 	CLI_debug("handle_request with limit of %d seconds", ITERATIONS_SECS);
 	for (i32 iteration = 0; iteration < ITERATIONS; ++iteration) {
@@ -688,14 +689,12 @@ int handle_requests(dynamic_array<WEBSERV_Instance>& instances, int epfd, struct
 
 				u16			port = ntohs(local_addr.sin_port);
 				if (valread > 0) {
-					std::string	message(buffer, cast(size_t)valread);
-
 					if (fd_request.find(fd) == fd_request.end()) {
 						fd_request[fd] = HTTP_request_make();
 					}
 					HTTP_Request& request = fd_request[fd];
 
-					if (!HTTP_request_read(request, (const byte*) buffer, (i32) valread)){
+					if (!HTTP_request_read(request, cast(const byte*)buffer, cast(i32)valread)) {
 						epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
 						std::cerr << htmlStatus[BAD_REQUEST] << std::endl;
 						http_respond_html(fd, BAD_REQUEST, "text/html", htmlStatus[BAD_REQUEST]);
@@ -703,7 +702,12 @@ int handle_requests(dynamic_array<WEBSERV_Instance>& instances, int epfd, struct
 						close(fd);
 						break;
 					}
-					if (!HTTP_request_is_closed(request)) break;
+                    if (!HTTP_request_is_closed(request)) {
+                        if (request.buff_stage != HTTP_REQUEST_STAGE_BODY) {
+                            break ;
+                        }
+                        HTTP_request_close(request);
+                    }
 
 					int status = methods(request, fd, get_server(instances, port), epfd);
 					

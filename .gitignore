@@ -4,6 +4,7 @@ webserv
 # Intermediary files
 *.d
 *.o
+*.swp
 
 # Configuration files
 *.toml

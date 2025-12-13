@@ -1,4 +1,5 @@
 - [ ] Project directory de-cluttering
+- [ ] Determine how to know EOF for non-chunked bodies
 - [ ] Remove all usage of std::string where not required
 - [ ] Remove all usage of std::map where not required
 - [ ] Fix Formatting
