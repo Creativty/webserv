@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 17:02:26 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/11 18:13:43 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/13 16:57:08 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,16 +22,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
-
-static void	MEM_copy(byte* src, i32 src_len, byte* dst, i32 dst_len) {
-	if (src == 0 || dst == 0) {
-		return ;
-	}
-
-	for (i32 i = 0; i < src_len && i < dst_len; ++i) {
-		dst[i] = src[i];
-	}
-}
 
 b32			OS_read_file(const string_view path, string_view& text) {
 	byte	path_cstr[512] = { 0 };

@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 18:33:49 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/11 18:27:53 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/13 17:21:07 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,6 +19,7 @@ HTTP_Request		HTTP_request_make(void) {
 
 	req.method = WEBSERV_METHOD_INVALID;
 	req.uri = WEBSERV_uri_make("");
+	req.protocol = string_view();
 
 	req.headers = HTTP_Headers();
 	req.headers.case_insensitive = 1;
@@ -324,10 +325,10 @@ static void			HTTP_request_read_stage_version(HTTP_Request& req) {
 		return ;
 	}
 
-	string_view	str_version = str.slice(0, idx_end);
+	req.protocol = str.slice(0, idx_end);
 	req.buff_index += idx_end + sep.len;
 
-	if (WEBSERV_http_version_supported(str_version)) {
+	if (WEBSERV_http_version_supported(req.protocol)) {
 		req.buff_stage = HTTP_REQUEST_STAGE_HEADERS;
 	} else {
 		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;

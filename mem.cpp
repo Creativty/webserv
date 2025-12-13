@@ -1,19 +1,23 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   webserv_main.cpp                                   :+:      :+:    :+:   */
+/*   mem.cpp                                            :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: xenobas <rahimos.123@gmail.com>            +#+  +:+       +#+        */
+/*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/11/29 10:58:41 by xenobas           #+#    #+#             */
-/*   Updated: 2025/11/29 10:59:39 by xenobas          ###   ########.fr       */
+/*   Created: 2025/12/13 16:56:01 by aindjare          #+#    #+#             */
+/*   Updated: 2025/12/13 16:56:09 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "webserv.hpp"
+#include "base.hpp"
 
-b32	WEBSERV_main(const WEBSERV_Config& config) {
-	(void)config;
+void	MEM_copy(byte* src, i32 src_len, byte* dst, i32 dst_len) {
+	if (src == 0 || dst == 0) {
+		return ;
+	}
 
-	return (1);
+	for (i32 i = 0; i < src_len && i < dst_len; ++i) {
+		dst[i] = src[i];
+	}
 }

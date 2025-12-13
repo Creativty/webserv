@@ -19,22 +19,13 @@
 #include <map>
 #include <sys/epoll.h>
 
-/*TODO:
-* - ADD QUERY_STRING to environment variables
-* - remove space from content-type
-* - 
-*/
-
-static std::map<int, int> cgi_map;
-static std::map<int, std::string> htmlStatus;
-
-
-
-
 /* TODO(XENOBAS):
- * - "HTTP/1.0 501 Not Implemented"
- * - "HTTP/1.0 505 HTTP Version Not Supported"
+ * - HTTP_Writer interface for safely constructing responses.
+ * - Event loop of the server is currently in chaos.
  */
+
+static std::map<int, int>			cgi_map;
+static std::map<int, std::string>	htmlStatus;
 
 #include <string>
 
@@ -88,7 +79,6 @@ std::string GetDefaultPage()
     return htmlContent;
 }
 
-
 enum HttpStatus {
     OK = 200,
     CREATED = 201,
@@ -104,7 +94,6 @@ enum HttpStatus {
 	NOT_IMPLEMENTED = 501,
 	PROCESSING = 102
 };
-
 
 std::string statusCode(int code){
 	if(code == 404) return "404 Not Found";
@@ -125,13 +114,14 @@ void	http_respond_html(int fd, int code, std::string type, const std::string &da
 	std::string	response_line = "HTTP/1.0 " + statusCode(code) + "\r\n";
 	std::string	headers = "Content-Type: " + type + "\r\n"
 		"\r\n";
-	std::cout << "client_fd in http_respond: " << fd << std::endl;
+
+	// std::cout << "client_fd in http_respond: " << fd << std::endl;
 	::send(fd, response_line.c_str(), response_line.size(), MSG_DONTWAIT);
 	::send(fd, headers.c_str(), headers.size(), MSG_DONTWAIT);
 
 	if (data.size())
 		::send(fd, data.c_str(), data.size(), MSG_DONTWAIT);
-	std::cout << response_line << headers << data << std::endl;
+	// std::cout << response_line << headers << data << std::endl;
 }
 
 std::string getFileExtension(const std::string& type) {
@@ -239,6 +229,7 @@ std::string getContentType(const std::string& filename) {
     return "text/pain";
 }
 
+/* TODO(xenobas): Slotted for removal */
 std::string url_decode(const std::string &str) {
 	std::string decoded;
 	char ch;
@@ -259,6 +250,7 @@ std::string url_decode(const std::string &str) {
 	return decoded;
 }
 
+/* TODO(xenobas): Slotted for removal */
 bool dirExists(std::string dir){
 	struct stat st;
 	if (stat(dir.c_str(), &st) == -1){
@@ -270,6 +262,7 @@ bool dirExists(std::string dir){
 	return true;
 }
 
+/* TODO(xenobas): Slotted for removal */
 std::string generateRandomFileName(std::string ext){
     static bool seeded = false;
     if (!seeded) {
@@ -283,56 +276,139 @@ std::string generateRandomFileName(std::string ext){
     return oss.str();
 }
 
+b32		PrepareEnvironment(const WEBSERV_Instance& instance, const HTTP_Request& request){
+	i32					ret_env_gateway = ::setenv("GATEWAY_INTERACE", "CGI/1.1", 1);
+	if (ret_env_gateway == -1) {
+		CLI_show_error_runtime("Could not set env variable \"GATEWAY_INTERFACE\"");
+		CLI_show_extra("Reason", "%m");
 
+		return (0);
+	}
 
-// std::string	getMethod(http::HTTP_Method method){
-std::string	getMethod(WEBSERV_Method method){
-	if (method == WEBSERV_METHOD_DELETE) return "DELETE";
-	if (method == WEBSERV_METHOD_POST) return "POST";
-	if (method == WEBSERV_METHOD_GET) return "GET";
-	return "";
-}
+	/* TODO(xenobas): PATH_INFO: Unimplemented */
 
+	/* NOTE(xenobas): PATH_TRANSLATED: There are no guarantees that PATH_INFOs are file system related, so it is left as empty */
+	/* NOTE(xenobas): REMOTE_ADDR: Not required thus ignored */
+	/* NOTE(xenobas): REMOTE_HOST: Not required thus ignored */
+	/* NOTE(xenobas): REMOTE_IDENT: Not required thus ignored */
+	/* NOTE(xenobas): REMOTE_USER: Not required thus ignored */
 
+	/* */
+	char				cstr_value[8 * 1024] = { 0 };
 
-void PrepareEnvirement(struct HTTP_Request request){
-	if(setenv("REQUEST_METHOD", getMethod(request.method).c_str(), 1))
-		std::cerr << "Error setting environment variable"<< std::endl;
-	
-	std::string query_str = "";
-	bool first = 1;
-	for_table_begin(request.uri.query, const hash_table<string_view>, param){
-		if (!first)
-			query_str += "&";
-		
-		query_str += param.key.to_string();
-		query_str += "=";
-		query_str += param.value.to_string();
-		first = 0;
-	}for_table_end;
+	const string_view&	str_uri = request.uri.str;
+	string_view			str_query = "";
+	i32					idx_query = str_uri.index("?");
+	if (idx_query >= 0) {
+		str_query = str_uri.slice(idx_query + 1);
+	}
+	MEM_copy((byte*)str_uri.text, str_uri.len, (byte*)cstr_value, 8 * 1024);
+	cstr_value[str_uri.len] = '\0';
 
-	if(setenv("QUERY_STRING", query_str.c_str(), 1))
-		std::cerr << "Error setting environment variable"<< std::endl;
-	
-	for_table_begin(request.headers, HTTP_Headers, header){
-		string_view tmp = header.key;
-		for (i32 i=0 ; i < tmp.len; i++){
-			if (tmp[i] == '-') tmp[i] = '_';
-			tmp[i] = static_cast<char>(std::toupper(static_cast<unsigned char>(tmp[i])));
+	i32					ret_env_query = ::setenv("QUERY_STRING", cstr_value, 1);
+	if (ret_env_query == -1) {
+		CLI_show_error_runtime("Could not set env variable \"QUERY_STRING\"");
+		CLI_show_extra("Reason", "%m");
+
+		return (0);
+	}
+
+	const char*	cstr_method		= WEBSERV_method_cstr(request.method);
+	i32			ret_env_method	= ::setenv("REQUEST_METHOD", cstr_method, 1);
+	if (ret_env_method == -1) {
+		CLI_show_error_runtime("Could not set env variable \"REQUEST_METHOD\"");
+		CLI_show_extra("Reason", "%m");
+
+		return (0);
+	}
+
+	/* TODO(xenobas): SCRIPT_NAME: Unimplemented */
+
+	string_view	str_name		= instance.host;
+	if (str_name) { /* SERVER_NAME */
+		MEM_copy((byte*)str_name.text, str_name.len, (byte*)cstr_value, 8 * 1024);
+		cstr_value[str_name.len] = '\0';
+
+		i32			ret_env_name	= ::setenv("SERVER_NAME", cstr_value, 1);
+		if (ret_env_name == -1) {
+			CLI_show_error_runtime("Could not set env variable \"SERVER_NAME\"");
+			CLI_show_extra("Reason", "%m");
+
+			return (0);
 		}
-		std::cout<< tmp << "="<< header.value.to_string().substr(1) << std::endl;
-		if(setenv(tmp.to_string().c_str() , header.value.to_string().c_str(), 1))
-			std::cerr << "Error setting environment variable"<< std::endl;
-	}for_table_end;
+	}
+
+	u16			u16_port		= instance.port;
+	cstring_write_u64(cstr_value, 8 * 1024, cast(u64)u16_port);
+
+	i32			ret_env_port	= ::setenv("SERVER_PORT", cstr_value, 1);
+	if (ret_env_port == -1) {
+		CLI_show_error_runtime("Could not set env variable \"SERVER_PORT\"");
+		CLI_show_extra("Reason", "%m");
+
+		return (0);
+	}
+
+	string_view	str_protocol		= request.protocol;
+	MEM_copy((byte*)str_protocol.text, str_protocol.len, (byte*)cstr_value, 8 * 1024);
+	cstr_value[str_protocol.len] = '\0';
+
+	i32			ret_env_protocol	= ::setenv("SERVER_PROTOCOL", cstr_value, 1);
+	if (ret_env_protocol == -1) {
+		CLI_show_error_runtime("Could not set env variable \"SERVER_PROTOCOL\"");
+		CLI_show_extra("Reason", "%m");
+
+		return (0);
+	}
+	
+	if (request.headers.has("Authorization")) {
+		const string_view&	str = request.headers.get("Authorization");
+		MEM_copy((byte*)str.text, str_uri.len, (byte*)cstr_value, 8 * 1024);
+		cstr_value[str.len] = '\0';
+
+		i32					ret = ::setenv("AUTH_TYPE", cstr_value, 1);
+		if (ret == -1) {
+			CLI_show_error_runtime("Could not set env variable \"AUTH_TYPE\"");
+			CLI_show_extra("Reason", "%m");
+
+			return (0);
+		}
+	}
+	if (request.headers.has("Content-Length")) {
+		const string_view&	str = request.headers.get("Content-Length");
+		MEM_copy((byte*)str.text, str_uri.len, (byte*)cstr_value, 8 * 1024);
+		cstr_value[str.len] = '\0';
+
+		i32					ret = ::setenv("CONTENT_LENGTH", cstr_value, 1);
+		if (ret == -1) {
+			CLI_show_error_runtime("Could not set env variable \"CONTENT_LENGTH\"");
+			CLI_show_extra("Reason", "%m");
+
+			return (0);
+		}
+	}
+	if (request.headers.has("Content-Type")) {
+		const string_view&	str = request.headers.get("Content-Type");
+		MEM_copy((byte*)str.text, str_uri.len, (byte*)cstr_value, 8 * 1024);
+		cstr_value[str.len] = '\0';
+
+		i32					ret = ::setenv("CONTENT_TYPE", cstr_value, 1);
+		if (ret == -1) {
+			CLI_show_error_runtime("Could not set env variable \"CONTENT_TYPE\"");
+			CLI_show_extra("Reason", "%m");
+
+			return (0);
+		}
+	}
+
+	return (1);
 }
 
-
-
-
-bool isDirectory(std::string path){
+/* TODO(xenobas): Slotted for removal */
+bool	isDirectory(std::string path){
 	struct stat s;
 
-	std::cout << "the path on isDirectory is :"<< path << std::endl;
+	// std::cout << "the path on isDirectory is :"<< path << std::endl;
 	if( stat(path.c_str(), &s) == 0 ){
 		if(s.st_mode & S_IFREG)
 			return (false);
@@ -342,6 +418,7 @@ bool isDirectory(std::string path){
 	return false;
 }
 
+/* TODO(xenobas): Slotted for removal */
 bool fileExists(const std::string& filename) {
     std::ifstream file(filename.c_str());
     return file.good();
@@ -358,21 +435,15 @@ u8* read_one_chunk(HTTP_Request req){
 }
 
 u8* GetBody(HTTP_Request req, i64 &l){
-	dynamic_array<HTTP_Chunk> chunks = req.chunks;
-	u64 len = 0;
-	u64 index = 0;
+	dynamic_array<HTTP_Chunk>	chunks = req.chunks;
+	u64							len = 0;
+	u64							index = 0;
 	
 	if (!req.chunked){
 		l = req.chunk.size;
 		return (read_one_chunk(req));
 	}
 
-	// let's say we have 3 chunks
-	// format: [idx, size]
-	// elements: [0, 5], [7 3], [12, 5]
-	// chunks.len = 3
-	// chunks.data.size == chunks[0].size (ALWAYS, never changes)
-	// What you want is, chunks[i].size,
 	for (int i = 0; i < chunks.len; i++)
 		len += (u64)chunks[i].size;
 
@@ -391,22 +462,18 @@ u8* GetBody(HTTP_Request req, i64 &l){
 }
 
 int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instance, int epfd){
-    std::string path = "/" + url_decode(request.uri.path.data[0].text);
-    bool file_ok;
+	const WEBSERV_URI&	uri = request.uri;
+	CLI_debug("Processing request at path \"%.*s\"", uri.str.len, uri.str.text);
 
-    // if (request.uri.str.has("/favicon.ico") == 0) return(NO_CONTENT);
-	std::cout << "path is :\t"<< path << std::endl;
+    std::string	path = url_decode(request.uri.str.to_string());
+	// std::cout << "path is :\t"<< path << std::endl;
 
-
-
-
-	string_view key = WEBSERV_http_route_pick(instance, string_view(path.c_str()));
-	WEBSERV_Route route = instance.routes.get(key);
-	//CGI
+	string_view		key = WEBSERV_http_route_pick(instance, string_view(path.c_str()));
+	WEBSERV_Route	route = instance.routes.get(key);
 	if (route.kind == WEBSERV_ROUTE_CGI){
 		path = request.uri.str.to_string().substr(1);
 
-		std::cout << path << std::endl;
+		// std::cout << path << std::endl;
 		if (!dirExists(path)) return SERVER_ERROR;
 
 		if (!fileExists(path)) return NOT_FOUND;
@@ -424,7 +491,7 @@ int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instan
 			return NOT_IMPLEMENTED;
 		}
 
-		PrepareEnvirement(request);
+		PrepareEnvironment(instance, request);
 
 		int inPipe[2], outPipe[2];
 		if (pipe(inPipe) == -1 || pipe(outPipe) == -1){
@@ -475,8 +542,6 @@ int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instan
 			return PROCESSING;
 		}
 	}
-
-
 	
     if (request.method == WEBSERV_METHOD_POST){
 		std::string dir =  route.Upload.directory.to_string();
@@ -495,7 +560,7 @@ int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instan
 		if (fd < 0)
 			return (perror("open file for upload"), SERVER_ERROR);
 		
-		std::cout << "file name: " << fileName << std::endl;
+		// std::cout << "file name: " << fileName << std::endl;
 		write(fd, body, (size_t)len);
 		close(fd);
 
@@ -505,12 +570,10 @@ int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instan
 		return CREATED;
     }
 
-
-
     if (request.method == WEBSERV_METHOD_DELETE){
 		path = url_decode(request.uri.str.to_string().substr(1));
         if (access(path.c_str(), F_OK)){
-            std::cout << "ERROR: cannot open " << path << std::endl;
+            std::cerr << "ERROR: cannot open " << path << std::endl;
 			return NOT_FOUND;
         }
 
@@ -522,14 +585,13 @@ int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instan
 		return(NO_CONTENT);
     }
 
-
     if (request.method == WEBSERV_METHOD_GET){
 		//TODO: substr(1) 
         path = url_decode(request.uri.str.to_string().substr(1));
         string_view res_file;
-		file_ok = OS_read_file(string_view(path.c_str()), res_file);
-		std::cout << "path is: " << path<< std::endl;
-		std::cout << "file_ok: " << file_ok<< std::endl;
+		b32			file_ok = OS_read_file(string_view(path.c_str()), res_file);
+		// std::cout << "path is: " << path<< std::endl;
+		// std::cout << "file_ok: " << file_ok<< std::endl;
         if (file_ok){
             assert(file_ok && "could not load template html file");            
             http_respond_html(new_socket, 200, getContentType(path), res_file.to_string());
@@ -545,41 +607,39 @@ int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instan
     return(METHOD_NOT_ALLOWED);
 }
 
-
 bool	is_first_connection(int fd, dynamic_array<WEBSERV_Instance> instances){
 	for (int i = 0; i < instances.len; i++)
 		if (fd == instances[i].fd) return 1;
 	return 0;
 }
 
-
-struct WEBSERV_Instance get_server(dynamic_array<WEBSERV_Instance> instances, int port){
+WEBSERV_Instance& get_server(dynamic_array<WEBSERV_Instance>& instances, u16 port){
+	/* TODO(xenobas): This is just wrong... It needs to check the address it came on, and the Host as well, not just port */
 	int i = 0;
-	while (instances[i].port != port) i++;
+	while (instances[i].port != port)
+		++i;
 	return (instances[i]);
 }
 
-int handle_requests(dynamic_array<WEBSERV_Instance> instances, int epfd, sockaddr_in address, size_t addrlen){
-	static std::map<int, HTTP_Request> fd_request;
-	// HTTP_Request request = HTTP_request_make();
-	while (true) {
-		struct epoll_event events[100];
-		int nfds = epoll_wait(epfd, events, 100, -1);
+int handle_requests(dynamic_array<WEBSERV_Instance>& instances, int epfd, struct sockaddr_in address, size_t addrlen){
+	std::map<int, HTTP_Request>	fd_request;
+
+	#define ITERATIONS_SECS 3 /* 3 seconds */
+	#define ITERATIONS ((ITERATIONS_SECS * 1000) / 41)
+	CLI_debug("handle_request with limit of %d seconds", ITERATIONS_SECS);
+	for (i32 iteration = 0; iteration < ITERATIONS; ++iteration) {
+		struct epoll_event	events[100];
+		i32					nfds = epoll_wait(epfd, events, 100, 41);
 		if (nfds == -1) {
 			perror("epoll_wait");
 			continue;
 		}
-
-		// bool				file_html_ok;
-		// const std::string	file_html = read_entire_file("pages/index.html", &file_html_ok);
-		// assert(file_html_ok && "could not load template html file");
 
 		for (int i = 0; i < nfds; i++){
 			int fd = events[i].data.fd;
 
 			if (is_first_connection(fd, instances)){
 				int new_socket = accept(fd, (struct sockaddr*)&address, (socklen_t*)&addrlen);
-				std::cout << "new_socket " << new_socket << std::endl;
 				if (new_socket < 0) {
 					perror("In accept");
 					return EXIT_FAILURE;
@@ -594,6 +654,7 @@ int handle_requests(dynamic_array<WEBSERV_Instance> instances, int epfd, sockadd
 					continue;
 				}
 
+				CLI_debug("New connection at file descriptor: %d", new_socket);
 			}
 			else if(cgi_map.count(fd)){
 				int client_fd = cgi_map[fd];
@@ -602,13 +663,13 @@ int handle_requests(dynamic_array<WEBSERV_Instance> instances, int epfd, sockadd
 				ssize_t valread = read(fd, buffer, sizeof(buffer));
 
 				if (valread > 0){
-					std::cout << "client_fd: \n" << client_fd << std::endl;
-					std::cout << "fd: \n" << fd << std::endl;
-					std::cout << "file content: \n" << buffer << std::endl;
+					// std::cout << "client_fd: \n" << client_fd << std::endl;
+					// std::cout << "fd: \n" << fd << std::endl;
+					// std::cout << "file content: \n" << buffer << std::endl;
 					http_respond_html(client_fd, 200, "text/html", buffer);
 				}
 				else{
-					std::cout << "\nnothing to read\n\n";
+					// std::cout << "\nnothing to read\n\n";
 					epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
 					close(client_fd);
 					cgi_map.erase(fd);
@@ -616,20 +677,16 @@ int handle_requests(dynamic_array<WEBSERV_Instance> instances, int epfd, sockadd
 				}
 			}
 			else if(!cgi_map.count(fd)){
-				char buffer[1024 * 1024];
-				std::memset(buffer, 0, sizeof(buffer));
+				CLI_debug("Incoming data not inteded for CGI on file descriptor: %d", fd);
+
+				char	buffer[1024 * 1024] = { 0 }; /* NOTE(xenobas): 1MiB is far too much */
 				ssize_t valread = recv(fd, buffer, sizeof(buffer), MSG_DONTWAIT);
 
-				sockaddr_in local_addr;
-				socklen_t len = sizeof(local_addr);
+				sockaddr_in	local_addr;
+				socklen_t	len = sizeof(local_addr);
 				getsockname(fd, (sockaddr*)&local_addr, &len);
-				int port = ntohs(local_addr.sin_port);
 
-				// std::cout << "buffer: " << buffer << std::endl;
-				std::cout << "valread: " << valread << std::endl;
-
-				
-
+				u16			port = ntohs(local_addr.sin_port);
 				if (valread > 0) {
 					std::string	message(buffer, cast(size_t)valread);
 
@@ -640,7 +697,7 @@ int handle_requests(dynamic_array<WEBSERV_Instance> instances, int epfd, sockadd
 
 					if (!HTTP_request_read(request, (const byte*) buffer, (i32) valread)){
 						epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
-						std::cout << htmlStatus[BAD_REQUEST] << std::endl;
+						std::cerr << htmlStatus[BAD_REQUEST] << std::endl;
 						http_respond_html(fd, BAD_REQUEST, "text/html", htmlStatus[BAD_REQUEST]);
 						fd_request.erase(fd);
 						close(fd);
@@ -650,17 +707,17 @@ int handle_requests(dynamic_array<WEBSERV_Instance> instances, int epfd, sockadd
 
 					int status = methods(request, fd, get_server(instances, port), epfd);
 					
-					std::cout << "\n\nstatus : " << status << "\n\n";
+					// std::cout << "\n\nstatus : " << status << "\n\n";
 					epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
 					if(status != PROCESSING){
-						std::cout << htmlStatus[status] << std::endl;
+						// std::cout << htmlStatus[status] << std::endl;
 						http_respond_html(fd, status, "text/html", htmlStatus[status]);
 						fd_request.erase(fd);
 						close(fd);	
 					}
 
 				} else {
-					std::cout << "No bytes are there to read" << std::endl;
+					// std::cout << "No bytes are there to read" << std::endl;
 					http_respond_html(fd, BAD_REQUEST, "text/html", htmlStatus[BAD_REQUEST]);
 					fd_request.erase(fd);
 					close(fd);
@@ -668,36 +725,23 @@ int handle_requests(dynamic_array<WEBSERV_Instance> instances, int epfd, sockadd
 			}
 		}
 	}
-	// HTTP_request_close(request);
 	return (1);
 }
 
-
-
-/* TODO(XENOBAS): 
- * - We need a better way of error handling, Either we bow down to exceptions (hate it) or we just hand roll our own.
- * - int server(), can be inlined into the main function directly...
- * - server initialisation needs to be its own function since we will be having multiple servers setup...
- * - Improve the current logging, we would like to have it more robust like what's been done with HARL, in the CPP Modules.
- * - HTTP_Writer interface for safely constructing responses.
- * - CGI is still not even considered in the current architecture.
- * - Event loop of the server is currently in chaos.
- */
-
 int	setup_servers(dynamic_array<WEBSERV_Instance> instances, int num_server){
-	htmlStatus[200] =GetDefaultPage();
-	htmlStatus[404] ="\r\n\r\n<h1>" + statusCode(404) + "</h1>";
-	htmlStatus[400] ="\r\n\r\n<h1>" + statusCode(400) + "</h1>";
-	htmlStatus[403] ="\r\n\r\n<h1>" + statusCode(403) + "</h1>";
-	htmlStatus[500] ="\r\n\r\n<h1>" + statusCode(500) + "</h1>";
-	htmlStatus[201] ="\r\n\r\n<h1>" + statusCode(201) + "</h1>";
-	htmlStatus[204] ="\r\n\r\n<h1>" + statusCode(204) + "</h1>";
-	htmlStatus[405] ="\r\n\r\n<h1>" + statusCode(405) + "</h1>";
-	htmlStatus[301] ="\r\n\r\n<h1>" + statusCode(301) + "</h1>";
-	htmlStatus[413] ="\r\n\r\n<h1>" + statusCode(413) + "</h1>";
-	htmlStatus[501] ="\r\n\r\n<h1>" + statusCode(501) + "</h1>";
-	htmlStatus[301] ="\r\n\r\n<h1>" + statusCode(301) + "</h1>";
-	htmlStatus[102] ="\r\n\r\n<h1>" + statusCode(102) + "</h1>";
+	htmlStatus[200] = GetDefaultPage();
+	htmlStatus[404] = "\r\n\r\n<h1>" + statusCode(404) + "</h1>";
+	htmlStatus[400] = "\r\n\r\n<h1>" + statusCode(400) + "</h1>";
+	htmlStatus[403] = "\r\n\r\n<h1>" + statusCode(403) + "</h1>";
+	htmlStatus[500] = "\r\n\r\n<h1>" + statusCode(500) + "</h1>";
+	htmlStatus[201] = "\r\n\r\n<h1>" + statusCode(201) + "</h1>";
+	htmlStatus[204] = "\r\n\r\n<h1>" + statusCode(204) + "</h1>";
+	htmlStatus[405] = "\r\n\r\n<h1>" + statusCode(405) + "</h1>";
+	htmlStatus[301] = "\r\n\r\n<h1>" + statusCode(301) + "</h1>";
+	htmlStatus[413] = "\r\n\r\n<h1>" + statusCode(413) + "</h1>";
+	htmlStatus[501] = "\r\n\r\n<h1>" + statusCode(501) + "</h1>";
+	htmlStatus[301] = "\r\n\r\n<h1>" + statusCode(301) + "</h1>";
+	htmlStatus[102] = "\r\n\r\n<h1>" + statusCode(102) + "</h1>";
 
 	for (int i = 0; i < num_server; i++){
 		instances[i].fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
@@ -731,21 +775,17 @@ int	setup_servers(dynamic_array<WEBSERV_Instance> instances, int num_server){
 	return(1);
 }
 
+int server(WEBSERV_Config&	config) {
+	i32	epfd = epoll_create(64);
+	if (epfd == -1) {
+		CLI_show_error_runtime("Could not create epoll handle");
+		CLI_show_extra("Reason", "%m");
 
+		return (0);
+	}
 
-int server(WEBSERV_Config	config) {
-	dynamic_array<WEBSERV_Instance> instances = config.instances;
-	int epfd = epoll_create1(0);
-	//TODO: check is epoll failed to create
-
-
+	dynamic_array<WEBSERV_Instance>&	instances = config.instances;
 	setup_servers(instances, instances.len);
-
-
-	//TODO: remove this
-	struct sockaddr_in address;
-	size_t addrlen = sizeof(address);
-	
 
 	for(int i = 0; i < instances.len; i++){
 		struct epoll_event ev;
@@ -753,11 +793,15 @@ int server(WEBSERV_Config	config) {
 		ev.data.fd = instances[i].fd;
 		epoll_ctl(epfd, EPOLL_CTL_ADD, instances[i].fd, &ev);
 	}
+	CLI_debug("HTTP Servers have been created");
 
+	struct sockaddr_in address;
+	size_t addrlen = sizeof(address);
 	handle_requests(instances, epfd, address, addrlen);
 
 	for (int i = 0; i < instances.len; i++)
 		close(instances[i].fd);
+	close(epfd);
 
 	return 0;
 }

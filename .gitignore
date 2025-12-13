@@ -9,15 +9,12 @@ webserv
 *.toml
 !configs/*.toml
 
+# Images
+www/assets/images/*
+!www/assets/images/1337.jpeg
+
 # Editor specific files
 tags
 .vscode/
 
-<<<<<<< HEAD
-*.toml
-http
-webserv
-www/assets/images/videoplayback.mp4
-=======
 *.old
->>>>>>> 4784aa75fdb43a8fb04e245ec4198174a17a4c9e

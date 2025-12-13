@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 14:43:46 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/11 18:26:32 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/13 16:12:22 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -41,6 +41,33 @@ WEBSERV_Method			WEBSERV_method_make(const string_view& str) {
 		return (WEBSERV_METHOD_PATCH);
 	}
 	return (WEBSERV_METHOD_INVALID);
+}
+const char*				WEBSERV_method_cstr(const WEBSERV_Method& method) {
+	static const char*	strings[] = {
+		"INVALID",
+
+		"GET",
+		"HEAD",
+		"POST",
+		"PUT",
+		"DELETE",
+		"CONNECT",
+		"OPTIONS",
+		"TRACE",
+		"PATCH",
+	};
+
+	if (method == WEBSERV_METHOD_INVALID) {
+		return (strings[0]);
+	}
+	for (i32 i = 0; i < cast(i32)count_of(strings) - 1; ++i) {
+		WEBSERV_Method	mask = cast(WEBSERV_Method)(1 << i);
+
+		if ((method & mask) == method) {
+			return (strings[i]);
+		}
+	}
+	return (strings[0]);
 }
 b32						WEBSERV_http_route_method_test(const WEBSERV_Route& route, WEBSERV_Method method) {
 	return (cast(b32)(method & route.methods_whitelist));

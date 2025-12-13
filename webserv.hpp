@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/11 18:16:13 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/13 17:54:00 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -229,10 +229,9 @@ struct WEBSERV_Route {
 };
 
 struct WEBSERV_Instance {
-	dynamic_array<WEBSERV_Interface>	interfaces; /* UNUSED */
-
 	u16									port;
 	WEBSERV_Address						addr;
+	string_view							host;
 
 	u32									request_body_max;
 
@@ -308,6 +307,7 @@ struct HTTP_Chunk {
 struct HTTP_Request {
 	WEBSERV_Method				method;
 	WEBSERV_URI					uri;
+	string_view					protocol;
 
 	HTTP_Headers				headers;
 	b32							chunked;
@@ -355,6 +355,7 @@ WEBSERV_URI			WEBSERV_uri_decode(const string_view& str);
 string_view			WEBSERV_uri_encode(const WEBSERV_URI& uri, b32 write_trailing_slash = 0);
 
 WEBSERV_Method		WEBSERV_method_make(const string_view& str);
+const char*			WEBSERV_method_cstr(const WEBSERV_Method& method);
 b32					WEBSERV_http_version_supported(const string_view& str);
 
 void				WEBSERV_config_delete(WEBSERV_Config& config);
@@ -372,6 +373,5 @@ b32					HTTP_request_read(HTTP_Request& req, const byte* data, i32 size);
 
 void				HTTP_request_debug(HTTP_Request& req);
 
-int					server(WEBSERV_Config config);
-b32					WEBSERV_main(const WEBSERV_Config& config);
+int					server(WEBSERV_Config& config);
 #endif
