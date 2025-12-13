@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:42:31 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/11 18:17:29 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/13 17:53:51 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -198,10 +198,9 @@ static Route_CGI		WEBSERV_route_cgi_make(void) {
 static Instance			WEBSERV_instance_make(void) {
 	Instance	instance;
 
-	instance.interfaces = dynamic_array<WEBSERV_Interface>();
-
-	instance.port      = 0;
-	instance.addr.blob = 0;
+	instance.port		= 0;
+	instance.addr.blob	= 0;
+	instance.host		= string_view();
 
 	instance.request_body_max = U32_MAX;
 
@@ -212,10 +211,10 @@ static Instance			WEBSERV_instance_make(void) {
 	return (instance);
 }
 static void				WEBSERV_instance_delete(Instance& instance) {
+	instance.host.free();
+
 	instance.error_4xx.free();
 	instance.error_5xx.free();
-
-	instance.interfaces.free();
 
 	for_table_begin(instance.routes, hash_table<Route>, item) {
 		WEBSERV_route_delete(item.value);
@@ -272,7 +271,7 @@ static void				WEBSERV_config_parse_port(Parser_Context& ctx, const TOML_Value& 
 
 	instance.port = cast(u16)port_signed;
 }
-static void				WEBSERV_config_parse_host(Parser_Context& ctx, const TOML_Value& value) {
+static void				WEBSERV_config_parse_addr(Parser_Context& ctx, const TOML_Value& value) {
 	Config&		config = ctx.config;
 	Instance&	instance = ctx.instance;
 
@@ -284,8 +283,8 @@ static void				WEBSERV_config_parse_host(Parser_Context& ctx, const TOML_Value& 
 		return ;
 	}
 
-	string_view	host_string = *value.String;
-	if (host_string.count('.') != 3) {
+	string_view	addr_string = *value.String;
+	if (addr_string.count('.') != 3) {
 		config_error(VALUE_INVALID, value.pos, "ipv4 address");
 		return ;
 	}
@@ -293,7 +292,7 @@ static void				WEBSERV_config_parse_host(Parser_Context& ctx, const TOML_Value& 
 	string_view		byte_string;
 	i32				byte_index = 0;
 	WEBSERV_Address	addr = { .blob = 0 };
-	while (host_string.split_iter(".", byte_string) && byte_index < 4) {
+	while (addr_string.split_iter(".", byte_string) && byte_index < 4) {
 		i32	byte_value = 0;
 		b32	is_leading_zero = 1;
 		b32	has_leading_zero = 0;
@@ -315,12 +314,27 @@ static void				WEBSERV_config_parse_host(Parser_Context& ctx, const TOML_Value& 
 
 		addr.bytes[byte_index++] = cast(u8)byte_value;
 	}
-	if ((bool)host_string || byte_index != 4) {
+	if ((bool)addr_string || byte_index != 4) {
 		config_error(VALUE_INVALID, value.pos, "ipv4 address");
 		return ;
 	}
 
 	instance.addr = addr;
+}
+static void				WEBSERV_config_parse_host(Parser_Context& ctx, const TOML_Value& value) {
+	Config&				config = ctx.config;
+	Instance&			instance = ctx.instance;
+
+	if (!CONTEXT_parse_expect(ctx, value, TOML_VALUE_STRING)) {
+		return ;
+	}
+	if (value.String == 0 || !(bool)(*(value.String))) {
+		config_error(STRING_EMPTY, value.pos, "host name");
+		return ;
+	}
+
+	const string_view&	host = *value.String;
+	instance.host = string_view::alloc(host);
 }
 static void				WEBSERV_config_parse_error_4xx(Parser_Context& ctx, const TOML_Value& value) {
 	Config&		config = ctx.config;
@@ -973,6 +987,8 @@ static void				WEBSERV_config_check_routes(Parser_Context& ctx) {
 static void				WEBSERV_config_parse_stage_key(Parser_Context& ctx, const string_view& key, const TOML_Value& value) {
 	if (key == "port") {
 		WEBSERV_config_parse_port(ctx, value);
+	} else if (key == "addr") {
+		WEBSERV_config_parse_addr(ctx, value);
 	} else if (key == "host") {
 		WEBSERV_config_parse_host(ctx, value);
 	} else if (key == "error_4xx") {

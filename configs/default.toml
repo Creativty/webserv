@@ -1,6 +1,7 @@
 [[instance]] # Basic server with a shortcutted /assets
 port = 8080
-host = "0.0.0.0"
+addr = "0.0.0.0"
+host = "shit.com"
 error_4xx = "configs/not_found.html"
 request_body_max = 512_000
 routes = [
@@ -53,7 +54,7 @@ routes = [
 
 [[instance]] # CGI bins otherwise redirects to exposed server
 port = 8081
-host = "127.0.0.1"
+addr = "127.0.0.1"
 routes = [
 	{
 		path = "/",
