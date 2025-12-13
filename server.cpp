@@ -229,6 +229,7 @@ std::string getContentType(const std::string& filename) {
     return "text/pain";
 }
 
+/* TODO(xenobas): Slotted for removal */
 std::string url_decode(const std::string &str) {
 	std::string decoded;
 	char ch;
@@ -249,6 +250,7 @@ std::string url_decode(const std::string &str) {
 	return decoded;
 }
 
+/* TODO(xenobas): Slotted for removal */
 bool dirExists(std::string dir){
 	struct stat st;
 	if (stat(dir.c_str(), &st) == -1){
@@ -260,6 +262,7 @@ bool dirExists(std::string dir){
 	return true;
 }
 
+/* TODO(xenobas): Slotted for removal */
 std::string generateRandomFileName(std::string ext){
     static bool seeded = false;
     if (!seeded) {
@@ -401,6 +404,7 @@ b32		PrepareEnvironment(const WEBSERV_Instance& instance, const HTTP_Request& re
 	return (1);
 }
 
+/* TODO(xenobas): Slotted for removal */
 bool	isDirectory(std::string path){
 	struct stat s;
 
@@ -414,6 +418,7 @@ bool	isDirectory(std::string path){
 	return false;
 }
 
+/* TODO(xenobas): Slotted for removal */
 bool fileExists(const std::string& filename) {
     std::ifstream file(filename.c_str());
     return file.good();
@@ -430,9 +435,9 @@ u8* read_one_chunk(HTTP_Request req){
 }
 
 u8* GetBody(HTTP_Request req, i64 &l){
-	dynamic_array<HTTP_Chunk> chunks = req.chunks;
-	u64 len = 0;
-	u64 index = 0;
+	dynamic_array<HTTP_Chunk>	chunks = req.chunks;
+	u64							len = 0;
+	u64							index = 0;
 	
 	if (!req.chunked){
 		l = req.chunk.size;
@@ -606,9 +611,11 @@ bool	is_first_connection(int fd, dynamic_array<WEBSERV_Instance> instances){
 	return 0;
 }
 
-struct WEBSERV_Instance get_server(dynamic_array<WEBSERV_Instance> instances, int port){
+WEBSERV_Instance& get_server(dynamic_array<WEBSERV_Instance>& instances, u16 port){
+	/* TODO(xenobas): This is just wrong... It needs to check the address it came on, and the Host as well, not just port */
 	int i = 0;
-	while (instances[i].port != port) i++;
+	while (instances[i].port != port)
+		++i;
 	return (instances[i]);
 }
 
@@ -720,19 +727,19 @@ int handle_requests(const dynamic_array<WEBSERV_Instance>& instances, int epfd, 
 }
 
 int	setup_servers(dynamic_array<WEBSERV_Instance> instances, int num_server){
-	htmlStatus[200] =GetDefaultPage();
-	htmlStatus[404] ="\r\n\r\n<h1>" + statusCode(404) + "</h1>";
-	htmlStatus[400] ="\r\n\r\n<h1>" + statusCode(400) + "</h1>";
-	htmlStatus[403] ="\r\n\r\n<h1>" + statusCode(403) + "</h1>";
-	htmlStatus[500] ="\r\n\r\n<h1>" + statusCode(500) + "</h1>";
-	htmlStatus[201] ="\r\n\r\n<h1>" + statusCode(201) + "</h1>";
-	htmlStatus[204] ="\r\n\r\n<h1>" + statusCode(204) + "</h1>";
-	htmlStatus[405] ="\r\n\r\n<h1>" + statusCode(405) + "</h1>";
-	htmlStatus[301] ="\r\n\r\n<h1>" + statusCode(301) + "</h1>";
-	htmlStatus[413] ="\r\n\r\n<h1>" + statusCode(413) + "</h1>";
-	htmlStatus[501] ="\r\n\r\n<h1>" + statusCode(501) + "</h1>";
-	htmlStatus[301] ="\r\n\r\n<h1>" + statusCode(301) + "</h1>";
-	htmlStatus[102] ="\r\n\r\n<h1>" + statusCode(102) + "</h1>";
+	htmlStatus[200] = GetDefaultPage();
+	htmlStatus[404] = "\r\n\r\n<h1>" + statusCode(404) + "</h1>";
+	htmlStatus[400] = "\r\n\r\n<h1>" + statusCode(400) + "</h1>";
+	htmlStatus[403] = "\r\n\r\n<h1>" + statusCode(403) + "</h1>";
+	htmlStatus[500] = "\r\n\r\n<h1>" + statusCode(500) + "</h1>";
+	htmlStatus[201] = "\r\n\r\n<h1>" + statusCode(201) + "</h1>";
+	htmlStatus[204] = "\r\n\r\n<h1>" + statusCode(204) + "</h1>";
+	htmlStatus[405] = "\r\n\r\n<h1>" + statusCode(405) + "</h1>";
+	htmlStatus[301] = "\r\n\r\n<h1>" + statusCode(301) + "</h1>";
+	htmlStatus[413] = "\r\n\r\n<h1>" + statusCode(413) + "</h1>";
+	htmlStatus[501] = "\r\n\r\n<h1>" + statusCode(501) + "</h1>";
+	htmlStatus[301] = "\r\n\r\n<h1>" + statusCode(301) + "</h1>";
+	htmlStatus[102] = "\r\n\r\n<h1>" + statusCode(102) + "</h1>";
 
 	for (int i = 0; i < num_server; i++){
 		instances[i].fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
@@ -778,9 +785,6 @@ int server(WEBSERV_Config&	config) {
 	dynamic_array<WEBSERV_Instance>&	instances = config.instances;
 	setup_servers(instances, instances.len);
 
-	struct sockaddr_in address;
-	size_t addrlen = sizeof(address);
-
 	for(int i = 0; i < instances.len; i++){
 		struct epoll_event ev;
 		ev.events = EPOLLIN;
@@ -789,6 +793,8 @@ int server(WEBSERV_Config&	config) {
 	}
 	CLI_debug("HTTP Servers have been created");
 
+	struct sockaddr_in address;
+	size_t addrlen = sizeof(address);
 	handle_requests(instances, epfd, address, addrlen);
 
 	for (int i = 0; i < instances.len; i++)
