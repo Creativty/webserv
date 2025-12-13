@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/17 15:56:46 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/11 18:04:06 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/13 17:11:24 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -51,5 +51,8 @@ void		MEM_zero(T& value) {
 		bytes[i] = 0;
 	}
 }
+
+void	MEM_copy(byte* src, i32 src_len, byte* dst, i32 dst_len);
+i32		cstring_write_u64(char* buff, i32 cap, u64 val);
 
 #endif
