@@ -17,13 +17,9 @@ OBJS		:=	$(SRCS:.cpp=.o)
 DEPS		:=	$(OBJS:.o=.d)
 
 CXX			:=	c++
-<<<<<<< HEAD
-CXXFLAGS	:=	-Wall -Wextra -Werror -Wconversion -Wswitch-enum -std=c++98 -ggdb -MMD -MP $$WEBSERV_DEFINES -DWEBSERV_DEBUG -D_GLIBCXX_USE_CXX11_ABI=0
-=======
 CXXFLAGS	:=	-std=c++98 -ggdb -MMD -MP \
 				-DDEBUG \
 				-Wall -Wextra -Werror -Wconversion -Wswitch-enum 
->>>>>>> 4784aa75fdb43a8fb04e245ec4198174a17a4c9e
 
 all: $(NAME)
 

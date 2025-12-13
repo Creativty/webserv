@@ -1,7 +1,6 @@
 import requests
 import os
 import time
-
 # --- CONFIGURATION ---
 TARGET_URL = 'http://localhost:8080/upload_test'  # Change to your server's URL
 FILE_NAME = './www/assets/images/1337.jpeg'

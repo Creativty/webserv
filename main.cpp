@@ -54,11 +54,7 @@ i32	main(i32 argc, cstring argv[]) {
 		return (8);
 	}
 
-<<<<<<< HEAD
-	if (false)
-=======
 	#if 0 /* TEST(xenobas): Route picker */
->>>>>>> 4784aa75fdb43a8fb04e245ec4198174a17a4c9e
 	{
 		const char*				paths[] = {
 			"/",
@@ -97,6 +93,8 @@ i32	main(i32 argc, cstring argv[]) {
 		}
 	}
 	#endif
+
+	server(config);
 
 	WEBSERV_config_delete(config);
 	return (0);
