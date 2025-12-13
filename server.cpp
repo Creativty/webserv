@@ -391,7 +391,7 @@ u8* GetBody(HTTP_Request req, i64 &l){
 }
 
 int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instance, int epfd){
-    std::string path = url_decode(request.uri.str.to_string());
+    std::string path = "/" + url_decode(request.uri.path.data[0].text);
     bool file_ok;
 
     // if (request.uri.str.has("/favicon.ico") == 0) return(NO_CONTENT);
@@ -404,7 +404,7 @@ int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instan
 	WEBSERV_Route route = instance.routes.get(key);
 	//CGI
 	if (route.kind == WEBSERV_ROUTE_CGI){
-		path = path.substr(1);
+		path = request.uri.str.to_string().substr(1);
 
 		std::cout << path << std::endl;
 		if (!dirExists(path)) return SERVER_ERROR;
@@ -413,10 +413,11 @@ int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instan
 
 		std::string typ = getContentType(path);
 		std::string ext = getFileExtension(typ);
+		std::cout << typ << std::endl << ext << std::endl;
 		ext = ext.substr(1);
 		char *argv[] = {
-			(char*) route.CGI.interpreters.get(string_view(ext.c_str())).text,
 			(char*)path.c_str(),
+			(char*) route.CGI.interpreters.get(string_view(ext.c_str())).text,
 			NULL
 		};
 		if (strlen(argv[0]) == 0){
@@ -457,6 +458,7 @@ int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instan
                                     "</body></html>";
                 
 			write(STDOUT_FILENO, err_msg, strlen(err_msg));
+			close(new_socket);
             exit(1);
 		}
 		else {
@@ -537,10 +539,10 @@ int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instan
 		if (!path.length())
         	return(OK);// for default page
 		if (isDirectory(path))
-			return (FORBIDDEN);// forbidden (when the user wants to get directory not file)
+			return (FORBIDDEN);// forbidden (when the user wants to get directory not file
 		return (NOT_FOUND);
     }
-    return(0);
+    return(METHOD_NOT_ALLOWED);
 }
 
 

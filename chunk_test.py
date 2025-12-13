@@ -1,44 +1,48 @@
 import requests
 import os
 import time
-# --- CONFIGURATION ---
-TARGET_URL = 'http://localhost:8080/upload_test'  # Change to your server's URL
-FILE_NAME = './www/assets/images/1337.jpeg'
-CHUNK_SIZE = 100  # Bytes per chunk (Keep small to test your server's parsing loop)
 
-# 1. Create a dummy file automatically so you don't get FileNotFoundError
+# --- CONFIGURATION ---
+TARGET_URL = 'http://localhost:8080/upload'
+FILE_NAME = './www/assets/images/1337.jpeg'
+CHUNK_SIZE = 200  # Bytes per chunk
+SLEEP_TIME = 1.0  # Seconds to wait between chunks
+
 def create_test_file():
+    # Ensure the directory exists first to avoid errors
+    os.makedirs(os.path.dirname(FILE_NAME), exist_ok=True)
+    
     if not os.path.exists(FILE_NAME):
         print(f"[*] Creating dummy file: {FILE_NAME}")
         with open(FILE_NAME, 'w') as f:
-            # Write enough data to span multiple chunks
-            f.write("This is a test of chunked transfer encoding.\n" * 10)
+            f.write("This is a test of chunked transfer encoding.\n" * 50)
     else:
         print(f"[*] Using existing file: {FILE_NAME}")
 
-# 2. Define a generator function
-# In Python 'requests', passing a generator to 'data' AUTOMATICALLY 
-# sets the header "Transfer-Encoding: chunked"
 def chunked_file_reader(file_path):
     with open(file_path, 'rb') as f:
+        chunk_count = 0
         while True:
             chunk = f.read(CHUNK_SIZE)
             if not chunk:
                 break
-            print(f" -> Sending chunk: {len(chunk)} bytes") # Debug print
+            
+            chunk_count += 1
+            print(f" -> Sending chunk {chunk_count}: {len(chunk)} bytes...")
             yield chunk
-            # Optional: Sleep to test if your server handles non-blocking I/O correctly
-            # time.sleep(0.1) 
+            
+            # --- THE SLEEP IS ADDED HERE ---
+            time.sleep(SLEEP_TIME) 
 
 def run_test():
     create_test_file()
     
-    print(f"[*] Sending {FILE_NAME} to {TARGET_URL} as chunks...")
+    print(f"[*] Sending {FILE_NAME} to {TARGET_URL} in chunks with {SLEEP_TIME}s delay...")
     
     try:
-        # Note: We do NOT set 'Content-Length'. Requests handles that.
-        headers = {'Content-Type': 'text/plain'} 
+        headers = {'Content-Type': 'image/jpeg'} 
         
+        # 'data' accepts a generator for chunked transfer
         response = requests.post(
             TARGET_URL, 
             data=chunked_file_reader(FILE_NAME), 
