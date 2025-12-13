@@ -6,7 +6,11 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 18:33:49 by xenobas           #+#    #+#             */
+<<<<<<< HEAD
 /*   Updated: 2025/12/10 14:03:30 by aindjare         ###   ########.fr       */
+=======
+/*   Updated: 2025/12/11 18:27:53 by xenobas          ###   ########.fr       */
+>>>>>>> 4784aa75fdb43a8fb04e245ec4198174a17a4c9e
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -64,6 +68,7 @@ void				HTTP_request_debug(HTTP_Request& req) {
 		{ /* Method */
 			char	buff[64] = { 0 };
 			switch (req.method) {
+<<<<<<< HEAD
 			// case WEBSERV_METHOD_PATCH:
 			// 	snprintf(buff, 64, "PATCH");
 			// 	break ;
@@ -79,6 +84,23 @@ void				HTTP_request_debug(HTTP_Request& req) {
 			// case WEBSERV_METHOD_HEAD:
 			// 	snprintf(buff, 64, "HEAD");
 			// 	break ;
+=======
+			case WEBSERV_METHOD_PATCH:
+				snprintf(buff, 64, "PATCH");
+				break ;
+			case WEBSERV_METHOD_TRACE:
+				snprintf(buff, 64, "TRACE");
+				break ;
+			case WEBSERV_METHOD_OPTIONS:
+				snprintf(buff, 64, "OPTIONS");
+				break ;
+			case WEBSERV_METHOD_CONNECT:
+				snprintf(buff, 64, "CONNECT");
+				break ;
+			case WEBSERV_METHOD_HEAD:
+				snprintf(buff, 64, "HEAD");
+				break ;
+>>>>>>> 4784aa75fdb43a8fb04e245ec4198174a17a4c9e
 			case WEBSERV_METHOD_DELETE:
 				snprintf(buff, 64, "DELETE");
 				break ;
@@ -168,12 +190,15 @@ b32					HTTP_request_read(HTTP_Request& req, const byte* data, i32 size) {
 	}
 
 	req.buff.push(size, data);
-	return (HTTP_request_read_internal(req));
+	b32	ok = HTTP_request_read_internal(req);
+	return (ok);
 }
 void				HTTP_request_close(HTTP_Request& req) {
-	if (HTTP_request_is_closed(req) /* Already closed */
-		|| !HTTP_request_is_stage_body(req) /* Waiting for essential header bytes */
-		|| (req.content_length >= 0 && req.chunk.size != req.content_length) /* Mismatching expected length and received length */ ) {
+	b32	is_closed = HTTP_request_is_closed(req);
+	b32	is_stage_essential = !HTTP_request_is_stage_body(req);
+	b32	is_length_insufficient = (req.content_length >= 0 && req.chunk.size != req.content_length);
+
+	if (is_closed || is_stage_essential || is_length_insufficient) {
 		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
 	} else {
 		req.buff_stage = HTTP_REQUEST_STAGE_DONE;
@@ -331,14 +356,14 @@ static void			HTTP_request_read_stage_version(HTTP_Request& req) {
 	}
 }
 static void			HTTP_request_read_stage_headers_infix(HTTP_Request& req, const string_view& name, const string_view& value) {
-	if (name.eq_insensitive("Content-Length")) {
+	if (name.eq_insensitive("content-length")) {
 		req.content_length = HTTP_parse_i64(value);
 		if (req.content_length < 0) {
 			req.content_length = -1;
 		}
 		return ;
 	}
-	if (name.eq_insensitive("Transfer-Encoding")) {
+	if (name.eq_insensitive("transfer-encoding")) {
 		req.chunked = value.eq_insensitive("chunked");
 		if (!req.chunked) {
 			req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
@@ -346,11 +371,19 @@ static void			HTTP_request_read_stage_headers_infix(HTTP_Request& req, const str
 		return ;
 	}
 }
+<<<<<<< HEAD
 // static void			HTTP_request_read_stage_headers_postfix(HTTP_Request& req) {
 // 	if (req.chunked && req.content_length >= 0) {
 // 		req.chunked = 0;
 // 	}
 // }
+=======
+static void			HTTP_request_read_stage_headers_postfix(HTTP_Request& req) {
+	if (req.chunked && req.content_length >= 0) {
+		req.chunked = 0;
+	}
+}
+>>>>>>> 4784aa75fdb43a8fb04e245ec4198174a17a4c9e
 static b32			HTTP_request_read_stage_headers(HTTP_Request& req) {
 	if (req.buff_index >= req.buff.len)
 		return (0);
@@ -388,7 +421,11 @@ static void			HTTP_request_read_stage_body(HTTP_Request& req) {
 	i32	rem = req.buff.len - req.buff_index;
 	req.chunk.size += rem;
 
+<<<<<<< HEAD
 	if (req.chunk.index == -1) {// was '<' 
+=======
+	if (req.chunk.index == -1) {
+>>>>>>> 4784aa75fdb43a8fb04e245ec4198174a17a4c9e
 		req.chunk.index = req.buff_index;
 	}
 

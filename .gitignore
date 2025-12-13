@@ -1,12 +1,23 @@
+# Binary file
+webserv
+
 # Intermediary files
 *.d
 *.o
+
+# Configuration files
+*.toml
+!configs/*.toml
 
 # Editor specific files
 tags
 .vscode/
 
+<<<<<<< HEAD
 *.toml
 http
 webserv
 www/assets/images/videoplayback.mp4
+=======
+*.old
+>>>>>>> 4784aa75fdb43a8fb04e245ec4198174a17a4c9e

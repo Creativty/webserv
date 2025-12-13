@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:42:31 by xenobas           #+#    #+#             */
-/*   Updated: 2025/11/14 17:16:15 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/11 18:17:29 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -120,6 +120,7 @@ static Route			WEBSERV_route_make(void) {
 	MEM_zero(route);
 
 	route.cascade = 1;
+	route.methods_whitelist = WEBSERV_METHOD_GET;
 	return (route);
 }
 static void				WEBSERV_route_delete(Route& route) {
@@ -418,6 +419,48 @@ static b32				WEBSERV_config_parse_route_cascade(Parser_Context& ctx, Route& rou
 
 	route.cascade = !value.Boolean;
 	return (1);
+}
+static b32				WEBSERV_config_parse_route_methods(Parser_Context& ctx, Route& route, const TOML_Value& value) {
+	if (!CONTEXT_parse_expect(ctx, value, TOML_VALUE_ARRAY)) {
+		return (0);
+	}
+	if (value.Array == 0 || value.Array->len == 0) {
+		context_error(VALUE_INVALID, value.pos, "methods array");
+		return (0);
+	}
+
+	b32				ok = 1;
+	WEBSERV_Method	whitelist = WEBSERV_METHOD_INVALID;
+	for (i32 i = 0; i < value.Array->len; ++i) {
+		const TOML_Value&	element = (*value.Array)[i];
+		if (!CONTEXT_parse_expect(ctx, element, TOML_VALUE_STRING)) {
+			ok = 0;
+
+			continue ;
+		}
+		if (element.String == 0) {
+			ok = 0;
+
+			context_error(VALUE_INVALID, element.pos, "method");
+			continue ;
+		}
+
+		const TOML_String&	string = *element.String;
+		WEBSERV_Method		method = WEBSERV_method_make(string);
+		if (method == WEBSERV_METHOD_INVALID) {
+			ok = 0;
+
+			context_error(VALUE_INVALID, element.pos, "method");
+			continue ;
+		}
+
+		whitelist = cast(WEBSERV_Method)(whitelist | method);
+	}
+
+	if (ok) {
+		route.methods_whitelist = whitelist;
+	}
+	return (ok);
 }
 static b32				WEBSERV_config_parse_route_kind(Parser_Context& ctx, Route& route, const TOML_Value& value) {
 	if (!CONTEXT_parse_expect(ctx, value, TOML_VALUE_STRING)) {
@@ -824,6 +867,7 @@ static b32				WEBSERV_config_parse_route(Parser_Context& ctx, Route& route, cons
 	Entry	entries[] = {
 		{ "path", WEBSERV_config_parse_route_path, /* required = */ 1, 0 }, /* Path of the route */
 		{ "cascade_disable", WEBSERV_config_parse_route_cascade, /* required = */ 0, 0 }, /* Whether the path is cascaded to descendants */
+		{ "methods", WEBSERV_config_parse_route_methods, /* required = */ 0, 0 }, /* Mask of allowed methods on route */
 
 		{ "type", WEBSERV_config_parse_route_kind, /* required = */ 1, 0 }, /* Variant of the route */
 		{ "props", WEBSERV_config_parse_route_props, /* required = */ 1, 0 }, /* Props of the route variant */

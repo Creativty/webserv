@@ -6,11 +6,12 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/16 09:24:38 by aindjare          #+#    #+#             */
-/*   Updated: 2025/10/28 14:42:19 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/11 18:05:47 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 #ifndef DYNAMIC_ARRAY_HPP
 #define DYNAMIC_ARRAY_HPP
+
 #include "base.hpp"
 #include <stdexcept>
 template <typename T>
@@ -37,21 +38,25 @@ struct dynamic_array {
 	T&				operator[](i32 index) {
 		if (index < 0)
 			throw std::out_of_range("Cannot use negative indices in dynamic_array::operator[]");
-		return ((*this)[(unsigned long long)index]);
+		if (index >= len)
+			throw std::out_of_range("index is out of range during dynamic_array::operator[]");
+		return (data[index]);
 	};
 	const T&		operator[](i32 index) const {
 		if (index < 0)
 			throw std::out_of_range("Cannot use negative indices in dynamic_array::operator[]");
-		return ((*this)[(unsigned long long)index]);
-	};
-	T&				operator[](unsigned long long index) {
-		if (index >= (unsigned long long)this->len)
-			throw std::out_of_range("index is out of range during dynamic_array<T>::operator[]");
+		if (index >= len)
+			throw std::out_of_range("index is out of range during dynamic_array::operator[]");
 		return (data[index]);
 	};
-	const T&		operator[](unsigned long long index) const {
-		if (index >= (unsigned long long)this->len)
-			throw std::out_of_range("index is out of range during dynamic_array<T>::operator[]");
+	T&				operator[](u64 index) {
+		if (index >= (u64)len)
+			throw std::out_of_range("index is out of range during dynamic_array::operator[]");
+		return (data[index]);
+	};
+	const T&		operator[](u64 index) const {
+		if (index >= (u64)len)
+			throw std::out_of_range("index is out of range during dynamic_array::operator[]");
 		return (data[index]);
 	};
 

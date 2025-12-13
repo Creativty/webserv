@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/17 15:56:46 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/12 13:45:24 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/11 18:04:06 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,7 +17,8 @@
 
 #define cast(T) (T)
 #define unused(V) ((void)(V))
-#define count_of(V) (sizeof(V) / sizeof(V[0]))
+#define size_of(V) (cast(u64)sizeof(V))
+#define count_of(V) (size_of(V) / size_of(V[0]))
 
 typedef int8_t		i8;
 typedef int16_t		i16;
@@ -44,7 +45,7 @@ typedef const char*	cstring;
 
 template <typename T>
 void		MEM_zero(T& value) {
-	u64		count = sizeof(T);
+	u64		count = size_of(T);
 	byte*	bytes = cast(byte*)(&value);
 	for (u64 i = 0; i < count; ++i) {
 		bytes[i] = 0;

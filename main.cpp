@@ -3,20 +3,16 @@
 /*                                                        :::      ::::::::   */
 /*   main.cpp                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: sennakhl <sennakhl@student.42.fr>          +#+  +:+       +#+        */
+/*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:45:19 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/02 09:43:14 by sennakhl         ###   ########.fr       */
+/*   Updated: 2025/12/11 18:12:11 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "webserv.hpp"
 #include <cstdlib>
 #include <ctime>
-
-#include <iostream>
-
-
 
 i32	main(i32 argc, cstring argv[]) {
  	CLI_exec_path = argv[0];
@@ -58,47 +54,49 @@ i32	main(i32 argc, cstring argv[]) {
 		return (8);
 	}
 
+<<<<<<< HEAD
 	if (false)
+=======
+	#if 0 /* TEST(xenobas): Route picker */
+>>>>>>> 4784aa75fdb43a8fb04e245ec4198174a17a4c9e
 	{
-		const WEBSERV_Instance&	instance = config.instances[0];
-		const char				*paths[] = {
-			// "/",
-			// "/index.html",
-			// "/images/1337.jpeg",
-			"/upload/Hyello.jpeg",
-			// "/assets/images/1337", /* Redirect */
-			// "/assets/images/1337.jpeg", /* Server */
-			// "/cgi/script.py",
+		const char*				paths[] = {
+			"/",
+			"/index.html",
+			"/images/1337.jpeg",
+			"/images/1337.jpeg",
+			"/upload",
+			"/upload",
+			"/assets/images/1337", /* Redirect */
+			"/assets/images/1337.jpeg", /* Server */
+		};
+		WEBSERV_Method			methods[] = {
+			WEBSERV_METHOD_GET,
+			WEBSERV_METHOD_GET,
+			WEBSERV_METHOD_GET,
+			WEBSERV_METHOD_POST,
+			WEBSERV_METHOD_GET,
+			WEBSERV_METHOD_POST,
+			WEBSERV_METHOD_GET,
+			WEBSERV_METHOD_HEAD,
 		};
 
+		const WEBSERV_Instance&	instance = config.instances[0];
 		for (i32 i = 0; i < cast(i32)count_of(paths); ++i) {
 			const string_view	key = WEBSERV_http_route_pick(instance, paths[i]);
-			WEBSERV_Route route = instance.routes.get(key);
+			printf("path \"%-24s\" ", paths[i]);
+			if (!key) {
+				printf("key not found\n");
+			} else {
+				printf("key \"%.*s\" was found ", key.len, key.text);
 
-			// string_view path = string_view(paths[i]);
-
-			std::cout << "path = " << string_view(paths[i]) << std::endl;
-			std::cout << "\troute_key = " << key << std::endl;
-			std::cout << "\troute_path = " << route.path << std::endl;
-			std::cout << "\troute_upload = " << route.Upload.directory << std::endl;
-
-			// const std::string p = paths[i];
-
-			// std::string typ = " " + getContentType(p);
-			// std::cout << typ << std::endl;
-			// std::string ext = getFileExtension(typ);
-			// std::cout << ext << std::endl;
-
-			// ext = ext.substr(1);
-
-			// std::cout << route.CGI.interpreters.get(string_view(ext.c_str())) << std::endl;
-
-			// std::cout << std::endl;
+				const WEBSERV_Route&	route = instance.routes.get(key);
+				b32						method_ok = WEBSERV_http_route_method_test(route, methods[i]);
+				printf("method is %s\n", method_ok ? "allowed" : "forbidden");
+			}
 		}
 	}
-
-	server(config);
-	
+	#endif
 
 	WEBSERV_config_delete(config);
 	return (0);
