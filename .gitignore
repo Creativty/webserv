@@ -5,6 +5,7 @@ webserv
 *.d
 *.o
 *.swp
+*.old
 
 # Configuration files
 *.toml
@@ -18,4 +19,5 @@ www/assets/images/*
 tags
 .vscode/
 
-*.old
+# Correction Tester files
+YoupiBanane/
