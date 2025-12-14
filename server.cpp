@@ -487,7 +487,7 @@ int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instan
 			(char*) route.CGI.interpreters.get(string_view(ext.c_str())).text,
 			NULL
 		};
-		if (strlen(argv[0]) == 0){
+		if (strlen(argv[1]) == 0){
 			return NOT_IMPLEMENTED;
 		}
 
@@ -669,13 +669,14 @@ int handle_requests(dynamic_array<WEBSERV_Instance>& instances, int epfd, struct
 					// std::cout << "file content: \n" << buffer << std::endl;
 					http_respond_html(client_fd, 200, "text/html", buffer);
 				}
-				else{
+				else
+					http_respond_html(client_fd, SERVER_ERROR, "text/html", htmlStatus[SERVER_ERROR]);
 					// std::cout << "\nnothing to read\n\n";
-					epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
-					close(client_fd);
-					cgi_map.erase(fd);
-					close(fd);
-				}
+				epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
+				fd_request.erase(client_fd);
+				close(client_fd);
+				cgi_map.erase(fd);
+				close(fd);
 			}
 			else if(!cgi_map.count(fd)){
 				CLI_debug("Incoming data not inteded for CGI on file descriptor: %d", fd);
@@ -689,7 +690,7 @@ int handle_requests(dynamic_array<WEBSERV_Instance>& instances, int epfd, struct
 
 				u16			port = ntohs(local_addr.sin_port);
 				if (valread > 0) {
-					if (fd_request.find(fd) == fd_request.end()) {
+					if (!fd_request.count(fd)) {
 						fd_request[fd] = HTTP_request_make();
 					}
 					HTTP_Request& request = fd_request[fd];
@@ -712,9 +713,8 @@ int handle_requests(dynamic_array<WEBSERV_Instance>& instances, int epfd, struct
 					int status = methods(request, fd, get_server(instances, port), epfd);
 					
 					// std::cout << "\n\nstatus : " << status << "\n\n";
-					epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
 					if(status != PROCESSING){
-						// std::cout << htmlStatus[status] << std::endl;
+						epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
 						http_respond_html(fd, status, "text/html", htmlStatus[status]);
 						fd_request.erase(fd);
 						close(fd);	
