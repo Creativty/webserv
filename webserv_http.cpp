@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 14:43:46 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/13 16:12:22 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/14 14:33:04 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -44,8 +44,6 @@ WEBSERV_Method			WEBSERV_method_make(const string_view& str) {
 }
 const char*				WEBSERV_method_cstr(const WEBSERV_Method& method) {
 	static const char*	strings[] = {
-		"INVALID",
-
 		"GET",
 		"HEAD",
 		"POST",
@@ -55,19 +53,23 @@ const char*				WEBSERV_method_cstr(const WEBSERV_Method& method) {
 		"OPTIONS",
 		"TRACE",
 		"PATCH",
+
+		"INVALID",
 	};
+	const i32			strings_count = cast(i32)count_of(strings);
+
 
 	if (method == WEBSERV_METHOD_INVALID) {
-		return (strings[0]);
+		return (strings[strings_count - 1]);
 	}
-	for (i32 i = 0; i < cast(i32)count_of(strings) - 1; ++i) {
+	for (i32 i = 0; i < strings_count - 1; ++i) {
 		WEBSERV_Method	mask = cast(WEBSERV_Method)(1 << i);
 
 		if ((method & mask) == method) {
 			return (strings[i]);
 		}
 	}
-	return (strings[0]);
+	return (strings[strings_count - 1]);
 }
 b32						WEBSERV_http_route_method_test(const WEBSERV_Route& route, WEBSERV_Method method) {
 	return (cast(b32)(method & route.methods_whitelist));
