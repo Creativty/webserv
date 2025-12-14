@@ -667,7 +667,7 @@ int handle_requests(dynamic_array<WEBSERV_Instance>& instances, int epfd, struct
 					// std::cout << "client_fd: \n" << client_fd << std::endl;
 					// std::cout << "fd: \n" << fd << std::endl;
 					// std::cout << "file content: \n" << buffer << std::endl;
-					http_respond_html(client_fd, 200, "text/html", buffer);
+					http_respond_html(client_fd, OK, "text/html", buffer);
 				}
 				else
 					http_respond_html(client_fd, SERVER_ERROR, "text/html", htmlStatus[SERVER_ERROR]);
