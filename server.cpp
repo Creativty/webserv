@@ -463,12 +463,14 @@ u8* GetBody(HTTP_Request req, i64 &l){
 
 int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instance, int epfd){
 	const WEBSERV_URI&	uri = request.uri;
-	CLI_debug("Processing request at path \"%.*s\"", uri.str.len, uri.str.text);
+	// CLI_debug("Processing request at path \"%.*s\"", uri.str.len, uri.str.text);
 
-    std::string	path = url_decode(request.uri.str.to_string());
-	// std::cout << "path is :\t"<< path << std::endl;
+    std::string	path = "/" + url_decode(uri.path[0].to_string());
+	std::cout << "path is :\t"<< path << std::endl;
+
 
 	string_view		key = WEBSERV_http_route_pick(instance, string_view(path.c_str()));
+	// string_view		key = WEBSERV_http_route_pick(instance, uri.path[0].text);
 	WEBSERV_Route	route = instance.routes.get(key);
 	if (route.kind == WEBSERV_ROUTE_CGI){
 		path = request.uri.str.to_string().substr(1);
@@ -625,7 +627,7 @@ WEBSERV_Instance& get_server(dynamic_array<WEBSERV_Instance>& instances, u16 por
 int handle_requests(dynamic_array<WEBSERV_Instance>& instances, int epfd, struct sockaddr_in address, size_t addrlen){
 	std::map<int, HTTP_Request>	fd_request;
 
-	#define ITERATIONS_SECS 600 /* 3 seconds */
+	#define ITERATIONS_SECS 120 /* 3 seconds */
 	#define ITERATIONS ((ITERATIONS_SECS * 1000) / 41)
 	CLI_debug("Event loop started with limit of %d seconds", ITERATIONS_SECS);
 
@@ -674,12 +676,13 @@ int handle_requests(dynamic_array<WEBSERV_Instance>& instances, int epfd, struct
 					// std::cout << "client_fd: \n" << client_fd << std::endl;
 					// std::cout << "fd: \n" << fd << std::endl;
 					// std::cout << "file content: \n" << buffer << std::endl;
-					http_respond_html(client_fd, 200, "text/html", buffer);
+					http_respond_html(client_fd, OK, "text/html", buffer);
 				}
 				else
 					http_respond_html(client_fd, SERVER_ERROR, "text/html", htmlStatus[SERVER_ERROR]);
 					// std::cout << "\nnothing to read\n\n";
 				epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
+				HTTP_request_delete(fd_request[client_fd]);
 				fd_request.erase(client_fd);
 				close(client_fd);
 				cgi_map.erase(fd);
@@ -706,6 +709,7 @@ int handle_requests(dynamic_array<WEBSERV_Instance>& instances, int epfd, struct
 						epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
 						std::cerr << htmlStatus[BAD_REQUEST] << std::endl;
 						http_respond_html(fd, BAD_REQUEST, "text/html", htmlStatus[BAD_REQUEST]);
+						HTTP_request_delete(request);
 						fd_request.erase(fd);
 						close(fd);
 						break;
@@ -723,6 +727,7 @@ int handle_requests(dynamic_array<WEBSERV_Instance>& instances, int epfd, struct
 					if(status != PROCESSING){
 						epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
 						http_respond_html(fd, status, "text/html", htmlStatus[status]);
+						HTTP_request_delete(request);
 						fd_request.erase(fd);
 						close(fd);	
 					}
@@ -730,6 +735,7 @@ int handle_requests(dynamic_array<WEBSERV_Instance>& instances, int epfd, struct
 				} else {
 					// std::cout << "No bytes are there to read" << std::endl;
 					http_respond_html(fd, BAD_REQUEST, "text/html", htmlStatus[BAD_REQUEST]);
+					HTTP_request_delete(fd_request[fd]);
 					fd_request.erase(fd);
 					close(fd);
 				}
