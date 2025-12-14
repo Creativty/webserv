@@ -627,13 +627,20 @@ int handle_requests(dynamic_array<WEBSERV_Instance>& instances, int epfd, struct
 
 	#define ITERATIONS_SECS 600 /* 3 seconds */
 	#define ITERATIONS ((ITERATIONS_SECS * 1000) / 41)
-	CLI_debug("handle_request with limit of %d seconds", ITERATIONS_SECS);
+	CLI_debug("Event loop started with limit of %d seconds", ITERATIONS_SECS);
+
 	for (i32 iteration = 0; iteration < ITERATIONS; ++iteration) {
 		struct epoll_event	events[100];
 		i32					nfds = epoll_wait(epfd, events, 100, 41);
 		if (nfds == -1) {
-			perror("epoll_wait");
-			continue;
+			if (errno != EINTR) {
+				CLI_show_error_runtime("Unrecoverable failure in system call \"epoll_wait\"");
+				CLI_show_extra("Reason", "%m");
+				break ;
+			}
+
+			CLI_show_error_runtime("System call \"epoll_wait\" was interrupted with a signal");
+			continue ;
 		}
 
 		for (int i = 0; i < nfds; i++){
