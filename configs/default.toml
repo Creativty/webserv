@@ -3,7 +3,7 @@ port = 8080
 addr = "0.0.0.0"
 host = "shit.com"
 error_4xx = "configs/not_found.html"
-request_body_max = 512_000
+request_body_max = 512_000_000
 routes = [
 	{
 		path = "/",
