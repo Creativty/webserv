@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 18:33:49 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/13 17:21:07 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/15 14:09:33 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -158,7 +158,7 @@ b32					HTTP_request_is_closed(const HTTP_Request& req) {
 b32					HTTP_request_is_error(const HTTP_Request& req) {
 	return (req.buff_stage == HTTP_REQUEST_STAGE_ERROR);
 }
-static b32			HTTP_request_is_stage_body(const HTTP_Request& req) {
+static b32			HTTP_request_is_content(const HTTP_Request& req) {
 	return (req.buff_stage == HTTP_REQUEST_STAGE_BODY || req.buff_stage == HTTP_REQUEST_STAGE_CHUNK_DATA);
 }
 
@@ -174,7 +174,7 @@ b32					HTTP_request_read(HTTP_Request& req, const byte* data, i32 size) {
 }
 void				HTTP_request_close(HTTP_Request& req) {
 	b32	is_closed = HTTP_request_is_closed(req);
-	b32	is_stage_essential = !HTTP_request_is_stage_body(req);
+	b32	is_stage_essential = !HTTP_request_is_content(req);
 	b32	is_length_insufficient = (req.content_length >= 0 && req.chunk.size != req.content_length);
 
 	if (is_closed || is_stage_essential || is_length_insufficient) {
@@ -389,15 +389,14 @@ static b32			HTTP_request_read_stage_headers(HTTP_Request& req) {
 	return (1);
 }
 static void			HTTP_request_read_stage_body(HTTP_Request& req) {
-	i32	rem = req.buff.len - req.buff_index;
-	req.chunk.size += rem;
-
+	i32		size = req.buff.len - req.buff_index;
 	if (req.chunk.index == -1) {
 		req.chunk.index = req.buff_index;
 	}
 
-	req.buff_index += rem;
-	if (req.content_length >= 0 && req.buff_index - req.chunk.index >= req.content_length) {
+	req.buff_index += size;
+	req.chunk.size += size;
+	if (req.content_length >= 0 && req.chunk.size >= req.content_length) {
 		HTTP_request_close(req);
 	}
 }
@@ -479,6 +478,11 @@ stage_read_headers:
 			goto stage_read_headers ;
 		}
 	}
+
+	if (HTTP_request_is_content(req) && req.content_length == -1 && !req.chunked) {
+		HTTP_request_close(req);
+	}
+
 	if (req.buff_stage == HTTP_REQUEST_STAGE_BODY) {
 		HTTP_request_read_stage_body(req);
 	}
