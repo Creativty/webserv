@@ -363,7 +363,7 @@ b32		PrepareEnvironment(const WEBSERV_Instance& instance, const HTTP_Request& re
 	
 	if (request.headers.has("Authorization")) {
 		const string_view&	str = request.headers.get("Authorization");
-		MEM_copy((byte*)str.text, str_uri.len, (byte*)cstr_value, 8 * 1024);
+		MEM_copy((byte*)str.text, str.len, (byte*)cstr_value, 8 * 1024);
 		cstr_value[str.len] = '\0';
 
 		i32					ret = ::setenv("AUTH_TYPE", cstr_value, 1);
