@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/13 17:54:00 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/15 16:48:16 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -332,8 +332,9 @@ b32					OS_test_file_read(const string_view& path, b32 strict_regular = 0);
 b32					OS_test_dir_read(const string_view& path, b32 strict_regular = 0);
 b32					OS_test_dir_read_write(const string_view& path, b32 strict_regular = 0);
         			
-#define				CLI_debug(...) CLI_debug_internal(__FILE__, __LINE__, __VA_ARGS__)
-void				CLI_debug_internal(const char* file, i32 line, const char *fmt, ...);
+#define				CLI_debug(...) CLI_debug_internal(__FILE__, __LINE__, "DEBUG", __VA_ARGS__)
+#define				CLI_todo(...) CLI_debug_internal(__FILE__, __LINE__, "TODO", __VA_ARGS__)
+void				CLI_debug_internal(const char* file, i32 line, const char *label, const char *fmt, ...);
 void				CLI_show_help(FILE* stream);
 void				CLI_show_extra(const char* prefix, const char* fmt, ...);
 void				CLI_show_error_file_ext(string_view file_path);

@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:16:13 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/11 18:27:11 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/15 16:47:46 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -27,16 +27,17 @@ static const char*	toml_value_kind_strings[] = {
 b32				CLI_is_tty = 0;
 string_view		CLI_exec_path = "<CLI_exec_path>";
 
-void			CLI_debug_internal(const char* file, i32 line, const char *fmt, ...) {
+void			CLI_debug_internal(const char* file, i32 line, const char *label, const char *fmt, ...) {
 #ifdef DEBUG
 	va_list	args;
 	va_start(args, fmt);
-	fprintf(stdout, "%s:%d: Debug: ", file, line);
+	fprintf(stdout, "%s:%d: %s: ", file, line, label);
 	vfprintf(stdout, fmt, args);
 	fprintf(stdout, "\n");
 	va_end(args);
 #else
 	unused(fmt);
+	unused(label);
 	unused(file);
 	unused(line);
 #endif
