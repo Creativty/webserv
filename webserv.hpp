@@ -363,7 +363,8 @@ void				WEBSERV_config_delete(WEBSERV_Config& config);
 WEBSERV_Config		WEBSERV_config_parse(const TOML_Document& toml);
 
 b32					WEBSERV_http_route_method_test(const WEBSERV_Route& route, WEBSERV_Method method);
-const string_view	WEBSERV_http_route_pick(const WEBSERV_Instance& instance, const string_view& path);
+string_view			WEBSERV_http_route_pick(const WEBSERV_Instance& instance, const string_view& path);
+string_view			WEBSERV_http_route_pick(const WEBSERV_Instance& instance, const HTTP_Request& req);
 
 HTTP_Request		HTTP_request_make(void);
 void				HTTP_request_delete(HTTP_Request& req);

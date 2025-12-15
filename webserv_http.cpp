@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 14:43:46 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/14 14:33:04 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/15 16:53:51 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -83,7 +83,7 @@ b32						WEBSERV_http_version_supported(const string_view& str) {
 	);
 }
 
-const string_view		WEBSERV_http_route_pick(const WEBSERV_Instance& instance, const string_view& path) {
+string_view				WEBSERV_http_route_pick(const WEBSERV_Instance& instance, const string_view& path) {
 	string_view	best_match;
 
 	string_view	path_symbolic = path;
@@ -121,4 +121,41 @@ const string_view		WEBSERV_http_route_pick(const WEBSERV_Instance& instance, con
 		best_match = key;
 	} for_table_end ;
 	return (best_match);
+}
+string_view				WEBSERV_http_route_pick(const WEBSERV_Instance& instance, const HTTP_Request& req) {
+	const dynamic_array<string_view>&	path_req = req.uri.path;
+	unused(path_req);
+
+	for_table_begin(instance.routes, const hash_table<WEBSERV_Route>, kv) {
+		const string_view&		path_route = kv.key;
+		const WEBSERV_Route&	route = kv.value;
+
+		if (path_req.len == 0 || path_req[0] == "index.html") {
+			if (path_route == "/" || path_route == "/index.html") {
+				if (route.kind == WEBSERV_ROUTE_BASIC || route.kind == WEBSERV_ROUTE_REDIRECT) {
+					return (path_route);
+				}
+				if (route.kind == WEBSERV_ROUTE_UPLOAD && path_req.len == 0 && path_route == "/") {
+					return (path_route);
+				}
+			}
+		}
+		unused(path_route);
+		unused(route);
+
+		string_view	path_temp = kv.key;
+		string_view	path_iter = string_view();
+		i32			path_index = 0;
+		while (path_temp.split_iter("/", path_iter) && path_index < path_req.len) {
+			if (!path_iter) { /* NOTE(xenobas): Ignore initial split */
+				continue ;
+			}
+
+			CLI_debug("[%2d] PATH_ITER = \"%.*s\"\tPATH_REQ  = \"%.*s\"", path_index, path_iter.len, path_iter.text, path_req[path_index].len, path_req[path_index].text);
+
+			++path_index;
+		}
+
+	} for_table_end ;
+	return (string_view(""));
 }
