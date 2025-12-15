@@ -461,7 +461,7 @@ u8* GetBody(HTTP_Request req, i64 &l){
 	return body;
 }
 
-int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instance, int epfd){
+int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instance, int epfd, std::map<int, HTTP_Request>&	fd_request){
 	const WEBSERV_URI&	uri = request.uri;
 	// CLI_debug("Processing request at path \"%.*s\"", uri.str.len, uri.str.text);
 
@@ -591,18 +591,18 @@ int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instan
     }
 
     if (request.method == WEBSERV_METHOD_GET){
-		//TODO: substr(1) 
         path = url_decode(request.uri.str.to_string().substr(1));
         string_view res_file;
 		b32			file_ok = OS_read_file(string_view(path.c_str()), res_file);
-		// std::cout << "path is: " << path<< std::endl;
-		// std::cout << "file_ok: " << file_ok<< std::endl;
         if (file_ok){
             assert(file_ok && "could not load template html file");            
-            http_respond_html(new_socket, 200, getContentType(path), res_file.to_string());
+            http_respond_html(new_socket, OK, getContentType(path), res_file.to_string());
+			HTTP_request_delete(fd_request[new_socket]);
+			fd_request.erase(new_socket);
 			close(new_socket);
-			return (PROCESSING);
+			return (res_file.free(), PROCESSING);
         }
+		res_file.free();
 		if (!path.length())
         	return(OK);// for default page
 		if (isDirectory(path))
@@ -723,7 +723,7 @@ int handle_requests(dynamic_array<WEBSERV_Instance>& instances, int epfd, struct
                         HTTP_request_close(request);
                     }
 
-					int status = methods(request, fd, get_server(instances, port), epfd);
+					int status = methods(request, fd, get_server(instances, port), epfd, fd_request);
 					
 					// std::cout << "\n\nstatus : " << status << "\n\n";
 					if(status != PROCESSING){
