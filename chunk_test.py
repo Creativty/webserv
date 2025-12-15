@@ -5,8 +5,9 @@ import time
 # --- CONFIGURATION ---
 TARGET_URL = 'http://localhost:8080/upload'
 FILE_NAME = './../../Downloads/videoplayback.mp4'
-CHUNK_SIZE = 2000  # Bytes per chunk
-SLEEP_TIME = 0.0  # Seconds to wait between chunks
+# FILE_NAME = './www/assets/images/1337.jpeg'
+CHUNK_SIZE = 20000000  # Bytes per chunk
+SLEEP_TIME = 1.0  # Seconds to wait between chunks
 
 def create_test_file():
     # Ensure the directory exists first to avoid errors

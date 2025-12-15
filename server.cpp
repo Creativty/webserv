@@ -376,7 +376,7 @@ b32		PrepareEnvironment(const WEBSERV_Instance& instance, const HTTP_Request& re
 	}
 	if (request.headers.has("Content-Length")) {
 		const string_view&	str = request.headers.get("Content-Length");
-		MEM_copy((byte*)str.text, str_uri.len, (byte*)cstr_value, 8 * 1024);
+		MEM_copy((byte*)str.text, str.len, (byte*)cstr_value, 8 * 1024);
 		cstr_value[str.len] = '\0';
 
 		i32					ret = ::setenv("CONTENT_LENGTH", cstr_value, 1);
@@ -389,7 +389,7 @@ b32		PrepareEnvironment(const WEBSERV_Instance& instance, const HTTP_Request& re
 	}
 	if (request.headers.has("Content-Type")) {
 		const string_view&	str = request.headers.get("Content-Type");
-		MEM_copy((byte*)str.text, str_uri.len, (byte*)cstr_value, 8 * 1024);
+		MEM_copy((byte*)str.text, str.len, (byte*)cstr_value, 8 * 1024);
 		cstr_value[str.len] = '\0';
 
 		i32					ret = ::setenv("CONTENT_TYPE", cstr_value, 1);
@@ -474,22 +474,25 @@ int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instan
 	WEBSERV_Route	route = instance.routes.get(key);
 	if (route.kind == WEBSERV_ROUTE_CGI){
 		path = request.uri.str.to_string().substr(1);
-
+		if (access(path.c_str(), X_OK))
+			return FORBIDDEN;
 		// std::cout << path << std::endl;
 		if (!dirExists(path)) return SERVER_ERROR;
 
 		if (!fileExists(path)) return NOT_FOUND;
 
+		
 		std::string typ = getContentType(path);
 		std::string ext = getFileExtension(typ);
 		std::cout << typ << std::endl << ext << std::endl;
 		ext = ext.substr(1);
+		string_view inter = route.CGI.interpreters.get(string_view(ext.c_str()));
 		char *argv[] = {
 			(char*)path.c_str(),
-			(char*) route.CGI.interpreters.get(string_view(ext.c_str())).text,
+			(char*) inter.text,
 			NULL
 		};
-		if (strlen(argv[1]) == 0){
+		if (inter.len == 0){
 			return NOT_IMPLEMENTED;
 		}
 
@@ -518,7 +521,6 @@ int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instan
 			dup2(outPipe[1], STDOUT_FILENO);
 			close(outPipe[1]);
 
-            /* TODO(sennakhl): Check for permission */
 			execv(argv[0], argv);
 			perror("execv");
 			const char* err_msg = "Status: 500 Internal Server Error\r\n"
@@ -627,7 +629,7 @@ WEBSERV_Instance& get_server(dynamic_array<WEBSERV_Instance>& instances, u16 por
 int handle_requests(dynamic_array<WEBSERV_Instance>& instances, int epfd, struct sockaddr_in address, size_t addrlen){
 	std::map<int, HTTP_Request>	fd_request;
 
-	#define ITERATIONS_SECS 120 /* 3 seconds */
+	#define ITERATIONS_SECS 120 /* seconds */
 	#define ITERATIONS ((ITERATIONS_SECS * 1000) / 41)
 	CLI_debug("Event loop started with limit of %d seconds", ITERATIONS_SECS);
 
