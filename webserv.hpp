@@ -156,6 +156,7 @@ struct WEBSERV_URI {
 	/* Commented outs are unused, since WEBSERV does not have a proxy mode where the members are needed */
 	dynamic_array<string_view>	path;
 	hash_table<string_view>		query;
+	b32							is_file;
 
 	/* string_view				domain; */
 	/* u16						port; */

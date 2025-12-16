@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 16:30:27 by xenobas           #+#    #+#             */
-/*   Updated: 2025/11/14 16:29:33 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/16 11:41:09 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,6 +18,7 @@ WEBSERV_URI			WEBSERV_uri_make(const string_view& str) {
 
 	uri.path = dynamic_array<string_view>();
 	uri.query = hash_table<string_view>();
+	uri.is_file = !str.has_suffix("/");
 
 	uri.str = str;
 	uri.ok = 0;
