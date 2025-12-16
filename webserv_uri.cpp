@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 16:30:27 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/16 11:41:09 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/16 16:16:29 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,7 +20,7 @@ WEBSERV_URI			WEBSERV_uri_make(const string_view& str) {
 	uri.query = hash_table<string_view>();
 	uri.is_file = !str.has_suffix("/");
 
-	uri.str = str;
+	uri.str = string_view::alloc(str);
 	uri.ok = 0;
 
 	return (uri);
@@ -34,7 +34,9 @@ void				WEBSERV_uri_delete(WEBSERV_URI& uri) {
 	for_table_begin(uri.query, hash_table<string_view>, param) {
 		param.value.free();
 	} for_table_end ;
-	uri.query.destroy();
+	uri.query.free();
+
+	uri.str.free();
 }
 
 static b32			WEBSERV_hex_match(byte b) {
