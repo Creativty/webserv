@@ -1,12 +1,12 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   cstring_write.cpp                                  :+:      :+:    :+:   */
+/*   cstring.cpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/13 17:03:06 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/13 17:11:50 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/16 14:09:27 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -32,4 +32,11 @@ i32	cstring_write_u64(char* buff, i32 cap, u64 val) {
 	}
 	buff[idx] = '\0';
 	return (idx);
+}
+i32	cstring_length(const char* str) {
+	i32	len = 0;
+	while (str && str[len]) {
+		++len;
+	}
+	return (len);
 }
