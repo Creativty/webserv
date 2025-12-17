@@ -4,9 +4,10 @@ import time
 
 # --- CONFIGURATION ---
 TARGET_URL = 'http://localhost:8080/upload'
-FILE_NAME = './../../Downloads/videoplayback.mp4'
-CHUNK_SIZE = 2000  # Bytes per chunk
-SLEEP_TIME = 0.0  # Seconds to wait between chunks
+TARGET_FILE = 'Video.mp4'
+FILE_NAME = '/home/aindjare/Downloads/RDT_20251203_083733.mp4'
+CHUNK_SIZE = 1024 * 8  # Bytes per chunk
+SLEEP_TIME = 0.005  # Seconds to wait between chunks
 
 def create_test_file():
     # Ensure the directory exists first to avoid errors
@@ -40,12 +41,13 @@ def run_test():
     print(f"[*] Sending {FILE_NAME} to {TARGET_URL} in chunks with {SLEEP_TIME}s delay...")
     
     try:
-        headers = {'Content-Type': 'video/mp4'} 
+        headers = { 'Content-Type': 'binary' } 
         
         # 'data' accepts a generator for chunked transfer
         response = requests.post(
             TARGET_URL, 
             data=chunked_file_reader(FILE_NAME), 
+            params={ 'path': TARGET_FILE },
             headers=headers
         )
         

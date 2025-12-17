@@ -6,13 +6,13 @@
 #    By: xenobas <rahimos.123@gmail.com>            +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/12/11 18:03:31 by xenobas           #+#    #+#              #
-#    Updated: 2025/12/11 18:03:32 by xenobas          ###   ########.fr        #
+#    Updated: 2025/12/17 20:00:03 by aindjare         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
 NAME		:=	webserv
-SRCS		:=	$(wildcard *.cpp)
-INCS		:=	$(wildcard *.hpp)
+SRCS		:=	$(wildcard src/*.cpp)
+INCS		:=	$(wildcard src/*.hpp)
 OBJS		:=	$(SRCS:.cpp=.o)
 DEPS		:=	$(OBJS:.o=.d)
 

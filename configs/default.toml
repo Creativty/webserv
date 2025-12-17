@@ -1,9 +1,10 @@
 [[instance]] # Basic server with a shortcutted /assets
 port = 8080
 addr = "0.0.0.0"
-host = "shit.com"
-error_4xx = "configs/not_found.html"
-request_body_max = 512_000_000
+# host = "shit.com"
+http = {
+	status_404 = "./configs/not_found.html", # Settings the default error page
+}
 routes = [
 	{
 		path = "/",
@@ -15,11 +16,20 @@ routes = [
 		},
 	},
 	{
+		path = "/storage",
+
+		type = "Server",
+		props = {
+			directory = "www/storage",
+			directory_list = true,
+		},
+	},
+	{
 		path = "/assets",
 
 		type = "Server",
 		props = {
-			directory = "www/assets/images",
+			directory = "www/assets",
 			directory_list = true,
 		},
 	},
@@ -29,7 +39,32 @@ routes = [
 		type = "Server",
 		props = {
 			directory = "www/assets/images",
-			directory_list = true,
+			directory_list = false,
+		},
+	},
+	# Redirections
+	{
+		path = "/favicon.ico",
+		type = "Redirect",
+		props = {
+			location = "/assets/images/web.svg",
+			status = 302,
+		},
+	},
+	{
+		path = "/redirect/dark",
+		type = "Redirect",
+		props = {
+			location = "/?dark",
+			status = 302,
+		},
+	},
+	{
+		path = "/redirect/1337.ma",
+		type = "Redirect",
+		props = {
+			location = "https://1337.ma",
+			status = 302,
 		},
 	},
 	{
@@ -37,42 +72,26 @@ routes = [
 
 		type = "Upload",
 		props = {
-			directory = "www/assets/images",
+			directory = "www/storage",
 			max_file_size = 256_000, # bytes
-		},
-	},
-	{
-		path = "/assets/images/1337",
-		cascade_disable = true,
-
-		type = "Redirect",
-		props = {
-			location = "/assets/images/1337.jpeg"
 		},
 	},
 ]
 
-[[instance]] # CGI bins otherwise redirects to exposed server
+[[instance]] # Common Gateway Interface Example
 port = 8081
 addr = "127.0.0.1"
 routes = [
-	{
-		path = "/",
-
-		type = "Redirect",
-		props = {
-			location = "http://localhost:8080",
-		},
-	},
 	{
 		path = "/cgi",
 		
 		type = "CGI",
 		props = {
+			directory = "www/cgi-bin/",
 			interpreters = {
-				py = "python3",
-				c = "clang",
-				lua = "luajit",
+				py  = "/usr/bin/python3",
+				sh  = "/usr/bin/bash",
+				php = "/usr/bin/php",
 			},
 		}
 	}

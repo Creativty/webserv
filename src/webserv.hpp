@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/15 16:48:16 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/17 18:13:00 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,6 +24,7 @@
 
 #include <fcntl.h>
 #include <netdb.h>
+#include <dirent.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -190,25 +191,27 @@ union WEBSERV_Address {
 enum WEBSERV_Route_Kind {
 	WEBSERV_ROUTE_INVALID,
 
-	WEBSERV_ROUTE_BASIC,
+	WEBSERV_ROUTE_SERVER,
 	WEBSERV_ROUTE_REDIRECT,
 	WEBSERV_ROUTE_UPLOAD,
 	WEBSERV_ROUTE_CGI,
 
 	WEBSERV_ROUTE_COUNT,
 };
-struct WEBSERV_Route_Basic {
+struct WEBSERV_Route_Server {
 	string_view	directory;
 	b32			directory_list;
 };
 struct WEBSERV_Route_Redirect {
 	string_view	location;
+	string_view	status;
 };
 struct WEBSERV_Route_Upload {
 	string_view	directory;
-	i32			max_file_size;
+	u32			max_file_size;
 };
 struct WEBSERV_Route_CGI {
+	string_view					directory;
 	hash_table<string_view>		interpreters;
 	hash_table<string_view>		env;
 };
@@ -223,7 +226,7 @@ struct WEBSERV_Route {
 	 * C++ doesn't allow non trivial constructor in union types
 	 * So we do this abomination instead
 	 */
-	WEBSERV_Route_Basic		Basic;
+	WEBSERV_Route_Server	Server;
 	WEBSERV_Route_Redirect	Redirect;
 	WEBSERV_Route_Upload	Upload;
 	WEBSERV_Route_CGI		CGI;
@@ -234,10 +237,9 @@ struct WEBSERV_Instance {
 	WEBSERV_Address						addr;
 	string_view							host;
 
-	u32									request_body_max;
-
-	string_view							error_4xx;
-	string_view							error_5xx;
+	/* Settings */
+	u32									request_body_limit;
+	hash_table<string_view>				status;
 
 	hash_table<WEBSERV_Route>			routes;
 
@@ -253,14 +255,15 @@ struct WEBSERV_Instance {
 	CONFIG_ERROR_KIND(KEY_REQUIRED, "key required") \
 	CONFIG_ERROR_KIND(TYPE_MISMATCH, "type mismatch") \
 	CONFIG_ERROR_KIND(PORT_RANGE, "port range") \
-	CONFIG_ERROR_KIND(REQUEST_BODY_MAX_RANGE, "request_body_max range") \
+	CONFIG_ERROR_KIND(REQUEST_BODY_LIMIT_RANGE, "request_body_limit range") \
 	CONFIG_ERROR_KIND(STRING_EMPTY, "string empty") \
 	CONFIG_ERROR_KIND(VALUE_INVALID, "value invalid") \
 	CONFIG_ERROR_KIND(ROUTE_TYPE, "route type") \
 	CONFIG_ERROR_KIND(ROUTE_PATH_DUP, "route path duplicate") \
-	CONFIG_ERROR_KIND(ERROR_FILE, "error html file") \
+	CONFIG_ERROR_KIND(FILE_INVALID, "file path invalid") \
 	CONFIG_ERROR_KIND(DIR_RO, "directory unreadable") \
 	CONFIG_ERROR_KIND(DIR_RW, "directory unreadable/unwritable") \
+	CONFIG_ERROR_KIND(INTERPRETER_INVALID, "interpreter path invalid") \
 	CONFIG_ERROR_KIND(INSTANCE_EMPTY, "instance empty")
 
 enum WEBSERV_Config_Error_Kind {
@@ -326,10 +329,14 @@ extern string_view	CLI_exec_path;
 extern b32			CLI_is_tty;
 
 b32					OS_read_file(const string_view path, string_view& text);
+b32					OS_write_file(const string_view& path, const string_view& content, b32 overwrite = 0);
+b32					OS_delete_file(const string_view& path);
 b32					OS_stat_file(const string_view& path, struct stat* buf = 0);
 b32					OS_access_file(const string_view& _path, i32 flags = F_OK);
 
 b32					OS_test_file_read(const string_view& path, b32 strict_regular = 0);
+b32					OS_test_file_write(const string_view& path, b32 strict_regular = 0);
+b32					OS_test_file_exists(const string_view& path, b32 strict_regular = 0);
 b32					OS_test_dir_read(const string_view& path, b32 strict_regular = 0);
 b32					OS_test_dir_read_write(const string_view& path, b32 strict_regular = 0);
         			

@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 13:58:18 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/16 14:16:29 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/16 19:41:18 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,6 +15,9 @@
 #define STRING_BUILDER_XSTR(V) STRING_BUILDER_STR(V)
 
 string_builder::string_builder(void): data() { }
+string_builder::string_builder(i32 size): data() {
+	data.resize(size);
+}
 string_builder::~string_builder(void) {
 	data.free();
 }

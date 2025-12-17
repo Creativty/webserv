@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/16 09:19:09 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/08 15:11:41 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/17 12:46:36 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -141,9 +141,10 @@ void					string_view::free(void) {
 string_view				string_view::alloc(const string_view& view) {
 	if (!(bool)view)
 		return (string_view());
-	char*	text = new char[view.len];
+	char*	text = new char[view.len + 1];
 	for (i32 i = 0; i < view.len; ++i)
 		text[i] = view[i];
+	text[view.len] = '\0';
 	return (string_view(text, view.len));
 };
 

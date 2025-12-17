@@ -1,12 +1,443 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
-	<meta charset="UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+	<link rel="stylesheet" href="assets/pico.min.css" />
+
 	<title>WEBSERV - S&A</title>
-</head>
+	<style>
+		:root {
+			--pico-nav-element-spacing-vertical: 0rem;
+			--pico-nav-element-spacing-horizontal: 0.5rem;
+
+			--pico-border-radius: 0.25rem;
+			--pico-typography-spacing-vertical: 1rem;
+			--pico-form-element-spacing-vertical: 0.5rem;
+		}
+		html {
+			scroll-behavior: smooth;
+			img {
+				border-radius: var(--pico-border-radius, 0);
+
+				-webkit-user-select: none;
+				user-select: none;
+			}
+		}
+		ul, ol {
+			padding-left: 1rem;
+			& > li {
+				list-style: none;
+				& > img ~ a {
+					margin-inline: 0.25rem;
+				}
+
+				&#monitor-tools {
+					display: flex;
+					align-items: center;
+					justify-content: center;
+				}
+				&#monitor-folder-empty {
+					text-align: center;
+					text-transform: uppercase;
+				}
+			}
+		}
+	</style>
+	<!-- Dark Mode -->
+	<script type="module">
+		const root = document.querySelector("html");
+		const uri = new URLSearchParams(window.location.search);
+		if (uri.has("dark")) {
+			root.setAttribute("data-theme", "dark");
+		}
+	</script>
+	<!-- Files monitor -->
+	<script type="module">
+		const parser = new DOMParser();
+		const url_initial = "/storage";
+		const undo_history = [];
+
+		async function request_files(folder) {
+			if (typeof folder !== "string") {
+				folder = url_initial;
+			}
+
+			const res = await fetch(folder);
+			if (!res.ok) {
+				throw new Error(`${res.status} ${res.statusText}`);
+			}
+		
+			const html = await res.text();
+			const doc  = parser.parseFromString(html, "text/html");
+
+			const links = Array.from(doc.querySelectorAll("a"));
+			return (links.map(function (link) {
+				const is_folder = link.hasAttribute("data-folder");
+				return ({ href: link.href, text: link.innerText, is_folder });
+			}));
+		}
+		function update_ui(files) {
+			const ul = document.getElementById("monitor_output");
+			if (ul === undefined || ul === null) {
+				throw new Error("Create an output for the monitor with the id=\"monitor_output\"");
+			}
+
+			ul.innerHTML = "";
+
+			{ /* NOTE(xenobas): undo */
+				const img = document.createElement("img");
+				img.width = 32;
+				img.height = 32;
+				img.src = "images/undo.svg";
+				img.style.cursor = "pointer";
+
+				const undo_location = undo_history.length > 1 ? undo_history[undo_history.length - 2] : url_initial;
+				img.setAttribute("data-href", undo_location);
+
+				img.addEventListener("click", async function (event) {
+					const disabled = ul.hasAttribute("data-disabled");
+					if (ul.disabled) {
+						return ;
+					}
+
+					try {
+						ul.setAttribute("data-disabled", "true");
+						const href = event.target.getAttribute("data-href");
+						const files = await request_files(href);
+						if (undo_history.length > 0) {
+							undo_history.pop();
+						}
+
+						update_ui(files);
+					} catch (err) {
+						console.error(err);
+					} finally {
+						ul.removeAttribute("data-disabled");
+					}
+				});
+
+				const li = document.createElement("li");
+				li.id = "monitor-tools";
+				li.appendChild(img);
+
+				ul.appendChild(li);
+			}
+
+			for (const { href, text, is_folder } of files) {
+				const img = document.createElement("img");
+				img.width = 32;
+				img.height = 32;
+				img.src = (is_folder ? "images/folder.svg" : "images/file.svg");
+
+				if (is_folder) {
+					img.style.cursor = "pointer";
+					img.setAttribute("data-href", href);
+					img.addEventListener("click", async function (event) {
+						const disabled = ul.hasAttribute("data-disabled");
+						if (ul.disabled) {
+							return ;
+						}
+
+						try {
+							ul.setAttribute("data-disabled", "true");
+							const href = event.target.getAttribute("data-href");
+
+							const files = await request_files(href);
+							undo_history.push(href);
+
+							update_ui(files);
+						} catch (err) {
+							console.error(err);
+						} finally {
+							ul.removeAttribute("data-disabled");
+						}
+					});
+				}
+
+				const a  = document.createElement("a");
+				a.href = href;
+				a.target = "_blank";
+				a.innerText = text;
+
+				const li = document.createElement("li");
+				li.appendChild(img);
+				li.appendChild(a);
+
+				ul.appendChild(li);
+			}
+			{
+				const a = document.createElement("a");
+				a.href = "#";
+				a.innerText = files.length > 0 ? `File count: ${files.length}` : `Folder empty`;
+
+				const li = document.createElement("li");
+				li.appendChild(a);
+
+				ul.appendChild(li);
+			}
+		}
+		async function routine() {
+			try {
+				const url_current = undo_history.length > 0 ? undo_history[undo_history.length - 1] : url_initial;
+
+				const files = await request_files(url_current);
+				update_ui(files);
+
+				setTimeout(routine, 2_500);
+			} catch (err) {
+				console.error(err);
+			}
+		}
+		document.addEventListener("DOMContentLoaded", () => {
+			routine();
+		});
+	</script>
+	<!-- Upload Interface -->
+	<script type="module">
+		function file_to_stream(file, chunk_size = 64 * 1024) {
+			let offset = 0;
+			return new ReadableStream({
+				async pull(controller) {
+					if (offset >= file.size) {
+						controller.close();
+						return ;
+					}
+
+					const end = Math.min(file.size, offset + chunk_size);
+					const chunk_data = await file.slice(offset, end).arrayBuffer();
+					controller.enqueue(new Uint8Array(chunk_data));
+
+					offset = end;
+				},
+				cancel(reason) {
+					console.log('Stream cancelled', reason);
+				}
+			});
+		}
+		document.addEventListener("DOMContentLoaded", () => {
+			const forms = document.querySelectorAll("[name=upload_forms] > form");
+			for (let i = 0; i < forms.length; ++i) {
+				const form = forms[i];
+				form.addEventListener("submit", async (ev) => {
+					try {
+						ev.preventDefault();
+
+						const form = ev.target;
+						const method = form.getAttribute("data-method");
+
+						const data = new FormData(form);
+						const path = data.get("path");
+						const file = data.get("file");
+
+						const url = new URL(window.location);
+						url.pathname = "/upload";
+						url.searchParams.set("path", path);
+
+						const resp = await fetch(url, {
+							method: method,
+							headers: {
+								"Content-Type": "application/octet-stream",
+							},
+
+							body: file,
+						});
+
+						if (!resp.ok) {
+							throw new Error(`${resp.status} ${resp.statusText}`);
+						}
+
+						console.log(resp.status, await resp.text());
+					} catch (err) {
+						console.error(err);
+					}
+				});
+			}
+		});
+	</script>
+	</head>
 <body>
-	<h1>WEBSERV - S&A</h1>
-	<img src="assets/images/1337.jpeg" width="400" height="400" alt="assets/images/1337.jpeg (Parent Route Example)" />
-	<img src="images/1337.jpeg" width="400" height="400" alt="images/1337.jpeg (Specific Route Example)" />
+	<header class="container">
+		<nav>
+			<ul>
+				<li><strong>webserv</strong></li>
+			</ul>
+			<ul>
+				<li><a href="https://profile.intra.42.fr/users/aindjare" target="_blank">aindjare</a></li>
+				<li><a href="https://profile.intra.42.fr/users/sennakhl" target="_blank">sennakhl</a></li>
+			</ul>
+		</nav>
+	</header>
+	<main class="container">
+		<hgroup>
+			<h1>Overview</h1>
+			<p>The best description is: PITA</p>
+		</hgroup>
+		<p>
+			<span>This project is the first where the learner encounters the concepts of servers, clients, frontend, backend, and more...</span> <br>
+			<span>We were tasked with creating a web server that is capable of the following:</span> <br>
+		</p>
+		<ul>
+			<li>
+				<label for="">
+					<input type="checkbox" checked disabled />
+					Implement an HTTP standard compliant reader and writer.
+				</label>
+			</li>
+			<li>
+				<label for="">
+					<input type="checkbox" checked disabled />
+					Multiplexing requests without the use of extra processes/threads.
+				</label>
+			</li>
+			<li>
+				<label for="">
+					<input type="checkbox" checked disabled />
+					<a href="#section_server">Serve a directory of files.</a>
+				</label>
+			</li>
+			<li>
+				<label for="">
+					<input type="checkbox" checked disabled />
+					<a href="#section_redirect">Redirection.</a>
+				</label>
+			</li>
+			<li>
+				<label for="">
+					<input type="checkbox" checked disabled />
+					<a href="#section_cgi">Common Gateway Interface.</a>
+				</label>
+			</li>
+			<li>
+				<label for="">
+					<input type="checkbox" checked disabled />
+					<a href="#section_upload">Uploading and Deletion of files.</a>
+				</label>
+			</li>
+		</ul>
+		<hr />
+		<section id="section_server">
+			<hgroup>
+				<h2>File server</h2>
+				<p>GET requests end up with files served, and maybe directories listed</p>
+			</hgroup>
+			<ul id="monitor_output">
+			</ul>
+		</section>
+		<hr />
+		<section id="section_upload">
+			<hgroup>
+				<h2>CRUD (Without the R)</h2>
+				<p>The best thing the internet ever did was the ability to share documents across time and space easily and hastily</p>
+			</hgroup>
+			<details name="upload_forms">
+				<summary>POST: Create if not exists, otherwise update</summary>
+				<form data-method="POST">
+					<fieldset>
+						<label>
+							File name
+							<input
+								type="text"
+
+								name="path"
+								placeholder="name.ext"
+								autocomplete="off"
+
+								title="File name"
+								pattern="[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*"
+								required
+							/>
+						</label>
+						<label>
+							File
+							<input
+								type="file"
+
+								name="file"
+								autocomplete="off"
+
+								title="File"
+								required
+							/>
+						</label>
+					</fieldset>
+					<input type="submit" value="Submit">
+				</form>
+			</details>
+			<details name="upload_forms">
+				<summary>PUT: Update remote file</summary>
+				<fieldset>
+					<label>
+						File name
+						<input
+							type="text"
+
+							name="path"
+							placeholder="name.ext"
+							autocomplete="off"
+
+							title="File name"
+							pattern="[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*"
+							required
+						/>
+					</label>
+					<label>
+						File
+						<input
+							type="file"
+
+							name="file"
+							autocomplete="off"
+
+							title="File"
+							required
+						/>
+					</label>
+				</fieldset>
+			</details>
+			<details name="upload_forms">
+				<summary>DELETE: Delete file from remote file system</summary>
+				<form data-method="DELETE">
+					<fieldset>
+						<label>
+							File path
+							<input
+								type="text"
+
+								name="path"
+								placeholder="name.ext"
+								autocomplete="off"
+
+								title="File name"
+								pattern="[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*"
+								required
+							/>
+						</label>
+					</fieldset>
+					<input type="submit" value="Submit">
+				</form>
+			</details>
+		</section>
+		<hr />
+		<section id="section_redirect">
+			<hgroup>
+				<h2>Redirect</h2>
+				<p>Requests get forwarded depending on the status code and Location header</p>
+			</hgroup>
+			<ul>
+				<li> <img src="/favicon.ico" alt="1337" width="32"> <a href="/favicon.ico"> Website's favicon</a> </li>
+				<li> <img src="/images/dark_mode.svg" alt="Moon" width="32"> <a href="/redirect/dark">Dark mode</a></li>
+				<li> <img src="/images/1337.jpeg" alt="1337" width="32" style="border-radius: 100%;"> <a href="/redirect/1337.ma" target="_blank">1337's own website</a></li>
+			</ul>
+		</section>
+		<hr />
+		<section id="section_cgi">
+			<hgroup>
+				<h2>Common Gateway Interface</h2>
+				<a href="https://en.wikipedia.org/wiki/Common_Gateway_Interface" target="_blank">Mafiyach...</a>
+			</hgroup>
+		</section>
+	</main>
 </body>
 </html>

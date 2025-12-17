@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:16:13 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/15 16:47:46 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/17 16:42:30 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -284,13 +284,13 @@ void			CLI_show_errors_config(const WEBSERV_Config& config) {
 		} else if (err.kind == WEBSERV_CONFIG_ERROR_PORT_RANGE) {
 			CLI_show_error_config(err.pos, "port value out of range, must be between 0 and 65535");
 			CLI_show_error_toml_line(config.document, err.pos);
-		} else if (err.kind == WEBSERV_CONFIG_ERROR_REQUEST_BODY_MAX_RANGE) {
-			CLI_show_error_config(err.pos, "request_body_max value is out of range, must be between 0 and 65535");
+		} else if (err.kind == WEBSERV_CONFIG_ERROR_REQUEST_BODY_LIMIT_RANGE) {
+			CLI_show_error_config(err.pos, "request_body_limit value is out of range, must be between 0 and 65535");
 			CLI_show_error_toml_line(config.document, err.pos);
 		} else if (err.kind == WEBSERV_CONFIG_ERROR_STRING_EMPTY) {
 			CLI_show_error_config(err.pos, "Expected \"%.*s\", got an empty string value", err.str.len, err.str.text);
 			CLI_show_error_toml_line(config.document, err.pos);
-		} else if (err.kind == WEBSERV_CONFIG_ERROR_ERROR_FILE) {
+		} else if (err.kind == WEBSERV_CONFIG_ERROR_FILE_INVALID) {
 			CLI_show_error_config(err.pos, "File \"%.*s\" is inaccessible or does not end in \".html\"", err.str.len, err.str.text);
 			CLI_show_error_toml_line(config.document, err.pos);
 		} else if (err.kind == WEBSERV_CONFIG_ERROR_VALUE_INVALID) {
@@ -302,6 +302,14 @@ void			CLI_show_errors_config(const WEBSERV_Config& config) {
 
 			string_view	str = err.str;
 			str.free(); /* NOTE(xenobas): This was allocated specifically for error reporting */
+		} else if (err.kind == WEBSERV_CONFIG_ERROR_INTERPRETER_INVALID) {
+			const string_view&	path = err.str;
+			const char*			desc = "does not exist";
+			if (OS_access_file(path, F_OK)) {
+				desc = "is not executable";
+			}
+			CLI_show_error_config(err.pos, "Interpreter located at \"%.*s\" %s", err.str.len, err.str.text, desc);
+			CLI_show_error_toml_line(config.document, err.pos);
 		} else if (err.kind == WEBSERV_CONFIG_ERROR_ROUTE_TYPE) {
 			const TOML_Value*	value = err.value;
 			b32					value_segfault = (value != 0 && value->String != 0);
@@ -311,24 +319,21 @@ void			CLI_show_errors_config(const WEBSERV_Config& config) {
 
 			char	buff[512] = { 0 };
 			u64		index = 0;
-			index += cast(u64)std::snprintf(&buff[index], 512ul - index, "\"%s\", ", "server"); // BASIC
+			index += cast(u64)std::snprintf(&buff[index], 512ul - index, "\"%s\", ", "server"); // SERVER
 			index += cast(u64)std::snprintf(&buff[index], 512ul - index, "\"%s\", ", "redirect"); // REDIRECT
 			index += cast(u64)std::snprintf(&buff[index], 512ul - index, "\"%s\", ", "upload"); // UPLOAD
 			index += cast(u64)std::snprintf(&buff[index], 512ul - index, "\"%s\"", "cgi"); // CGI
 
 			CLI_show_extra("Hint", "Must be one of the following options { %s }", buff);
 		} else if (err.kind == WEBSERV_CONFIG_ERROR_DIR_RO) {
-			string_view	str = err.str;
+			const string_view&	str = err.str;
 			CLI_show_error_config(err.pos, "Directory \"%.*s\" either doesn't exist or isn't allowed to be read", str.len, str.text);
 			CLI_show_error_toml_line(config.document, err.pos);
-
-			str.free();
 		} else if (err.kind == WEBSERV_CONFIG_ERROR_DIR_RW) {
-			string_view	str = err.str;
+			const string_view&	str = err.str;
+
 			CLI_show_error_config(err.pos, "Directory \"%.*s\" either doesn't exist, isn't allowed to be read, or cannot be written", str.len, str.text);
 			CLI_show_error_toml_line(config.document, err.pos);
-
-			str.free();
 		} else {
 			const char*	error_str = webserv_config_error_kind_strings[err.kind];
 			CLI_show_error_config(err.pos, "TODO: Error \"%s\" reporting is unimplemented", error_str);

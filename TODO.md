@@ -1,10 +1,11 @@
 - [ ] Project directory de-cluttering
-- [ ] Determine how to know EOF for non-chunked bodies
+- [x] Determine how to know EOF for non-chunked bodies
 - [ ] Remove all usage of std::string where not required
 - [ ] Remove all usage of std::map where not required
 - [ ] Fix Formatting
 - [ ] Forbidden functions removal
 - [ ] Client Timeouts
+- [ ] Multiplex Writing to Sockets
 - [ ] CGI Path resolution
     - Assuming CGI route on /cgi
     - No other route even if it is CGI should be definable under /cgi/*

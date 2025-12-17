@@ -1,0 +1,1755 @@
+#include <cassert>
+#include <iostream>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#include <cstring>
+#include <arpa/inet.h>
+#include <cstdlib>
+#include <stdio.h>
+#include <fstream>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <ctime>
+#include <sstream>
+#include <limits.h>
+#include <sys/wait.h>
+#include <cstdlib>
+#include <map>
+#include <sys/epoll.h>
+
+#include "webserv.hpp"
+#include "string_builder.hpp"
+
+static std::map<int, int>			cgi_map;
+static std::map<int, std::string>	htmlStatus;
+
+#include <string>
+
+// This is a C++98-compatible way to declare a large, multi-line string.
+// The compiler automatically joins all these pieces into one std::string.
+std::string GetDefaultPage()
+{
+    std::string htmlContent =
+        "<!DOCTYPE html>\n"
+        "<html lang=\"en\">\n"
+        "<head>\n"
+        "    <meta charset=\"UTF-8\">\n"
+        "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+        "    <title>Welcome to Webserv!</title>\n"
+        "    <style>\n"
+        "        body {\n"
+        "            font-family: Arial, sans-serif;\n"
+        "            display: flex;\n"
+        "            justify-content: center;\n"
+        "            align-items: center;\n"
+        "            height: 100vh;\n"
+        "            margin: 0;\n"
+        "            background-color: #f4f4f4;\n"
+        "        }\n"
+        "        .container {\n"
+        "            text-align: center;\n"
+        "            padding: 50px;\n"
+        "            border-radius: 10px;\n"
+        "            background-color: #ffffff;\n"
+        "            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);\n"
+        "        }\n"
+        "        h1 {\n"
+        "            color: #333;\n"
+        "        }\n"
+        "        p {\n"
+        "            color: #555;\n"
+        "            font-size: 1.2em;\n"
+        "        }\n"
+        "    </style>\n"
+        "</head>\n"
+        "<body>\n"
+        "\n"
+        "    <div class=\"container\">\n"
+        "        <h1>Hello from Webserv!</h1>\n"
+        "        <p>This is a default page.</p>\n"
+        "    </div>\n"
+        "\n"
+        "</body>\n"
+        "</html>\n";
+
+    return htmlContent;
+}
+
+enum HttpStatus {
+    OK = 200,
+    CREATED = 201,
+    BAD_REQUEST = 400,
+    UNAUTHORIZED = 401,
+    FORBIDDEN = 403,
+    NOT_FOUND = 404,
+    SERVER_ERROR = 500,
+	NO_CONTENT = 204,
+	METHOD_NOT_ALLOWED = 405,
+	MOVED_PERMANETLY = 301,
+	PAYLOAD_TOO_LARGE = 413,
+	NOT_IMPLEMENTED = 501,
+	PROCESSING = 102
+};
+
+std::string statusCode(int code){
+	if(code == 404) return "404 Not Found";
+	if(code == 400) return "400 Bad Request";
+	if(code == 500) return "500 Internal Server Error";
+	if(code == 201) return "201 Created";
+	if(code == 204) return "204 No Content";
+	if(code == 403) return "403 Forbidden";
+	if(code == 405) return "405 Method Not Allowed";
+	if(code == 301) return "301 Moved Permanently";
+	if(code == 413) return "413 Payload Too Large";
+	if(code == 501) return "501 Not Implemented";
+	if(code == 502) return "502 Gateway Error";
+	if(code == 102) return "102 Processing";
+	return "200 OK";
+}
+
+void	http_respond_html(int fd, int code, std::string type, const std::string &data) {
+	std::string	response_line = "HTTP/1.0 " + statusCode(code) + "\r\n";
+	std::string	headers = "Content-Type: " + type + "\r\n"
+		"\r\n";
+
+	// std::cout << "client_fd in http_respond: " << fd << std::endl;
+	::send(fd, response_line.c_str(), response_line.size(), MSG_DONTWAIT);
+	::send(fd, headers.c_str(), headers.size(), MSG_DONTWAIT);
+
+	if (data.size())
+		::send(fd, data.c_str(), data.size(), MSG_DONTWAIT);
+	// std::cout << response_line << headers << data << std::endl;
+}
+
+std::string getFileExtension(const std::string& type) {
+    if (type == "text/html")                	return ".html";
+    if (type == "text/css")                 	return ".css";
+    if (type == "application/javascript")   	return ".js";
+    if (type == "application/json")         	return ".json";
+    if (type == "application/xml")          	return ".xml";
+    if (type == "application/pdf")          	return ".pdf";
+ 
+    // Images	 
+    if (type == "image/png")                	return ".png";
+    if (type == "image/jpeg")               	return ".jpg";
+    if (type == "image/gif")                	return ".gif";
+    if (type == "image/bmp")                	return ".bmp";
+    if (type == "image/x-icon")             	return ".ico";
+    if (type == "image/svg+xml")            	return ".svg";
+    if (type == "image/webp")               	return ".webp";
+ 
+    // Audio	 
+    if (type == "audio/mpeg")               	return ".mp3";
+    if (type == "audio/wav")                	return ".wav";
+    if (type == "audio/ogg")                	return ".ogg";
+ 
+    // Video	 
+    if (type == "video/mp4")                	return ".mp4";
+    if (type == "video/webm")               	return ".webm";
+    if (type == "video/x-msvideo")          	return ".avi";
+    if (type == "video/quicktime")          	return ".mov";
+    if (type == "video/x-matroska")         	return ".mkv";
+    
+	// Fonts	 
+    if (type == "font/ttf")                 	return ".ttf";
+    if (type == "font/otf")                 	return ".otf";
+    if (type == "font/woff")                	return ".woff";
+    if (type == "font/woff2")               	return ".woff2";
+ 
+    // Archives	 
+    if (type == "application/zip")          	return ".zip";
+    if (type == "application/vnd.rar")      	return ".rar";
+    if (type == "application/x-7z-compressed")	return ".7z";
+    if (type == "application/x-tar")        	return ".tar";
+    if (type == "application/gzip")         	return ".gz";
+ 
+    // Scripts /  Code	
+    if (type == "application/x-httpd-php")  	return ".php";
+    if (type == "text/x-python")            	return ".py";
+    if (type == "text/x-c++src")            	return ".cpp";
+    if (type == "text/x-csrc")              	return ".c";
+    if (type == "application/x-sh")         	return ".sh";
+    return ""; 
+} 
+
+std::string getContentType(const std::string& filename) {
+    if (filename.find(".html") != std::string::npos) return "text/html";
+    if (filename.find(".htm")  != std::string::npos) return "text/html";
+    if (filename.find(".css")  != std::string::npos) return "text/css";
+    if (filename.find(".js")   != std::string::npos) return "application/javascript";
+    if (filename.find(".json") != std::string::npos) return "application/json";
+    if (filename.find(".xml")  != std::string::npos) return "application/xml";
+    if (filename.find(".pdf")  != std::string::npos) return "application/pdf";
+
+    // Images
+    if (filename.find(".png")  != std::string::npos) return "image/png";
+    if (filename.find(".jpg")  != std::string::npos) return "image/jpeg";
+    if (filename.find(".jpeg") != std::string::npos) return "image/jpeg";
+    if (filename.find(".gif")  != std::string::npos) return "image/gif";
+    if (filename.find(".bmp")  != std::string::npos) return "image/bmp";
+    if (filename.find(".ico")  != std::string::npos) return "image/x-icon";
+    if (filename.find(".svg")  != std::string::npos) return "image/svg+xml";
+    if (filename.find(".webp") != std::string::npos) return "image/webp";
+
+    // Audio
+    if (filename.find(".mp3")  != std::string::npos) return "audio/mpeg";
+    if (filename.find(".wav")  != std::string::npos) return "audio/wav";
+    if (filename.find(".ogg")  != std::string::npos) return "audio/ogg";
+
+    // Video
+    if (filename.find(".mp4")  != std::string::npos) return "video/mp4";
+    if (filename.find(".webm") != std::string::npos) return "video/webm";
+    if (filename.find(".avi")  != std::string::npos) return "video/x-msvideo";
+    if (filename.find(".mov")  != std::string::npos) return "video/quicktime";
+    if (filename.find(".mkv")  != std::string::npos) return "video/x-matroska";
+
+    // Fonts
+    if (filename.find(".ttf")  != std::string::npos) return "font/ttf";
+    if (filename.find(".otf")  != std::string::npos) return "font/otf";
+    if (filename.find(".woff") != std::string::npos) return "font/woff";
+    if (filename.find(".woff2")!= std::string::npos) return "font/woff2";
+
+    // Archives
+    if (filename.find(".zip")  != std::string::npos) return "application/zip";
+    if (filename.find(".rar")  != std::string::npos) return "application/vnd.rar";
+    if (filename.find(".7z")   != std::string::npos) return "application/x-7z-compressed";
+    if (filename.find(".tar")  != std::string::npos) return "application/x-tar";
+    if (filename.find(".gz")   != std::string::npos) return "application/gzip";
+
+    // Scripts / Code
+    if (filename.find(".php")  != std::string::npos) return "application/x-httpd-php";
+    if (filename.find(".py")   != std::string::npos) return "text/x-python";
+    if (filename.find(".cpp")  != std::string::npos) return "text/x-c++src";
+    if (filename.find(".c")    != std::string::npos) return "text/x-csrc";
+    if (filename.find(".sh")   != std::string::npos) return "application/x-sh";
+
+    return "text/plain";
+}
+string_view getContentType(const string_view& filename) {
+    if (filename.has_suffix(".html")) return "text/html";
+    if (filename.has_suffix(".htm") ) return "text/html";
+    if (filename.has_suffix(".css") ) return "text/css";
+    if (filename.has_suffix(".js")  ) return "application/javascript";
+    if (filename.has_suffix(".json")) return "application/json";
+    if (filename.has_suffix(".xml") ) return "application/xml";
+    if (filename.has_suffix(".pdf") ) return "application/pdf";
+
+    // Images
+    if (filename.has_suffix(".png") ) return "image/png";
+    if (filename.has_suffix(".jpg") ) return "image/jpeg";
+    if (filename.has_suffix(".jpeg")) return "image/jpeg";
+    if (filename.has_suffix(".gif") ) return "image/gif";
+    if (filename.has_suffix(".bmp") ) return "image/bmp";
+    if (filename.has_suffix(".ico") ) return "image/x-icon";
+    if (filename.has_suffix(".svg") ) return "image/svg+xml";
+    if (filename.has_suffix(".webp")) return "image/webp";
+
+    // Audio
+    if (filename.has_suffix(".mp3") ) return "audio/mpeg";
+    if (filename.has_suffix(".wav") ) return "audio/wav";
+    if (filename.has_suffix(".ogg") ) return "audio/ogg";
+
+    // Video
+    if (filename.has_suffix(".mp4") ) return "video/mp4";
+    if (filename.has_suffix(".webm")) return "video/webm";
+    if (filename.has_suffix(".avi") ) return "video/x-msvideo";
+    if (filename.has_suffix(".mov") ) return "video/quicktime";
+    if (filename.has_suffix(".mkv") ) return "video/x-matroska";
+
+    // Fonts
+    if (filename.has_suffix(".ttf") ) return "font/ttf";
+    if (filename.has_suffix(".otf") ) return "font/otf";
+    if (filename.has_suffix(".woff")) return "font/woff";
+    if (filename.has_suffix(".woff2")) return "font/woff2";
+
+    // Archives
+    if (filename.has_suffix(".zip") ) return "application/zip";
+    if (filename.has_suffix(".rar") ) return "application/vnd.rar";
+    if (filename.has_suffix(".7z")  ) return "application/x-7z-compressed";
+    if (filename.has_suffix(".tar") ) return "application/x-tar";
+    if (filename.has_suffix(".gz")  ) return "application/gzip";
+
+    // Scripts / Code
+    if (filename.has_suffix(".php") ) return "application/x-httpd-php";
+    if (filename.has_suffix(".py")  ) return "text/x-python";
+    if (filename.has_suffix(".cpp") ) return "text/x-c++src";
+    if (filename.has_suffix(".c")   ) return "text/x-csrc";
+    if (filename.has_suffix(".sh")  ) return "application/x-sh";
+
+    return "text/plain";
+}
+
+/* TODO(xenobas): Slotted for removal */
+std::string url_decode(const std::string &str) {
+	std::string decoded;
+	char ch;
+	int ii;
+	for (size_t i = 0; i < str.length(); i++) {
+		if (str[i] == '%') {
+
+			sscanf(str.substr(i + 1, 2).c_str(), "%x", &ii);
+			ch = static_cast<char>(ii);
+			decoded += ch;
+			i = i + 2;
+		} else if (str[i] == '+') {
+			decoded += ' ';
+		} else {
+			decoded += str[i];
+		}
+	}
+	return decoded;
+}
+
+/* TODO(xenobas): Slotted for removal */
+bool dirExists(std::string dir){
+	struct stat st;
+	if (stat(dir.c_str(), &st) == -1){
+		if (mkdir(dir.c_str(), 0755) == -1){
+			std::cerr << "mkdir failed: "<< strerror(errno) << std::endl;
+			return false;
+		}
+	}
+	return true;
+}
+
+/* TODO(xenobas): Slotted for removal */
+std::string generateRandomFileName(std::string ext){
+    static bool seeded = false;
+    if (!seeded) {
+        std::srand(static_cast<unsigned int>(std::time(0)));
+        seeded = true;
+    }
+
+    int r = std::rand();
+    std::ostringstream oss;
+    oss << "upload_"<< r << ext;
+    return oss.str();
+}
+
+b32		PrepareEnvironment(const WEBSERV_Instance& instance, const HTTP_Request& request){
+	i32					ret_env_gateway = ::setenv("GATEWAY_INTERACE", "CGI/1.1", 1);
+	if (ret_env_gateway == -1) {
+		CLI_show_error_runtime("Could not set env variable \"GATEWAY_INTERFACE\"");
+		CLI_show_extra("Reason", "%m");
+
+		return (0);
+	}
+
+	/* TODO(xenobas): PATH_INFO: Unimplemented */
+
+	/* NOTE(xenobas): PATH_TRANSLATED: There are no guarantees that PATH_INFOs are file system related, so it is left as empty */
+	/* NOTE(xenobas): REMOTE_ADDR: Not required thus ignored */
+	/* NOTE(xenobas): REMOTE_HOST: Not required thus ignored */
+	/* NOTE(xenobas): REMOTE_IDENT: Not required thus ignored */
+	/* NOTE(xenobas): REMOTE_USER: Not required thus ignored */
+
+	/* */
+	char				cstr_value[8 * 1024] = { 0 };
+
+	const string_view&	str_uri = request.uri.str;
+	string_view			str_query = "";
+	i32					idx_query = str_uri.index("?");
+	if (idx_query >= 0) {
+		str_query = str_uri.slice(idx_query + 1);
+	}
+	MEM_copy((byte*)str_uri.text, str_uri.len, (byte*)cstr_value, 8 * 1024);
+	cstr_value[str_uri.len] = '\0';
+
+	i32					ret_env_query = ::setenv("QUERY_STRING", cstr_value, 1);
+	if (ret_env_query == -1) {
+		CLI_show_error_runtime("Could not set env variable \"QUERY_STRING\"");
+		CLI_show_extra("Reason", "%m");
+
+		return (0);
+	}
+
+	const char*	cstr_method		= WEBSERV_method_cstr(request.method);
+	i32			ret_env_method	= ::setenv("REQUEST_METHOD", cstr_method, 1);
+	if (ret_env_method == -1) {
+		CLI_show_error_runtime("Could not set env variable \"REQUEST_METHOD\"");
+		CLI_show_extra("Reason", "%m");
+
+		return (0);
+	}
+
+	/* TODO(xenobas): SCRIPT_NAME: Unimplemented */
+
+	string_view	str_name		= instance.host;
+	if (str_name) { /* SERVER_NAME */
+		MEM_copy((byte*)str_name.text, str_name.len, (byte*)cstr_value, 8 * 1024);
+		cstr_value[str_name.len] = '\0';
+
+		i32			ret_env_name	= ::setenv("SERVER_NAME", cstr_value, 1);
+		if (ret_env_name == -1) {
+			CLI_show_error_runtime("Could not set env variable \"SERVER_NAME\"");
+			CLI_show_extra("Reason", "%m");
+
+			return (0);
+		}
+	}
+
+	u16			u16_port		= instance.port;
+	cstring_write_u64(cstr_value, 8 * 1024, cast(u64)u16_port);
+
+	i32			ret_env_port	= ::setenv("SERVER_PORT", cstr_value, 1);
+	if (ret_env_port == -1) {
+		CLI_show_error_runtime("Could not set env variable \"SERVER_PORT\"");
+		CLI_show_extra("Reason", "%m");
+
+		return (0);
+	}
+
+	string_view	str_protocol		= request.protocol;
+	MEM_copy((byte*)str_protocol.text, str_protocol.len, (byte*)cstr_value, 8 * 1024);
+	cstr_value[str_protocol.len] = '\0';
+
+	i32			ret_env_protocol	= ::setenv("SERVER_PROTOCOL", cstr_value, 1);
+	if (ret_env_protocol == -1) {
+		CLI_show_error_runtime("Could not set env variable \"SERVER_PROTOCOL\"");
+		CLI_show_extra("Reason", "%m");
+
+		return (0);
+	}
+	
+	if (request.headers.has("Authorization")) {
+		const string_view&	str = request.headers.get("Authorization");
+		MEM_copy((byte*)str.text, str.len, (byte*)cstr_value, 8 * 1024);
+		cstr_value[str.len] = '\0';
+
+		i32					ret = ::setenv("AUTH_TYPE", cstr_value, 1);
+		if (ret == -1) {
+			CLI_show_error_runtime("Could not set env variable \"AUTH_TYPE\"");
+			CLI_show_extra("Reason", "%m");
+
+			return (0);
+		}
+	}
+	if (request.headers.has("Content-Length")) {
+		const string_view&	str = request.headers.get("Content-Length");
+		MEM_copy((byte*)str.text, str.len, (byte*)cstr_value, 8 * 1024);
+		cstr_value[str.len] = '\0';
+
+		i32					ret = ::setenv("CONTENT_LENGTH", cstr_value, 1);
+		if (ret == -1) {
+			CLI_show_error_runtime("Could not set env variable \"CONTENT_LENGTH\"");
+			CLI_show_extra("Reason", "%m");
+
+			return (0);
+		}
+	}
+	if (request.headers.has("Content-Type")) {
+		const string_view&	str = request.headers.get("Content-Type");
+		MEM_copy((byte*)str.text, str.len, (byte*)cstr_value, 8 * 1024);
+		cstr_value[str.len] = '\0';
+
+		i32					ret = ::setenv("CONTENT_TYPE", cstr_value, 1);
+		if (ret == -1) {
+			CLI_show_error_runtime("Could not set env variable \"CONTENT_TYPE\"");
+			CLI_show_extra("Reason", "%m");
+
+			return (0);
+		}
+	}
+
+	return (1);
+}
+
+/* TODO(xenobas): Slotted for removal */
+bool	isDirectory(std::string path){
+	struct stat s;
+
+	// std::cout << "the path on isDirectory is :"<< path << std::endl;
+	if( stat(path.c_str(), &s) == 0 ){
+		if(s.st_mode & S_IFREG)
+			return (false);
+		if( s.st_mode & S_IFDIR )
+			return (true);
+	}
+	return false;
+}
+
+/* TODO(xenobas): Slotted for removal */
+bool fileExists(const std::string& filename) {
+    std::ifstream file(filename.c_str());
+    return file.good();
+}
+
+u8* read_one_chunk(HTTP_Request req){
+	HTTP_Chunk chunk = req.chunk;
+	byte* body = (byte *) calloc((u64)(chunk.size + 1), sizeof(byte));
+	if (!body) return NULL;
+	for (int i = 0; i < chunk.size; i++){
+		body[i] = req.buff[chunk.index + i];
+	}
+	return body;
+}
+
+u8* GetBody(HTTP_Request req, i64 &l){
+	dynamic_array<HTTP_Chunk>	chunks = req.chunks;
+	u64							len = 0;
+	u64							index = 0;
+	
+	if (!req.chunked){
+		l = req.chunk.size;
+		return (read_one_chunk(req));
+	}
+
+	for (int i = 0; i < chunks.len; i++)
+		len += (u64)chunks[i].size;
+
+	byte* body = (byte *) calloc((len + 1), sizeof(byte));
+	if (!body) return NULL;
+	for(int i = 0; i < chunks.len; i++){
+		// byte* buff = &req.buff[chunks[i].index]; (safer)
+		byte* buff = req.buff.data + chunks[i].index;
+		for (int j = 0; j < chunks[i].size && index <= len; j++){
+			body[index] = buff[j];
+			index++;
+		}
+	}
+	l = (i64)len;
+	return body;
+}
+
+bool	is_first_connection(int fd, dynamic_array<WEBSERV_Instance> instances){
+	for (int i = 0; i < instances.len; i++)
+		if (fd == instances[i].fd) return 1;
+	return 0;
+}
+
+WEBSERV_Instance& get_server(dynamic_array<WEBSERV_Instance>& instances, u16 port){
+	/* TODO(xenobas): This is just wrong... It needs to check the address it came on, and the Host as well, not just port */
+	int i = 0;
+	while (instances[i].port != port)
+		++i;
+	return (instances[i]);
+}
+
+i32		INSTANCE_find(const dynamic_array<WEBSERV_Instance>& instances, const struct sockaddr_in& sockinfo, const HTTP_Request& req) {
+	for (i32 i = 0; i < instances.len; ++i) {
+		const WEBSERV_Instance&	instance = instances[i];
+		const string_view&		host = instance.host;
+		u32						addr = instance.addr.blob;
+		u16						port = ::htons(instance.port);
+
+		if (sockinfo.sin_port != port) continue ;
+		if (0x00000000 != addr && sockinfo.sin_addr.s_addr != addr) continue ;
+		if (!!host && req.headers.has("Host")) {
+			string_view	seek = req.headers.get("Host");
+			i32			index_delimiter = seek.index(":");
+			if (index_delimiter != -1) {
+				seek = seek.slice(0, index_delimiter);
+			}
+
+			if (seek != host) continue ;
+		}
+
+		return (i);
+	}
+	return (-1);
+}
+
+/* SECTION: Response Writers needs to fuck off, Because the paradigm has changed */
+b32		REQUEST_response_status(const string_view& http_status_code, i32 fd) {
+	string_view		http_status_desc = "Unknown";
+	if (http_status_code == "200") {
+		http_status_desc = "Success";
+	}
+	if (http_status_code == "400") {
+		http_status_desc = "Bad Request";
+	}
+	if (http_status_code == "401") {
+		http_status_desc = "Unauthorized";
+	}
+	if (http_status_code == "403") {
+		http_status_desc = "Forbidden";
+	}
+	if (http_status_code == "404") {
+		http_status_desc = "Not Found";
+	}
+	if (http_status_code == "500") {
+		http_status_desc = "Internal Server Error";
+	}
+	if (http_status_code == "501") {
+		http_status_desc = "Not Implemented";
+	}
+	if (http_status_code == "502") {
+		http_status_desc = "Gateway Error";
+	}
+
+	i64	content_length = 10 + http_status_code.len + http_status_desc.len;
+
+	string_builder	builder;
+
+	builder.write("HTTP/1.1 "); builder.write(http_status_code); builder.write(' '); builder.write(http_status_desc); builder.write("\r\n");
+
+	builder.write("Content-Length: "); builder.write(content_length); builder.write("\r\n");
+	builder.write("Content-Type: text/html\r\n");
+	builder.write("\r\n");
+
+	builder.write("<h1>");
+	builder.write(http_status_code);
+	builder.write(' ');
+	builder.write(http_status_desc);
+	builder.write("</h1>");
+
+	string_view	http_message = builder.to_view();
+	i64			ret_write = ::write(fd, cast(void*)http_message.text, cast(u64)http_message.len);
+	if (ret_write == -1) {
+		CLI_show_error_runtime("Failed during write response to client");
+		CLI_show_extra("Reason", "%m");
+
+		return (0);
+	}
+	return (1);
+}
+b32		REQUEST_response_body(const string_view& http_status_code, const string_view& http_body, i32 fd, string_view content_type = "text/plain") {
+	string_view		http_status_desc = "Unknown";
+	if (http_status_code == "200") {
+		http_status_desc = "Success";
+	}
+	if (http_status_code == "201") {
+		http_status_desc = "Created";
+	}
+	if (http_status_code == "204") {
+		http_status_desc = "No Additional Content";
+	}
+	if (http_status_code == "400") {
+		http_status_desc = "Bad Request";
+	}
+	if (http_status_code == "401") {
+		http_status_desc = "Unauthorized";
+	}
+	if (http_status_code == "403") {
+		http_status_desc = "Forbidden";
+	}
+	if (http_status_code == "404") {
+		http_status_desc = "Not Found";
+	}
+	if (http_status_code == "405") {
+		http_status_desc = "Method Not Allowed";
+	}
+	if (http_status_code == "500") {
+		http_status_desc = "Internal Server Error";
+	}
+	if (http_status_code == "501") {
+		http_status_desc = "Not Implemented";
+	}
+	if (http_status_code == "502") {
+		http_status_desc = "Gateway Error";
+	}
+
+	i64				content_length = http_body.len;
+	{
+		string_builder	builder;
+		builder.write("HTTP/1.1 "); builder.write(http_status_code); builder.write(' '); builder.write(http_status_desc); builder.write("\r\n");
+		builder.write("Content-Length: "); builder.write(content_length); builder.write("\r\n");
+		builder.write("Content-Type: "); builder.write(content_type); builder.write("\r\n");
+		builder.write("\r\n");
+
+		string_view	http_message = builder.to_view();
+		i64			ret_write = ::write(fd, cast(void*)http_message.text, cast(u64)http_message.len);
+		if (ret_write == -1) {
+			CLI_show_error_runtime("Failed during write response to client");
+			CLI_show_extra("Reason", "%m");
+
+			return (0);
+		}
+	}
+
+	{
+		i32	chunk_index = 0;
+		for (; chunk_index < (content_length / 8192); ++chunk_index) {
+			i32	chunk_offset = chunk_index * 8192;
+			i64	ret_write = ::write(fd, &http_body[chunk_offset], 8192ul);
+			if (ret_write == -1) {
+				CLI_show_error_runtime("Failed during write response to client");
+				CLI_show_extra("Reason", "%m");
+
+				return (0);
+			}
+		}
+		{ /* NOTE(xenobas): Trailing chunk */
+			i32	chunk_offset = chunk_index * 8192;
+			i64	chunk_trailer = content_length % 8192;
+			if (chunk_trailer > 0) {
+				i64	ret_write = ::write(fd, &http_body[chunk_offset], cast(u64)chunk_trailer);
+				if (ret_write == -1) {
+					CLI_show_error_runtime("Failed during write response to client");
+					CLI_show_extra("Reason", "%m");
+
+					return (0);
+				}
+			}
+		}
+	}
+
+	return (1);
+}
+b32		INSTANCE_response_status(const WEBSERV_Instance& instance, const string_view& http_status_code, i32 fd) {
+	string_view		http_status_desc = "Unknown";
+	if (http_status_code == "200") {
+		http_status_desc = "Success";
+	}
+	if (http_status_code == "201") {
+		http_status_desc = "Created";
+	}
+	if (http_status_code == "204") {
+		http_status_desc = "No Additional Content";
+	}
+	if (http_status_code == "400") {
+		http_status_desc = "Bad Request";
+	}
+	if (http_status_code == "401") {
+		http_status_desc = "Unauthorized";
+	}
+	if (http_status_code == "403") {
+		http_status_desc = "Forbidden";
+	}
+	if (http_status_code == "404") {
+		http_status_desc = "Not Found";
+	}
+	if (http_status_code == "405") {
+		http_status_desc = "Method Not Allowed";
+	}
+	if (http_status_code == "500") {
+		http_status_desc = "Internal Server Error";
+	}
+	if (http_status_code == "501") {
+		http_status_desc = "Not Implemented";
+	}
+	if (http_status_code == "502") {
+		http_status_desc = "Gateway Error";
+	}
+
+
+	string_view		http_body = string_view();
+	if (instance.status.has(http_status_code)) {
+		http_body = instance.status.get(http_status_code);
+	}
+
+	i64	content_length = http_body.len;
+	if (!http_body) {
+		content_length  = 10 + http_status_code.len + http_status_desc.len;
+	}
+
+	string_builder	builder;
+
+	builder.write("HTTP/1.1 "); builder.write(http_status_code); builder.write(' '); builder.write(http_status_desc); builder.write("\r\n");
+
+	builder.write("Content-Length: "); builder.write(content_length); builder.write("\r\n");
+	builder.write("Content-Type: text/html\r\n");
+	builder.write("\r\n");
+
+	if (http_body) {
+		builder.write(http_body);
+	} else {
+		builder.write("<h1>");
+		builder.write(http_status_code);
+		builder.write(' ');
+		builder.write(http_status_desc);
+		builder.write("</h1>");
+	}
+
+	string_view	http_message = builder.to_view();
+	i64			ret_write = ::write(fd, cast(void*)http_message.text, cast(u64)http_message.len);
+	if (ret_write == -1) {
+		CLI_show_error_runtime("Failed during write response to client");
+		CLI_show_extra("Reason", "%m");
+
+		return (0);
+	}
+	return (1);
+}
+b32		INSTANCE_response_redirect(const WEBSERV_Instance& instance, const string_view& http_status_code, const string_view& location, i32 fd) {
+	string_view		http_status_desc = "Unknown";
+	if (http_status_code == "301") {
+		http_status_desc = "Moved Permanently";
+	}
+	if (http_status_code == "302") {
+		http_status_desc = "Found";
+	}
+	if (http_status_code == "303") {
+		http_status_desc = "See Other";
+	}
+	if (http_status_code == "304") {
+		http_status_desc = "Not Modified";
+	}
+	if (http_status_code == "307") {
+		http_status_desc = "Temporary Redirect";
+	}
+	if (http_status_code == "308") {
+		http_status_desc = "Permanent Redirect";
+	}
+
+	string_view		html_body = string_view();
+	if (instance.status.has(http_status_code)) {
+		html_body = instance.status.get(http_status_code);
+	}
+
+	i64	content_length = html_body.len;
+	if (!html_body) {
+		content_length  = 10 + http_status_code.len + http_status_desc.len;
+	}
+
+	string_builder	builder;
+
+	builder.write("HTTP/1.1 "); builder.write(http_status_code); builder.write(' '); builder.write(http_status_desc); builder.write("\r\n");
+
+	builder.write("Location: "); builder.write(location); builder.write("\r\n");
+	builder.write("Content-Length: "); builder.write(content_length); builder.write("\r\n");
+	builder.write("Content-Type: text/html\r\n");
+	builder.write("\r\n");
+
+	if (html_body) {
+		builder.write(html_body);
+	} else {
+		builder.write("<h1>");
+		builder.write(http_status_code);
+		builder.write(' ');
+		builder.write(http_status_desc);
+		builder.write("</h1>");
+	}
+
+	string_view	http_message = builder.to_view();
+	i64			ret_write = ::write(fd, cast(void*)http_message.text, cast(u64)http_message.len);
+	if (ret_write == -1) {
+		CLI_show_error_runtime("Failed during write response to client");
+		CLI_show_extra("Reason", "%m");
+
+		return (0);
+	}
+	return (1);
+}
+b32		INSTANCE_response_upload(const WEBSERV_Instance& instance, const string_view& http_status_code, const string_view& filename, i32 fd) {
+	unused(instance);
+
+	string_view		http_status_desc = "Unknown";
+	if (http_status_code == "200") {
+		http_status_desc = "Success";
+	}
+	if (http_status_code == "201") {
+		http_status_desc = "Created";
+	}
+	if (http_status_code == "204") {
+		http_status_desc = "No Additional Content";
+	}
+	if (http_status_code == "400") {
+		http_status_desc = "Bad Request";
+	}
+	if (http_status_code == "401") {
+		http_status_desc = "Unauthorized";
+	}
+	if (http_status_code == "403") {
+		http_status_desc = "Forbidden";
+	}
+	if (http_status_code == "404") {
+		http_status_desc = "Not Found";
+	}
+	if (http_status_code == "405") {
+		http_status_desc = "Method Not Allowed";
+	}
+	if (http_status_code == "500") {
+		http_status_desc = "Internal Server Error";
+	}
+	if (http_status_code == "501") {
+		http_status_desc = "Not Implemented";
+	}
+	if (http_status_code == "502") {
+		http_status_desc = "Gateway Error";
+	}
+
+	string_builder	body;
+	if (http_status_code == "201") {
+		body.write("<!DOCTYPE html>\n");
+		body.write("<html>\n");
+		body.write("\t<head></head>\n");
+		body.write("\t<body>\n");
+		body.write("\t\t<h1>File \""); body.write(filename); body.write("\" has been created successfully</h1>\n");
+		body.write("\t</body>\n");
+		body.write("</html>\n");
+	}
+	else if (http_status_code != "204") {
+		body.write("<!DOCTYPE html>\n");
+		body.write("<html>\n");
+		body.write("\t<head></head>\n");
+		body.write("\t<body>\n");
+		body.write("\t\t<h1>"); body.write(http_status_code); body.write(' '); body.write(http_status_desc); body.write("</h1>\n");
+		body.write("\t</body>\n");
+		body.write("</html>\n");
+	}
+
+	string_builder	builder;
+
+	builder.write("HTTP/1.1 "); builder.write(http_status_code); builder.write(' '); builder.write(http_status_desc); builder.write("\r\n");
+
+	i64				content_length = body.data.len;
+	builder.write("Content-Length: "); builder.write(content_length); builder.write("\r\n");
+	builder.write("Content-Type: text/html\r\n");
+	builder.write("\r\n");
+	
+	builder.write(body.to_view());
+
+	string_view	http_message = builder.to_view();
+	i64			ret_write = ::write(fd, cast(void*)http_message.text, cast(u64)http_message.len);
+	if (ret_write == -1) {
+		CLI_show_error_runtime("Failed during write response to client");
+		CLI_show_extra("Reason", "%m");
+
+		return (0);
+	}
+	return (1);
+}
+
+/* SECTION: Request Processors */
+void	INSTANCE_request_process_upload(const WEBSERV_Instance& instance, const HTTP_Request& req, const WEBSERV_Route& route, i32 fd) {
+	string_view			content_type = "binary";
+	if (req.headers.has("Content-Type")) {
+		content_type = req.headers.get("Content-Type");
+	}
+	if ((content_type != "binary" && content_type != "application/octet-stream") || !req.uri.query.has("path")) {
+		INSTANCE_response_status(instance, "400", fd);
+		return ;
+	}
+
+	string_view			filename = req.uri.query.get("path");
+	if (!filename || filename == "." || filename == ".." || filename.has("/")) {
+		INSTANCE_response_status(instance, "400", fd);
+		return ;
+	}
+
+	const string_view&	directory = route.Upload.directory;
+
+	u64					file_size = 0;
+	u32					file_capacity = 1024 * 1024 * 32; // route.Upload.max_file_size < instance.request_body_limit ? route.Upload.max_file_size : instance.request_body_limit;
+	for (i32 i = 0; i < req.chunks.len; ++i) {
+		file_size += cast(u64)req.chunks[i].size;
+	}
+	if (file_size > file_capacity) {
+		INSTANCE_response_status(instance, "400", fd); /* TODO(xenobas): Use appropriate status code for file size too large */
+		return ;
+	}
+
+	char	directory_cwd_buffer[1024] = { 0 };
+	char*	directory_cwd = ::getcwd(directory_cwd_buffer, 1024);
+	if (directory_cwd == NULL) {
+		CLI_show_error_runtime("Could not get current working directory");
+		CLI_show_extra("Reason", "%m");
+
+		INSTANCE_response_status(instance, "500", fd);
+		return ;
+	}
+
+	i32	ok_chdir_forwards = ::chdir(directory.text);
+	if (ok_chdir_forwards == -1) {
+		CLI_show_error_runtime("Could not change current working directory to \"%.*s\"", directory.len, directory.text);
+		CLI_show_extra("Reason", "%m");
+
+		INSTANCE_response_status(instance, "500", fd);
+		return ;
+	}
+
+	b32			ok_write = 1;
+	for (i32 i = 0; i < req.chunks.len; ++i) {
+		const HTTP_Chunk&	chunk = req.chunks[i];
+		string_view			content((char*)&req.buff[chunk.index], chunk.size);
+
+		i32	flags = (i == 0) ? (O_CREAT | O_TRUNC) : (O_APPEND);
+		CLI_debug("Uploading file chunk %d into \"%.*s/%.*s\"", i, directory.len, directory.text, filename.len, filename.text);
+		if (!OS_write_file(filename, content, flags)) {
+			CLI_show_error_runtime("Could not write uploaded file into the filesystem");
+			CLI_show_extra("Reason", "%m");
+
+			INSTANCE_response_status(instance, "500", fd);
+
+			ok_write = 0;
+			return ;
+		}
+	}
+
+	i32	ok_chdir_backwards = ::chdir(directory_cwd);
+	if (ok_chdir_backwards == -1) { /* NOTE(xenobas): If this fucking happens we're in for a doozy */
+		CLI_show_error_runtime("Could not restore current working directory");
+		CLI_show_extra("Reason", "%m");
+
+		INSTANCE_response_status(instance, "500", fd);
+		return ;
+	}
+
+	INSTANCE_response_upload(instance, "201", filename, fd);
+}
+void	INSTANCE_request_process_delete(const WEBSERV_Instance& instance, const HTTP_Request& req, const WEBSERV_Route& route, i32 fd) {
+	if (!req.uri.query.has("path")) {
+		INSTANCE_response_status(instance, "400", fd);
+		return ;
+	}
+
+	string_view	filename = req.uri.query.get("path");
+	if (!filename || filename == "." || filename == ".." || filename.has("/")) {
+		INSTANCE_response_status(instance, "400", fd);
+		return ;
+	}
+
+	const string_view&	directory = route.Upload.directory;
+
+	char	directory_cwd_buffer[1024] = { 0 };
+	char*	directory_cwd = ::getcwd(directory_cwd_buffer, 1024);
+	if (directory_cwd == NULL) {
+		CLI_show_error_runtime("Could not get current working directory");
+		CLI_show_extra("Reason", "%m");
+
+		INSTANCE_response_status(instance, "500", fd);
+		return ;
+	}
+
+	i32	ok_chdir_forwards = ::chdir(directory.text);
+	if (ok_chdir_forwards == -1) {
+		CLI_show_error_runtime("Could not change current working directory to \"%.*s\"", directory.len, directory.text);
+		CLI_show_extra("Reason", "%m");
+
+		INSTANCE_response_status(instance, "500", fd);
+		return ;
+	}
+
+	b32	file_deleted = 1;
+	if (OS_test_file_exists(filename)) {
+		if (OS_test_file_write(filename)) {
+			if (!OS_delete_file(filename)) {
+				CLI_show_error_runtime("Could not delete file \"%.*s/%.*s\"", directory.len, directory.text, filename.len, filename.text);
+				CLI_show_extra("Reason", "%m");
+
+				file_deleted = 0;
+				INSTANCE_response_status(instance, "500", fd);
+			}
+		} else {
+			file_deleted = 0;
+			INSTANCE_response_status(instance, "401", fd);
+		}
+	} else {
+		file_deleted = 0;
+		INSTANCE_response_status(instance, "404", fd);
+	}
+
+	i32	ok_chdir_backwards = ::chdir(directory_cwd);
+	if (ok_chdir_backwards == -1) { /* NOTE(xenobas): If this fucking happens we're in for a doozy */
+		CLI_show_error_runtime("Could not restore current working directory");
+		CLI_show_extra("Reason", "%m");
+
+		INSTANCE_response_status(instance, "500", fd);
+		return ;
+	}
+
+	if (file_deleted) {
+		INSTANCE_response_status(instance, "204", fd);
+	}
+}
+void	INSTANCE_request_process_cgi(const WEBSERV_Instance& instance, const HTTP_Request& req, const WEBSERV_Route& route, i32 fd) {
+	unused(instance);
+	unused(req);
+	unused(route);
+	unused(fd);
+	INSTANCE_response_status(instance, "501", fd);
+}
+void	INSTANCE_request_process(const WEBSERV_Instance& instance, const HTTP_Request& req, i32 fd) {
+	if (req.headers.has("Keep-Alive")) { /* NOTE(xenobas): Unsupported */
+		INSTANCE_response_status(instance, "501", fd);
+		return ;
+	}
+
+	string_view				route_path = WEBSERV_http_route_pick(instance, req);
+	if (!route_path || !instance.routes.has(route_path)) { /* NOTE(xenobas): Not Found */
+		INSTANCE_response_status(instance, "404", fd);
+		return ;
+	}
+
+	const WEBSERV_Route&	route = instance.routes.get(route_path);
+	if ((req.method & route.methods_whitelist) == 0x0) {
+		INSTANCE_response_status(instance, "405", fd);
+		return ;
+	}
+
+	CLI_debug("Processing request path \"%.*s\" via route \"%.*s\"", req.uri.str.len, req.uri.str.text, route_path.len, route_path.text);
+	switch (route.kind) {
+		case WEBSERV_ROUTE_SERVER: { /* NOTE(xenobas): Serve a directory */
+			const string_view&	directory = route.Server.directory;
+			b32					directory_list = route.Server.directory_list;
+
+			WEBSERV_URI		uri = WEBSERV_uri_decode(route.path);
+			i32				offset = uri.path.len;
+			for (i32 i = 0; i < uri.path.len; i++) {
+				if (uri.path[i] != req.uri.path[i]) {
+					offset = i;
+
+					break ;
+				}
+			}
+
+			string_builder	builder(1024);
+			builder.write(directory);
+			if (!directory.has_suffix("/")) builder.write('/');
+
+			for (i32 i = offset; i < req.uri.path.len; ++i) {
+				builder.write(req.uri.path[i]);
+				if (i + 1 < req.uri.path.len) builder.write('/');
+			}
+			builder.write('\0'); builder.data.len--;
+			WEBSERV_uri_delete(uri);
+
+			string_view		resource_path = builder.to_view();
+
+			if (OS_test_file_read(resource_path)) {
+				string_view	resource_data;
+				b32			ok_read = OS_read_file(resource_path, resource_data);
+				if (!ok_read) {
+					CLI_show_error_runtime("Could not read file at \"%.*s\"", resource_path.len, resource_path.text);
+					CLI_show_extra("Reason", "%m");
+
+					INSTANCE_response_status(instance, "500", fd);
+
+					break;
+				}
+
+				REQUEST_response_body("200", resource_data, fd, /* content_type = */ getContentType(resource_path));
+				resource_data.free();
+
+				break;
+			}
+			if (OS_test_dir_read(resource_path)) {
+				if (directory_list) {
+					string_builder	page_builder;
+
+					DIR*			directory_handle = ::opendir(resource_path.text);
+					if (directory_handle == NULL) {
+						CLI_show_error_runtime("Could not open directory \"%.*s\"", resource_path.len, resource_path.text);
+						CLI_show_extra("Reason", "%m");
+
+						INSTANCE_response_status(instance, "500", fd);
+
+						break ;
+					}
+
+					page_builder.write("<!DOCTYPE html>\n"
+										"<html>\n"
+										"\t<body>\n");
+
+					page_builder.write("\t\t<h1>Directory listing for /");
+					for (i32 i = 0; i < req.uri.path.len; ++i) {
+						if (i > 0) {
+							page_builder.write('/');
+						}
+						page_builder.write(req.uri.path[i]);
+					}
+					page_builder.write("</h1>\n"
+										"\t\t<hr />\n"
+										"\t\t<ul>\n");
+
+					errno = 0; /* NOTE(xenobas): Clearing errno from previous libc calls */
+					i32	entries_count = 0;
+					do {
+						struct dirent*	entry = ::readdir(directory_handle);
+						if (entry == NULL) break ;
+
+						string_view		name((const char*)entry->d_name);
+						if (name == "." || name == "..") continue ;
+
+						page_builder.write("\t\t\t<li><a ");
+
+						/* NOTE(xenobas): HREF */
+						page_builder.write("href=\"");
+						for (i32 i = 0; i < req.uri.path.len; ++i) {
+							page_builder.write('/');
+							page_builder.write(req.uri.path[i]);
+						}
+						page_builder.write('/'); page_builder.write(name);
+						page_builder.write("\" ");
+
+						b32	is_folder = (entry->d_type == DT_DIR);
+						if (is_folder) {
+							page_builder.write("data-folder ");
+						}
+
+						page_builder.write(">");
+
+						page_builder.write(name);
+						page_builder.write("</a></li>\n");
+
+						++entries_count;
+					} while (errno == 0);
+
+					page_builder.write(
+									"\t\t</ul>\n"
+									"\t</body>\n"
+									"</html>"
+					);
+
+					b32					directory_closed = ::closedir(directory_handle) == 0;
+					if (!directory_closed) {
+						CLI_show_error_runtime("Could not close directory \"%.*s\"", resource_path.len, resource_path.text);
+						CLI_show_extra("Reason", "%m");
+
+						INSTANCE_response_status(instance, "500", fd);
+
+						break ;
+					}
+
+					string_view			page = page_builder.to_view();
+					REQUEST_response_body("200", page, fd, /* content_type = */ "text/html");
+					break;
+				} else {
+					builder.write("/index.html"); /* TODO(xenobas): Make this configurable as the key `fallback` */
+
+					string_view	fallback_path = builder.to_view();
+					CLI_debug("Using fallback access \"%.*s\"", fallback_path.len, fallback_path.text);
+
+					if (OS_test_file_read(fallback_path)) {
+						string_view	fallback_data;
+						b32			ok_read = OS_read_file(fallback_path, fallback_data);
+						if (!ok_read) {
+							CLI_show_error_runtime("Could not read file at \"%.*s\"", fallback_path.len, fallback_path.text);
+							CLI_show_extra("Reason", "%m");
+
+							INSTANCE_response_status(instance, "500", fd);
+
+							break;
+						}
+
+						REQUEST_response_body("200", fallback_data, fd, /* content_type = */ getContentType(fallback_path));
+						fallback_data.free();
+						break ;
+					}
+				}
+			}
+
+			CLI_show_error_runtime("Could not find resource at \"%.*s\"", resource_path.len, resource_path.text);
+			INSTANCE_response_status(instance, "404", fd);
+		} break ;
+		case WEBSERV_ROUTE_UPLOAD: { /* NOTE(xenobas): Allows uploading files to the server */
+			if (req.method == WEBSERV_METHOD_POST || req.method == WEBSERV_METHOD_PUT) {
+				INSTANCE_request_process_upload(instance, req, route, fd);
+			} else if (req.method == WEBSERV_METHOD_DELETE) {
+				INSTANCE_request_process_delete(instance, req, route, fd);
+			}
+		} break ;
+		case WEBSERV_ROUTE_CGI: { /* NOTE(xenobas): Common Gateway Interface */
+			INSTANCE_request_process_cgi(instance, req, route, fd);
+		} break ;
+		case WEBSERV_ROUTE_REDIRECT: { /* NOTE(xenobas): Redirect to a specified location */
+			const string_view&	location = route.Redirect.location;
+			const string_view&	status = route.Redirect.status;
+
+			INSTANCE_response_redirect(instance, status, location, fd);
+		} break ;
+		case WEBSERV_ROUTE_INVALID:
+		case WEBSERV_ROUTE_COUNT:
+		default: {
+			INSTANCE_response_status(instance, "502", fd);
+		} break ;
+	}
+}
+
+int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instance, int epfd){
+	const WEBSERV_URI&	uri = request.uri;
+	// CLI_debug("Processing request at path \"%.*s\"", uri.str.len, uri.str.text);
+
+    std::string	path = "/" + url_decode(uri.path[0].to_string());
+	std::cout << "path is :\t"<< path << std::endl;
+
+	string_view		key = WEBSERV_http_route_pick(instance, string_view(path.c_str()));
+	// string_view		key = WEBSERV_http_route_pick(instance, uri.path[0].text);
+	WEBSERV_Route	route = instance.routes.get(key);
+	if (route.kind == WEBSERV_ROUTE_CGI){
+		path = request.uri.str.to_string().substr(1);
+
+		// std::cout << path << std::endl;
+		if (!dirExists(path)) return SERVER_ERROR;
+
+		if (!fileExists(path)) return NOT_FOUND;
+
+		std::string typ = getContentType(path);
+		std::string ext = getFileExtension(typ);
+		std::cout << typ << std::endl << ext << std::endl;
+		ext = ext.substr(1);
+		char *argv[] = {
+			(char*)path.c_str(),
+			(char*) route.CGI.interpreters.get(string_view(ext.c_str())).text,
+			NULL
+		};
+		if (strlen(argv[1]) == 0){
+			return NOT_IMPLEMENTED;
+		}
+
+		PrepareEnvironment(instance, request);
+
+		int inPipe[2], outPipe[2];
+		if (pipe(inPipe) == -1 || pipe(outPipe) == -1){
+			perror("pipe");
+			return SERVER_ERROR;
+		}
+					
+		int pid = fork();
+		if (pid < 0) return(perror("fork"), SERVER_ERROR);
+
+		if (pid == 0){
+			if (request.method == WEBSERV_METHOD_POST){
+				write(inPipe[1], request.buff.data , (size_t) request.buff.len);
+			}
+
+			{
+				int fd = inPipe[1];
+				close(fd);
+
+				close(fd);
+			}
+			dup2(inPipe[0], STDIN_FILENO);
+			close(inPipe[0]);
+			
+			close(outPipe[0]);
+			dup2(outPipe[1], STDOUT_FILENO);
+			close(outPipe[1]);
+
+            /* TODO(sennakhl): Check for permission */
+			execv(argv[0], argv);
+			perror("execv");
+			const char* err_msg = "Status: 500 Internal Server Error\r\n"
+                                    "Content-Type: text/html\r\n\r\n"
+                                    "<html><body><h1>500 Internal Server Error</h1>"
+                                    "<p>CGI script execution failed (execve).</p>"
+                                    "</body></html>";
+                
+			write(STDOUT_FILENO, err_msg, strlen(err_msg));
+			close(new_socket);
+            exit(1);
+		}
+		else {
+			close(inPipe[0]);
+			close(outPipe[1]);
+			close(inPipe[1]);
+
+			struct epoll_event ev;
+			ev.events = EPOLLIN;
+			ev.data.fd = outPipe[0];
+			epoll_ctl(epfd, EPOLL_CTL_ADD, outPipe[0], &ev);
+
+			cgi_map[outPipe[0]] = new_socket;
+			return PROCESSING;
+		}
+	}
+	
+    if (request.method == WEBSERV_METHOD_POST){
+		std::string dir =  route.Upload.directory.to_string();
+
+
+		char oldDir[PATH_MAX];
+		if (getcwd(oldDir, sizeof(oldDir)) == NULL) 	return (perror("getcwd"), SERVER_ERROR);
+		if (chdir(dir.c_str()) == -1)					return (perror("chdir"), SERVER_ERROR);
+
+		i64 len;
+		u8* body = GetBody(request, len);
+
+		std::string ext = getFileExtension(request.headers.get("Content-Type").to_string());
+		std::string fileName = generateRandomFileName(ext);
+		int fd = open(fileName.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+		if (fd < 0)
+			return (perror("open file for upload"), SERVER_ERROR);
+		
+		// std::cout << "file name: " << fileName << std::endl;
+		write(fd, body, (size_t)len);
+		close(fd);
+
+		chdir(oldDir);
+		free(body);
+		// close(new_socket);
+		return CREATED;
+    }
+
+    if (request.method == WEBSERV_METHOD_DELETE){
+		path = url_decode(request.uri.str.to_string().substr(1));
+        if (access(path.c_str(), F_OK)){
+            std::cerr << "ERROR: cannot open " << path << std::endl;
+			return NOT_FOUND;
+        }
+
+		if (remove(path.c_str())){
+			perror("remove");
+			return FORBIDDEN;
+		}
+		// http_respond_html(new_socket, 204, "text/plain", "");
+		return(NO_CONTENT);
+    }
+
+    if (request.method == WEBSERV_METHOD_GET){
+        path = url_decode(request.uri.str.to_string().substr(1));
+        string_view res_file;
+		b32			file_ok = OS_read_file(string_view(path.c_str()), res_file);
+		// std::cout << "path is: " << path<< std::endl;
+		// std::cout << "file_ok: " << file_ok<< std::endl;
+        if (file_ok){
+            assert(file_ok && "could not load template html file");            
+            http_respond_html(new_socket, 200, getContentType(path), res_file.to_string());
+			close(new_socket);
+			return (PROCESSING);
+        }
+		if (!path.length())
+        	return(OK);// for default page
+		if (isDirectory(path))
+			return (FORBIDDEN);// forbidden (when the user wants to get directory not file
+		return (NOT_FOUND);
+    }
+    return(METHOD_NOT_ALLOWED);
+}
+
+int handle_requests(dynamic_array<WEBSERV_Instance>& instances, int epfd, struct sockaddr_in address){
+	#define ITERATIONS_SECS 600
+	#define ITERATIONS ((ITERATIONS_SECS * 1000) / 41)
+	#define EVENTS_CAP 32
+
+	CLI_debug("Event loop started with limit of %d seconds", ITERATIONS_SECS);
+
+	std::map<int, HTTP_Request>	map_requests;
+#ifdef ITERATIONS
+	for (i32 iteration = 0; iteration < ITERATIONS; ++iteration)
+#else
+	for (;;)
+#endif
+	{
+		struct epoll_event	ev_buffer[EVENTS_CAP];
+		i32					fds_count = epoll_wait(epfd, ev_buffer, EVENTS_CAP, 41);
+		if (fds_count == -1) {
+			if (errno != EINTR) {
+				CLI_show_error_runtime("Unrecoverable failure in system call \"epoll_wait\"");
+				CLI_show_extra("Reason", "%m");
+				break ;
+			}
+
+			CLI_show_error_runtime("System call \"epoll_wait\" was interrupted with a signal");
+			continue ;
+		}
+
+		for (i32 i = 0; i < fds_count; ++i) {
+			struct sockaddr_in	sockinfo;
+			u64					sockinfosz = sizeof(sockinfo);
+			i32					fd_event = ev_buffer[i].data.fd;
+
+			i32					instance_idx = -1;
+			for (i32 i = 0; i < instances.len; ++i) {
+				if (instances[i].fd == fd_event) {
+					instance_idx = i;
+
+					break ;
+				}
+			}
+			if (instance_idx >= 0) {
+				struct epoll_event	ev_client;
+
+				MEM_zero(address);
+				MEM_zero(ev_client);
+
+				i32	fd_client = ::accept(fd_event, cast(struct sockaddr*)(&sockinfo), cast(socklen_t*)(&sockinfosz));
+				if (fd_client == -1) {
+					CLI_show_error_runtime("Could not accept incoming connection");
+					CLI_show_extra("Reason", "%m");
+
+					continue ;
+				}
+
+				ev_client.events	= EPOLLIN;
+				ev_client.data.fd	= fd_client;
+				b32	ok_add_interest = (::epoll_ctl(epfd, EPOLL_CTL_ADD, fd_client, &ev_client) == 0);
+				if (!ok_add_interest) {
+					INSTANCE_response_status(instances[instance_idx], "500", fd_client);
+
+					CLI_show_error_runtime("Could not add client to event loop interests");
+					CLI_show_extra("Reason", "%m");
+
+					::close(fd_client);
+					continue ;
+				}
+
+				{
+					u32	addr = sockinfo.sin_addr.s_addr;
+					u8*	bytes = cast(u8*)(&addr);
+					CLI_debug("Connection incoming from %u.%u.%u.%u:%u is registered successfully",
+								bytes[0], bytes[1], bytes[2], bytes[3], ::ntohs(sockinfo.sin_port));
+				}
+				continue ;
+			}
+
+			b32					ok_sockinfo = ::getsockname(fd_event,
+				cast(struct sockaddr*)(&sockinfo), cast(socklen_t*)(&sockinfosz)) == 0;
+			if (!ok_sockinfo) {
+				CLI_show_error_runtime("Could not gleam connection socket information");
+				CLI_show_extra("Reason", "%m");
+
+				REQUEST_response_status("500", fd_event);
+
+				if (map_requests.find(fd_event) != map_requests.end()) {
+					HTTP_request_delete(map_requests[fd_event]);
+				}
+				map_requests.erase(fd_event);
+
+				epoll_ctl(epfd, EPOLL_CTL_DEL, fd_event, NULL);
+				::close(fd_event);
+
+				continue ;
+			}
+
+			std::map<int, int>::iterator	fd_cgi = cgi_map.find(fd_event);
+			if (fd_cgi == cgi_map.end()) {
+				std::map<int, HTTP_Request>::iterator	iter_req = map_requests.find(fd_event);
+
+				byte			data_buffer[8192 * 4] = { 0 };
+				i64				data_len = ::read(fd_event, cast(void*)data_buffer, sizeof(data_buffer));
+				if (data_len == -1) {
+					CLI_show_error_runtime("Could not read incoming data from connection");
+					CLI_show_extra("Reason", "%m");
+
+					REQUEST_response_status("500", fd_event);
+
+					if (iter_req != map_requests.end()) {
+						HTTP_request_delete(map_requests[fd_event]);
+					}
+					map_requests.erase(fd_event);
+
+					epoll_ctl(epfd, EPOLL_CTL_DEL, fd_event, NULL);
+					::close(fd_event);
+
+					continue ;
+				}
+				else if (data_len == 0) {
+					CLI_debug("Connection was closed remote bound");
+
+					if (iter_req != map_requests.end()) {
+						HTTP_request_delete(map_requests[fd_event]);
+					}
+					map_requests.erase(fd_event);
+
+					epoll_ctl(epfd, EPOLL_CTL_DEL, fd_event, NULL);
+
+					continue ;
+				}
+
+				CLI_debug("Read %ld bytes of data from connection", data_len);
+
+				if (iter_req == map_requests.end()) {
+					map_requests[fd_event] = HTTP_request_make();
+				}
+				HTTP_Request&	req = map_requests[fd_event];
+				b32				req_ok = HTTP_request_read(req, (const byte*)data_buffer, cast(i32)data_len);
+				if (!req_ok) {
+					u32	addr = sockinfo.sin_addr.s_addr;
+					u8*	bytes = cast(u8*)(&addr);
+					CLI_show_error_runtime("Could not parse request from connection at %u.%u.%u.%u:%u",
+								bytes[0], bytes[1], bytes[2], bytes[3], ::ntohs(sockinfo.sin_port));
+
+					REQUEST_response_status("400", fd_event);
+
+					HTTP_request_delete(req);
+					map_requests.erase(fd_event);
+
+					epoll_ctl(epfd, EPOLL_CTL_DEL, fd_event, NULL);
+					::close(fd_event);
+
+					continue ;
+				}
+				if (HTTP_request_is_closed(req) && !HTTP_request_is_error(req)) {
+					CLI_debug("Request is done being parsed");
+
+					i32						instance_idx = INSTANCE_find(instances, sockinfo, req);
+					if (instance_idx == -1) {
+						CLI_show_error_runtime("Could not find adequate instance for request");
+						REQUEST_response_status("502", fd_event);
+
+						HTTP_request_delete(req);
+						map_requests.erase(fd_event);
+
+						epoll_ctl(epfd, EPOLL_CTL_DEL, fd_event, NULL);
+						::close(fd_event);
+
+						continue ;
+					}
+					CLI_debug("Request Instance Processor is at index %d", instance_idx);
+
+					const WEBSERV_Instance&	instance = instances[instance_idx];
+					INSTANCE_request_process(instance, req, fd_event);
+
+					HTTP_request_delete(req);
+					map_requests.erase(fd_event);
+
+					epoll_ctl(epfd, EPOLL_CTL_DEL, fd_event, NULL);
+					::close(fd_event);
+				}
+
+				continue ;
+			}
+		}
+
+		for (int i = 0; i < 0; i++){
+			int fd = ev_buffer[i].data.fd;
+
+			if (!cgi_map.count(fd)){
+				CLI_debug("Incoming data not inteded for CGI on file descriptor: %d", fd);
+
+				char	buffer[1024 * 1024] = { 0 }; /* NOTE(xenobas): 1MiB is far too much */
+				ssize_t valread = recv(fd, buffer, sizeof(buffer), MSG_DONTWAIT);
+
+				sockaddr_in	local_addr;
+				socklen_t	len = sizeof(local_addr);
+				getsockname(fd, (sockaddr*)&local_addr, &len);
+
+				u16			port = ntohs(local_addr.sin_port);
+				if (valread > 0) {
+					if (!map_requests.count(fd)) {
+						map_requests[fd] = HTTP_request_make();
+					}
+					HTTP_Request& request = map_requests[fd];
+
+					if (!HTTP_request_read(request, cast(const byte*)buffer, cast(i32)valread)) {
+						epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
+						std::cerr << htmlStatus[BAD_REQUEST] << std::endl;
+						http_respond_html(fd, BAD_REQUEST, "text/html", htmlStatus[BAD_REQUEST]);
+						map_requests.erase(fd);
+						close(fd);
+						break;
+					}
+                    if (!HTTP_request_is_closed(request)) {
+                        if (request.buff_stage != HTTP_REQUEST_STAGE_BODY) {
+                            break ;
+                        }
+                        HTTP_request_close(request);
+                    }
+
+					int status = methods(request, fd, get_server(instances, port), epfd);
+					
+					// std::cout << "\n\nstatus : " << status << "\n\n";
+					if(status != PROCESSING){
+						epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
+						http_respond_html(fd, status, "text/html", htmlStatus[status]);
+						map_requests.erase(fd);
+						close(fd);	
+					}
+
+				} else {
+					// std::cout << "No bytes are there to read" << std::endl;
+					http_respond_html(fd, BAD_REQUEST, "text/html", htmlStatus[BAD_REQUEST]);
+					map_requests.erase(fd);
+					close(fd);
+				}
+			}
+			else if(cgi_map.count(fd)){
+				int client_fd = cgi_map[fd];
+				char buffer[1024 * 1024];
+				std::memset(buffer, 0, sizeof(buffer));
+				ssize_t valread = read(fd, buffer, sizeof(buffer));
+
+				if (valread > 0){
+					// std::cout << "client_fd: \n" << client_fd << std::endl;
+					// std::cout << "fd: \n" << fd << std::endl;
+					// std::cout << "file content: \n" << buffer << std::endl;
+					http_respond_html(client_fd, 200, "text/html", buffer);
+				}
+				else
+					http_respond_html(client_fd, SERVER_ERROR, "text/html", htmlStatus[SERVER_ERROR]);
+					// std::cout << "\nnothing to read\n\n";
+				epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
+				map_requests.erase(client_fd);
+				close(client_fd);
+				cgi_map.erase(fd);
+				close(fd);
+			}
+		}
+	}
+
+	for (std::map<int, HTTP_Request>::iterator iter = map_requests.begin();
+		iter != map_requests.end(); ++iter) {
+		HTTP_Request&	req = iter->second;
+
+		HTTP_request_delete(req);
+	}
+	return (1);
+}
+
+/* TODO(xenobas): Replace this */
+int	setup_servers(dynamic_array<WEBSERV_Instance> instances, int num_server){
+	htmlStatus[200] = GetDefaultPage();
+	htmlStatus[404] = "\r\n\r\n<h1>" + statusCode(404) + "</h1>";
+	htmlStatus[400] = "\r\n\r\n<h1>" + statusCode(400) + "</h1>";
+	htmlStatus[403] = "\r\n\r\n<h1>" + statusCode(403) + "</h1>";
+	htmlStatus[500] = "\r\n\r\n<h1>" + statusCode(500) + "</h1>";
+	htmlStatus[201] = "\r\n\r\n<h1>" + statusCode(201) + "</h1>";
+	htmlStatus[204] = "\r\n\r\n<h1>" + statusCode(204) + "</h1>";
+	htmlStatus[405] = "\r\n\r\n<h1>" + statusCode(405) + "</h1>";
+	htmlStatus[301] = "\r\n\r\n<h1>" + statusCode(301) + "</h1>";
+	htmlStatus[413] = "\r\n\r\n<h1>" + statusCode(413) + "</h1>";
+	htmlStatus[501] = "\r\n\r\n<h1>" + statusCode(501) + "</h1>";
+	htmlStatus[301] = "\r\n\r\n<h1>" + statusCode(301) + "</h1>";
+	htmlStatus[102] = "\r\n\r\n<h1>" + statusCode(102) + "</h1>";
+
+	for (int i = 0; i < num_server; i++){
+		instances[i].fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+
+		struct sockaddr_in address;
+		size_t addrlen = sizeof(address);
+		
+		if (instances[i].fd < 0) {
+			std::cerr << "Socket creation failed" << std::endl;
+			return 2;
+		}
+		{
+			const int reuseaddr = 1;
+			setsockopt(instances[i].fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(int));
+		}
+		std::memset((char*)&address, 0, addrlen);
+		address.sin_family = AF_INET;
+		address.sin_addr.s_addr = instances[i].addr.blob;
+		address.sin_port = ::htons(instances[i].port);
+		
+		if (bind(instances[i].fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
+			perror("bind failed");
+			return 2;
+		}
+		
+		if (listen(instances[i].fd, SOMAXCONN) < 0) {
+			perror("In listen");
+			return EXIT_FAILURE;
+		}
+
+		CLI_debug("HTTP Server listening at %u.%u.%u.%u:%u",
+			instances[i].addr.bytes[0],
+			instances[i].addr.bytes[1],
+			instances[i].addr.bytes[2],
+			instances[i].addr.bytes[3],
+			instances[i].port);
+	}
+	return(1);
+}
+
+int server(WEBSERV_Config&	config) {
+	i32	epfd = epoll_create(64);
+	if (epfd == -1) {
+		CLI_show_error_runtime("Could not create epoll handle");
+		CLI_show_extra("Reason", "%m");
+
+		return (0);
+	}
+
+	dynamic_array<WEBSERV_Instance>&	instances = config.instances;
+	setup_servers(instances, instances.len);
+
+	for(int i = 0; i < instances.len; i++){
+		struct epoll_event ev;
+		ev.events = EPOLLIN;
+		ev.data.fd = instances[i].fd;
+		epoll_ctl(epfd, EPOLL_CTL_ADD, instances[i].fd, &ev);
+	}
+	CLI_debug("HTTP Servers have been created");
+
+	struct sockaddr_in address;
+	handle_requests(instances, epfd, address);
+
+	for (int i = 0; i < instances.len; i++)
+		close(instances[i].fd);
+	close(epfd);
+
+	return 0;
+}

@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 18:33:49 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/15 14:09:33 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/17 17:51:24 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -180,6 +180,10 @@ void				HTTP_request_close(HTTP_Request& req) {
 	if (is_closed || is_stage_essential || is_length_insufficient) {
 		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
 	} else {
+		if (!req.chunked) {
+			req.chunks.push(req.chunk);
+		}
+
 		req.buff_stage = HTTP_REQUEST_STAGE_DONE;
 	}
 }
@@ -309,9 +313,16 @@ static void			HTTP_request_read_stage_uri(HTTP_Request& req) {
 	req.uri = WEBSERV_uri_decode(str_uri);
 	if (!req.uri.ok) {
 		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
-	} else {
-		req.buff_stage = HTTP_REQUEST_STAGE_VERSION;
+		return ;
 	}
+	for (i32 i = 0; i < req.uri.path.len; ++i) {
+		if (req.uri.path[i] == "..") {
+			req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
+			return ;
+		}
+	}
+
+	req.buff_stage = HTTP_REQUEST_STAGE_VERSION;
 }
 static void			HTTP_request_read_stage_version(HTTP_Request& req) {
 	if (req.buff_index >= req.buff.len)

@@ -5,7 +5,6 @@ routes = [
 	{
 		path = "/images",
 		type = "Server",
-		methods = [ "GET", "HEAD" ],
 
 		props = {
 			directory = "www/assets/images",
@@ -23,7 +22,6 @@ routes = [
 	},
 	{
 		path = "/upload",
-		methods = [ "POST", "PUT" ],
 
 		type = "Upload",
 		props = {
