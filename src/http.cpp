@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 18:33:49 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/17 17:51:24 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/17 23:33:48 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -55,7 +55,7 @@ void				HTTP_request_debug(HTTP_Request& req) {
 			char	buff[64] = { 0 };
 			if (HTTP_request_is_error(req)) {
 				snprintf(buff, 64, "has failed");
-			} else if (HTTP_request_is_closed(req)) {
+			} else if (HTTP_request_is_done(req)) {
 				snprintf(buff, 64, "is done");
 			} else {
 				snprintf(buff, 64, "is waiting for more bytes, thus incomplete");
@@ -149,7 +149,7 @@ void				HTTP_request_debug(HTTP_Request& req) {
 	printf("=== HTTP_Request   END  ===\n");
 }
 
-b32					HTTP_request_is_closed(const HTTP_Request& req) {
+b32					HTTP_request_is_done(const HTTP_Request& req) {
 	return (
 		req.buff_stage == HTTP_REQUEST_STAGE_DONE
 		|| req.buff_stage == HTTP_REQUEST_STAGE_ERROR
@@ -163,7 +163,7 @@ static b32			HTTP_request_is_content(const HTTP_Request& req) {
 }
 
 b32					HTTP_request_read(HTTP_Request& req, const byte* data, i32 size) {
-	if (HTTP_request_is_closed(req) || size == 0  || data == 0) {
+	if (HTTP_request_is_done(req) || size == 0  || data == 0) {
 		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
 		return (0);
 	}
@@ -173,11 +173,11 @@ b32					HTTP_request_read(HTTP_Request& req, const byte* data, i32 size) {
 	return (ok);
 }
 void				HTTP_request_close(HTTP_Request& req) {
-	b32	is_closed = HTTP_request_is_closed(req);
+	b32	is_done = HTTP_request_is_done(req);
 	b32	is_stage_essential = !HTTP_request_is_content(req);
 	b32	is_length_insufficient = (req.content_length >= 0 && req.chunk.size != req.content_length);
 
-	if (is_closed || is_stage_essential || is_length_insufficient) {
+	if (is_done || is_stage_essential || is_length_insufficient) {
 		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
 	} else {
 		if (!req.chunked) {

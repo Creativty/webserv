@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/17 18:13:00 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/17 23:44:35 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,6 +18,7 @@
 #include "hash_table.hpp"
 #include "terminal.hpp"
 
+#include <cerrno>
 #include <cstdio>
 #include <cstring>
 #include <cstdarg>
@@ -27,6 +28,7 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/epoll.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 
@@ -358,6 +360,15 @@ TOML_Document		TOML_make(const string_view& file);
 void				TOML_delete(TOML_Document& document);
 TOML_Document		TOML_parse_file(const string_view& file);
 
+HTTP_Request		HTTP_request_make(void);
+void				HTTP_request_delete(HTTP_Request& req);
+b32					HTTP_request_is_error(const HTTP_Request& req);
+b32					HTTP_request_is_done(const HTTP_Request& req);
+void				HTTP_request_close(HTTP_Request& req);
+b32					HTTP_request_read(HTTP_Request& req, const byte* data, i32 size);
+
+void				HTTP_request_debug(HTTP_Request& req);
+
 WEBSERV_URI			WEBSERV_uri_make(const string_view& str);
 void				WEBSERV_uri_delete(WEBSERV_URI& uri);
 WEBSERV_URI			WEBSERV_uri_decode(const string_view& str);
@@ -374,14 +385,5 @@ b32					WEBSERV_http_route_method_test(const WEBSERV_Route& route, WEBSERV_Metho
 string_view			WEBSERV_http_route_pick(const WEBSERV_Instance& instance, const string_view& path);
 string_view			WEBSERV_http_route_pick(const WEBSERV_Instance& instance, const HTTP_Request& req);
 
-HTTP_Request		HTTP_request_make(void);
-void				HTTP_request_delete(HTTP_Request& req);
-b32					HTTP_request_is_error(const HTTP_Request& req);
-b32					HTTP_request_is_closed(const HTTP_Request& req);
-void				HTTP_request_close(HTTP_Request& req);
-b32					HTTP_request_read(HTTP_Request& req, const byte* data, i32 size);
-
-void				HTTP_request_debug(HTTP_Request& req);
-
-int					server(WEBSERV_Config& config);
+b32					WEBSERV_context_run(const WEBSERV_Config& config);
 #endif

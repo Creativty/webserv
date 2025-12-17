@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:42:31 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/17 16:43:22 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/17 21:41:40 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -794,10 +794,6 @@ static b32				WEBSERV_config_parse_route(Parser_Context& ctx, Route& route, cons
 	}
 
 	switch (route.kind) {
-		case WEBSERV_ROUTE_REDIRECT: {
-			route.cascade = 0;
-			route.methods_whitelist = cast(WEBSERV_Method)(~0x00000000);
-		} break ;
 		case WEBSERV_ROUTE_SERVER: {
 			route.cascade = 1;
 			route.methods_whitelist = WEBSERV_METHOD_GET;
@@ -806,9 +802,13 @@ static b32				WEBSERV_config_parse_route(Parser_Context& ctx, Route& route, cons
 			route.cascade = 1;
 			route.methods_whitelist = cast(WEBSERV_Method)(WEBSERV_METHOD_POST | WEBSERV_METHOD_PUT | WEBSERV_METHOD_DELETE);
 		} break ;
+		case WEBSERV_ROUTE_REDIRECT: {
+			route.cascade = 0;
+			route.methods_whitelist = cast(WEBSERV_Method)(0xFF);
+		} break ;
 		case WEBSERV_ROUTE_CGI: {
 			route.cascade = 1;
-			route.methods_whitelist = cast(WEBSERV_Method)(~0x00000000);
+			route.methods_whitelist = cast(WEBSERV_Method)(0xFF);
 		} break ;
 		case WEBSERV_ROUTE_INVALID:
 		case WEBSERV_ROUTE_COUNT:

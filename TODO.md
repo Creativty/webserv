@@ -1,11 +1,12 @@
-- [ ] Project directory de-cluttering
+- [x] Project directory de-cluttering
 - [x] Determine how to know EOF for non-chunked bodies
-- [ ] Remove all usage of std::string where not required
-- [ ] Remove all usage of std::map where not required
-- [ ] Fix Formatting
+- [x] Multiplex Writing to Sockets
+- [x] Remove all usage of std::string where not required
+- [x] Remove all usage of std::map where not required
+- [x] Fix Formatting
 - [ ] Forbidden functions removal
 - [ ] Client Timeouts
-- [ ] Multiplex Writing to Sockets
+- [ ] Pessimist code path testing
 - [ ] CGI Path resolution
     - Assuming CGI route on /cgi
     - No other route even if it is CGI should be definable under /cgi/*
@@ -14,4 +15,3 @@
       <===============><==============>
          SCRIPT_NAME       PATH_INFO
     ```
-- [ ] Pessimist code path testing

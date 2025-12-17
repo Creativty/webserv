@@ -5,7 +5,6 @@ webserv
 *.d
 *.o
 *.swp
-*.old
 
 # Configuration files
 *.toml
