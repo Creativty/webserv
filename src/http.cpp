@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 18:33:49 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/18 16:10:03 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/18 21:52:04 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -180,7 +180,7 @@ void				HTTP_request_close(HTTP_Request& req) {
 	if (is_done || is_stage_essential || is_length_insufficient) {
 		req.buff_stage = HTTP_REQUEST_STAGE_ERROR;
 	} else {
-		if (!req.chunked) {
+		if (!req.chunked && req.chunk.size > 0) {
 			req.chunks.push(req.chunk);
 		}
 
