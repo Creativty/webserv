@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:16:13 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/17 16:42:30 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/18 13:20:19 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -352,4 +352,9 @@ void			CLI_show_error_runtime(const char* fmt, ...) {
 	vfprintf(stderr, fmt, args);
 	fprintf(stderr, "\n");
 	va_end(args);
+}
+
+void			CLI_flush(void) {
+	::fflush(stdout);
+	::fflush(stderr);
 }

@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:45:19 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/17 23:45:23 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/18 13:22:53 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -95,6 +95,7 @@ i32	main(i32 argc, cstring argv[]) {
 	#endif
 
 	b32	ok_run = WEBSERV_context_run(config);
+	CLI_debug("WEBSERV_context_run has terminated");
 
 	WEBSERV_config_delete(config);
 	return (ok_run ? 0 : 16);

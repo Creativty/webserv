@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/17 23:44:35 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/18 13:20:32 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,6 +16,8 @@
 #include "string_view.hpp"
 #include "dynamic_array.hpp"
 #include "hash_table.hpp"
+#include "i64_table.hpp"
+#include "string_builder.hpp"
 #include "terminal.hpp"
 
 #include <cerrno>
@@ -26,6 +28,7 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <dirent.h>
+#include <signal.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/epoll.h>
@@ -355,6 +358,7 @@ void				CLI_show_error_config(const Position pos, const char *fmt, ...);
 void				CLI_show_errors_toml(const TOML_Document& document);
 void				CLI_show_errors_config(const WEBSERV_Config& config);
 void				CLI_show_error_runtime(const char* fmt, ...);
+void				CLI_flush(void);
 
 TOML_Document		TOML_make(const string_view& file);
 void				TOML_delete(TOML_Document& document);
