@@ -6,11 +6,18 @@
 /*   By: xenobas <rahimos.123@gmail.com>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/17 21:32:19 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/18 13:55:15 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/18 14:10:34 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "webserv.hpp"
+
+string_view		strconv_i64(i64 n) {
+	string_builder	b;
+
+	b.write(n);
+	return (b.to_string());
+}
 
 enum HTTP_Status {
 	HTTP_STATUS_PROCESSING			=  102,
@@ -28,6 +35,99 @@ enum HTTP_Status {
 	HTTP_STATUS_NOT_IMPLEMENTED		=  501,
 	HTTP_STATUS_BAD_GATEWAY			=  502,
 };
+
+string_view		HTTP_status_as_string(HTTP_Status status) {
+	switch (status) {
+		case HTTP_STATUS_PROCESSING: {
+			return ("101");
+		} break ;
+		case HTTP_STATUS_METHOD_NOT_ALLOWED: {
+			return ("405");
+		} break ;
+		case HTTP_STATUS_OK: {
+			return ("200");
+		} break ;
+		case HTTP_STATUS_CREATED: {
+			return ("201");
+		} break ;
+		case HTTP_STATUS_NO_CONTENT: {
+			return ("204");
+		} break ;
+		case HTTP_STATUS_MOVED_PERMANENTLY: {
+			return ("301");
+		} break ;
+		case HTTP_STATUS_BAD_REQUEST: {
+			return ("400");
+		} break ;
+		case HTTP_STATUS_UNAUTHORIZED: {
+			return ("401");
+		} break ;
+		case HTTP_STATUS_FORBIDDEN: {
+			return ("403");
+		} break ;
+		case HTTP_STATUS_NOT_FOUND: {
+			return ("404");
+		} break ;
+		case HTTP_STATUS_CONTENT_TOO_LARGE: {
+			return ("413");
+		} break ;
+		case HTTP_STATUS_SERVER_ERROR: {
+			return ("500");
+		} break ;
+		case HTTP_STATUS_NOT_IMPLEMENTED: {
+			return ("501");
+		} break ;
+		case HTTP_STATUS_BAD_GATEWAY: {
+			return ("502");
+		} break ;
+	}
+}
+string_view		HTTP_status_as_text(HTTP_Status status) {
+	switch (status) {
+		case HTTP_STATUS_PROCESSING: {
+			return ("Processing");
+		} break ;
+		case HTTP_STATUS_METHOD_NOT_ALLOWED: {
+			return ("Method Not Allowed");
+		} break ;
+		case HTTP_STATUS_OK: {
+			return ("OK");
+		} break ;
+		case HTTP_STATUS_CREATED: {
+			return ("Created");
+		} break ;
+		case HTTP_STATUS_NO_CONTENT: {
+			return ("No Content");
+		} break ;
+		case HTTP_STATUS_MOVED_PERMANENTLY: {
+			return ("Moved Permanently");
+		} break ;
+		case HTTP_STATUS_BAD_REQUEST: {
+			return ("Bad Request");
+		} break ;
+		case HTTP_STATUS_UNAUTHORIZED: {
+			return ("Unauthorized");
+		} break ;
+		case HTTP_STATUS_FORBIDDEN: {
+			return ("Forbidden");
+		} break ;
+		case HTTP_STATUS_NOT_FOUND: {
+			return ("Not Found");
+		} break ;
+		case HTTP_STATUS_CONTENT_TOO_LARGE: {
+			return ("Content Too Large");
+		} break ;
+		case HTTP_STATUS_SERVER_ERROR: {
+			return ("Internal Server Error");
+		} break ;
+		case HTTP_STATUS_NOT_IMPLEMENTED: {
+			return ("Not Implemented");
+		} break ;
+		case HTTP_STATUS_BAD_GATEWAY: {
+			return ("Bad Gateway");
+		} break ;
+	}
+}
 
 /* TODO(xenobas): Continue with response work */
 struct HTTP_Response {
@@ -172,99 +272,6 @@ b32				WEBSERV_context_interest_make_server(WEBSERV_Context& context, i32 idx, i
 	return (1);
 }
 
-string_view		HTTP_status_as_string(HTTP_Status status) {
-	switch (status) {
-		case HTTP_STATUS_PROCESSING: {
-			return ("101");
-		} break ;
-		case HTTP_STATUS_METHOD_NOT_ALLOWED: {
-			return ("405");
-		} break ;
-		case HTTP_STATUS_OK: {
-			return ("200");
-		} break ;
-		case HTTP_STATUS_CREATED: {
-			return ("201");
-		} break ;
-		case HTTP_STATUS_NO_CONTENT: {
-			return ("204");
-		} break ;
-		case HTTP_STATUS_MOVED_PERMANENTLY: {
-			return ("301");
-		} break ;
-		case HTTP_STATUS_BAD_REQUEST: {
-			return ("400");
-		} break ;
-		case HTTP_STATUS_UNAUTHORIZED: {
-			return ("401");
-		} break ;
-		case HTTP_STATUS_FORBIDDEN: {
-			return ("403");
-		} break ;
-		case HTTP_STATUS_NOT_FOUND: {
-			return ("404");
-		} break ;
-		case HTTP_STATUS_CONTENT_TOO_LARGE: {
-			return ("413");
-		} break ;
-		case HTTP_STATUS_SERVER_ERROR: {
-			return ("500");
-		} break ;
-		case HTTP_STATUS_NOT_IMPLEMENTED: {
-			return ("501");
-		} break ;
-		case HTTP_STATUS_BAD_GATEWAY: {
-			return ("502");
-		} break ;
-	}
-}
-string_view		HTTP_status_as_text(HTTP_Status status) {
-	switch (status) {
-		case HTTP_STATUS_PROCESSING: {
-			return ("Processing");
-		} break ;
-		case HTTP_STATUS_METHOD_NOT_ALLOWED: {
-			return ("Method Not Allowed");
-		} break ;
-		case HTTP_STATUS_OK: {
-			return ("OK");
-		} break ;
-		case HTTP_STATUS_CREATED: {
-			return ("Created");
-		} break ;
-		case HTTP_STATUS_NO_CONTENT: {
-			return ("No Content");
-		} break ;
-		case HTTP_STATUS_MOVED_PERMANENTLY: {
-			return ("Moved Permanently");
-		} break ;
-		case HTTP_STATUS_BAD_REQUEST: {
-			return ("Bad Request");
-		} break ;
-		case HTTP_STATUS_UNAUTHORIZED: {
-			return ("Unauthorized");
-		} break ;
-		case HTTP_STATUS_FORBIDDEN: {
-			return ("Forbidden");
-		} break ;
-		case HTTP_STATUS_NOT_FOUND: {
-			return ("Not Found");
-		} break ;
-		case HTTP_STATUS_CONTENT_TOO_LARGE: {
-			return ("Content Too Large");
-		} break ;
-		case HTTP_STATUS_SERVER_ERROR: {
-			return ("Internal Server Error");
-		} break ;
-		case HTTP_STATUS_NOT_IMPLEMENTED: {
-			return ("Not Implemented");
-		} break ;
-		case HTTP_STATUS_BAD_GATEWAY: {
-			return ("Bad Gateway");
-		} break ;
-	}
-}
-
 void			WEBSERV_context_server_make(WEBSERV_Context& context, i32 idx) {
 	const WEBSERV_Instance&	instance = context.config.instances[idx];
 	i32						fd = ::socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
@@ -376,12 +383,6 @@ void			WEBSERV_response_message_write_content_status(HTTP_Response& response, st
 
 }
 
-string_view		strconv_i64(i64 n) {
-	string_builder	b;
-
-	b.write(n);
-	return (b.to_string());
-}
 void			WEBSERV_context_response_from_status(WEBSERV_Context& context, WEBSERV_Interest& interest, HTTP_Status status_code) {
 	HTTP_Response		response;
 	WEBSERV_Instance&	instance = context.config.instances[interest.server_idx];
@@ -679,6 +680,9 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 				} break ;
 			}
 		}
+		// TODO(xenobas): Implement Client Timeout
+		// last_event_time - curr_time > TIMEOUT -> lbab al7bab
+		// interest
 		CLI_flush();
 	}
 
