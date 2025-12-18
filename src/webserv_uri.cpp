@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 16:30:27 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/16 16:16:29 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/18 16:20:23 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -87,7 +87,7 @@ static b32			WEBSERV_uri_write_byte(string_builder& builder, const string_view& 
 	builder.write(view);
 	return (0);
 }
-static string_view	WEBSERV_uri_decode_comp(const string_view& str) {
+static string_view	WEBSERV_uri_decode_comp(const string_view& str, b32 is_query_param = 0) {
 	string_builder	builder;
 
 	for (i32 i = 0; i < str.len; ) {
@@ -102,7 +102,11 @@ static string_view	WEBSERV_uri_decode_comp(const string_view& str) {
 
 			string_view	view = str.slice(i, i + len);
 			WEBSERV_uri_write_byte(builder, view);
-		} else {
+		}
+		else if (str[i] == '+' && is_query_param) {
+			builder.write(' ');
+		}
+		else {
 			builder.write(str[i]);
 		}
 		i += len;
@@ -213,8 +217,8 @@ WEBSERV_URI			WEBSERV_uri_decode(const string_view& str) {
 			if (view_key.len == 0) {
 				continue ;
 			}
-			string_view	key = WEBSERV_uri_decode_comp(view_key);
-			string_view	val = WEBSERV_uri_decode_comp(view_val);
+			string_view	key = WEBSERV_uri_decode_comp(view_key, /* is_query_param = */ 1);
+			string_view	val = WEBSERV_uri_decode_comp(view_val, /* is_query_param = */ 1);
 
 			uri.query.set(key, val);
 			key.free();
