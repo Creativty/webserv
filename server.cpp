@@ -592,8 +592,23 @@ int methods(HTTP_Request request, int new_socket, struct WEBSERV_Instance instan
 
     if (request.method == WEBSERV_METHOD_GET){
         path = url_decode(request.uri.str.to_string().substr(1));
-        string_view res_file;
-		b32			file_ok = OS_read_file(string_view(path.c_str()), res_file);
+		struct stat path_stat;
+		if (stat(path.c_str(), &path_stat) == -1){
+			perror("stat");
+			return(NOT_FOUND);
+		}
+		string_view res_file;
+		b32 file_ok;
+		if (S_ISDIR(path_stat.st_mode)){
+			if (false){//TODO check enabling directory listing
+				return FORBIDDEN;
+			}
+			file_ok = 1;
+			res_file;//TODO generateListingDirectory 
+		}
+		else if(S_ISREG(path_stat.st_mode))
+			file_ok = OS_read_file(string_view(path.c_str()), res_file);
+
         if (file_ok){
             assert(file_ok && "could not load template html file");            
             http_respond_html(new_socket, OK, getContentType(path), res_file.to_string());
