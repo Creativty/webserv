@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:45:19 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/18 13:22:53 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/18 14:33:28 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,6 +15,8 @@
 #include <ctime>
 
 i32	main(i32 argc, cstring argv[]) {
+	i64	ts_start = OS_timestamp_now();
+
  	CLI_exec_path = argv[0];
 	CLI_is_tty = isatty(STDOUT_FILENO);
 
@@ -98,5 +100,8 @@ i32	main(i32 argc, cstring argv[]) {
 	CLI_debug("WEBSERV_context_run has terminated");
 
 	WEBSERV_config_delete(config);
+
+	i64	ts_end = OS_timestamp_now();
+	CLI_debug("main(...) took %ldms", ts_end - ts_start);
 	return (ok_run ? 0 : 16);
 }

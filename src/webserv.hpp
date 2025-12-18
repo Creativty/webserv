@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/18 13:20:32 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/18 14:46:57 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -243,6 +243,7 @@ struct WEBSERV_Instance {
 	string_view							host;
 
 	/* Settings */
+	i64									timeout;
 	u32									request_body_limit;
 	hash_table<string_view>				status;
 
@@ -260,6 +261,7 @@ struct WEBSERV_Instance {
 	CONFIG_ERROR_KIND(KEY_REQUIRED, "key required") \
 	CONFIG_ERROR_KIND(TYPE_MISMATCH, "type mismatch") \
 	CONFIG_ERROR_KIND(PORT_RANGE, "port range") \
+	CONFIG_ERROR_KIND(TIMEOUT_RANGE, "timeout range") \
 	CONFIG_ERROR_KIND(REQUEST_BODY_LIMIT_RANGE, "request_body_limit range") \
 	CONFIG_ERROR_KIND(STRING_EMPTY, "string empty") \
 	CONFIG_ERROR_KIND(VALUE_INVALID, "value invalid") \
@@ -344,6 +346,8 @@ b32					OS_test_file_write(const string_view& path, b32 strict_regular = 0);
 b32					OS_test_file_exists(const string_view& path, b32 strict_regular = 0);
 b32					OS_test_dir_read(const string_view& path, b32 strict_regular = 0);
 b32					OS_test_dir_read_write(const string_view& path, b32 strict_regular = 0);
+
+i64					OS_timestamp_now(void);
         			
 #define				CLI_debug(...) CLI_debug_internal(__FILE__, __LINE__, "DEBUG", __VA_ARGS__)
 #define				CLI_todo(...) CLI_debug_internal(__FILE__, __LINE__, "TODO", __VA_ARGS__)

@@ -5,7 +5,7 @@
 - [x] Remove all usage of std::map where not required
 - [x] Fix Formatting
 - [ ] Forbidden functions removal
-- [ ] Client Timeouts
+- [x] Client Timeouts
 - [ ] Pessimist code path testing
 - [ ] CGI Path resolution
     - Assuming CGI route on /cgi

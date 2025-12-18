@@ -6,7 +6,7 @@
 /*   By: xenobas <rahimos.123@gmail.com>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/17 21:32:19 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/18 14:10:34 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/18 15:03:57 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -156,9 +156,9 @@ struct WEBSERV_Interest {
 	i32						fd;
 	WEBSERV_Interest_Type	type;
 
+	i64						timestamp; /* NOTE(xenobas): Last event timestamp */
 	i32						server_idx; /* NOTE(xenobas): context.config.instances[server_idx] */
 
-	i64						client_ts; /* TODO(xenobas): Timeout timestamp */
 	HTTP_Request			client_req;
 	HTTP_Response			client_res;
 	struct sockaddr_in		client_sockaddr;
@@ -221,6 +221,7 @@ b32				WEBSERV_context_interest_make_client(WEBSERV_Context& context, i32 srv, i
 	interest.fd = fd;
 	interest.type = WEBSERV_INTEREST_CLIENT;
 
+	interest.timestamp = OS_timestamp_now();
 	interest.server_idx = srv;
 
 	interest.client_req = HTTP_request_make();
@@ -250,6 +251,8 @@ b32				WEBSERV_context_interest_make_server(WEBSERV_Context& context, i32 idx, i
 
 	interest.fd = fd;
 	interest.type = WEBSERV_INTEREST_SERVER;
+
+	interest.timestamp = OS_timestamp_now();
 	interest.server_idx = idx;
 
 	struct epoll_event	event_register; MEM_zero(event_register);
@@ -502,6 +505,8 @@ b32				WEBSERV_context_response_write(WEBSERV_Context& context, WEBSERV_Interest
 		else if (write_ret >= 0) {
 			res.write_idx += write_ret;
 		}
+
+		interest.timestamp = OS_timestamp_now();
 		return (0);
 	}
 
@@ -642,6 +647,8 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 							continue ;
 						}
 
+						interest.timestamp = OS_timestamp_now();
+
 						if (!HTTP_request_read(interest.client_req, buff_arr, cast(i32)buff_len)) {
 							CLI_show_error_runtime("Parser has denied the request");
 
@@ -680,9 +687,29 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 				} break ;
 			}
 		}
-		// TODO(xenobas): Implement Client Timeout
-		// last_event_time - curr_time > TIMEOUT -> lbab al7bab
-		// interest
+
+		i64	ts_curr = OS_timestamp_now();
+		for (i32 interest_idx = 0; interest_idx < context.interests.cap; ++interest_idx) {
+			if (!context.interests.items[interest_idx].used) {
+				continue ;
+			}
+
+			WEBSERV_Interest&	interest = context.interests.items[interest_idx].value;
+			if (interest.type == WEBSERV_INTEREST_SERVER) {
+				continue ;
+			}
+
+			WEBSERV_Instance&	instance = context.config.instances[interest.server_idx];
+
+			i64	ts_last  = interest.timestamp;
+			i64	duration = ts_curr - ts_last;
+			if (duration < instance.timeout) {
+				continue ;
+			}
+
+			WEBSERV_context_interest_delete(context, interest);
+			req_count++;
+		}
 		CLI_flush();
 	}
 

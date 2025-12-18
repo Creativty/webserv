@@ -6,7 +6,7 @@
 /*   By: xenobas <rahimos.123@gmail.com>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/17 21:52:38 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/17 22:29:23 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/18 14:43:10 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -100,6 +100,7 @@ struct i64_table {
 		this->destroy();
 	}
 
+	/* TODO(xenobas): This shit does not work, use bucket addressing instead */
 	void		set(const i64& key, const T& value) {
 		if (this->count >= this->cap / 2)
 			this->resize(this->cap == 0 ? 8 : this->cap * 2);

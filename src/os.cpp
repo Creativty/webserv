@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 17:02:26 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/17 18:55:07 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/18 15:00:43 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,12 +16,12 @@
 #include "dynamic_array.hpp"
 
 #include <string>
-#include <fstream>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <time.h>
 #define PATH_CAP 1024
 
 b32			OS_read_file(const string_view path, string_view& text) {
@@ -172,4 +172,14 @@ b32			OS_test_dir_read_write(const string_view& path, b32 strict_regular = 0) {
 
 	b32			access_ok = (::access(path_cstr, F_OK | R_OK | W_OK) == 0);
 	return (access_ok);
+}
+
+/* DESCRIPTION(xenobas): Returns the timestamp in milliseconds */
+i64			OS_timestamp_now(void) {
+	struct timespec	tp;
+	i32				ret = ::clock_gettime(CLOCK_MONOTONIC, &tp);
+	if (ret == 0) {
+		return (cast(i64)(tp.tv_sec * 1000) + cast(i64)(tp.tv_nsec / 1000000));
+	}
+	return (-1);
 }

@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:16:13 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/18 13:20:19 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/18 14:47:20 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -283,6 +283,9 @@ void			CLI_show_errors_config(const WEBSERV_Config& config) {
 			CLI_show_error_toml_line(config.document, err.pos);
 		} else if (err.kind == WEBSERV_CONFIG_ERROR_PORT_RANGE) {
 			CLI_show_error_config(err.pos, "port value out of range, must be between 0 and 65535");
+			CLI_show_error_toml_line(config.document, err.pos);
+		} else if (err.kind == WEBSERV_CONFIG_ERROR_TIMEOUT_RANGE) {
+			CLI_show_error_config(err.pos, "timeout must be larger than 0");
 			CLI_show_error_toml_line(config.document, err.pos);
 		} else if (err.kind == WEBSERV_CONFIG_ERROR_REQUEST_BODY_LIMIT_RANGE) {
 			CLI_show_error_config(err.pos, "request_body_limit value is out of range, must be between 0 and 65535");

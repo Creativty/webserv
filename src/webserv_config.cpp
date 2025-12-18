@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:42:31 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/18 11:43:11 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/18 14:48:11 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -207,6 +207,7 @@ static Instance			WEBSERV_instance_make(void) {
 	instance.addr.blob	= 0;
 	instance.host		= string_view();
 
+	instance.timeout = 5000;
 	instance.request_body_limit = U32_MAX;
 
 	instance.routes = hash_table<WEBSERV_Route>();
@@ -954,6 +955,21 @@ static void				WEBSERV_config_parse_instance_request_body_limit(Parser_Context& 
 
 	instance.request_body_limit = cast(u32)request_body_limit;
 }
+static void				WEBSERV_config_parse_instance_timeout(Parser_Context& ctx, const string_view& key, const TOML_Value& value) {
+	Instance&	instance = ctx.instance;
+	unused(key);
+
+	if (!CONTEXT_parse_expect(ctx, value, TOML_VALUE_NUMBER)) {
+		return ;
+	}
+	i64			timeout = value.Number;
+	if (timeout <= 0) {
+		context_error(TIMEOUT_RANGE, value.pos);
+		return ;
+	}
+
+	instance.timeout = timeout;
+}
 static void				WEBSERV_config_parse_instance_status(Parser_Context& ctx, const string_view& key, const TOML_Value& value) {
 	Config&				config = ctx.config;
 	Instance&			instance = ctx.instance;
@@ -998,6 +1014,7 @@ static void				WEBSERV_config_parse_instance_http(Parser_Context& ctx, const TOM
 
 	Entry	entries[] = {
 		{ "request_body_limit", WEBSERV_config_parse_instance_request_body_limit, /* required = */ 0, 0 },	/* Instance host			(e.g "website.com") */
+		{ "timeout", WEBSERV_config_parse_instance_timeout, /* required = */ 0, 0 },	/* Instance timeout			(e.g 5000ms) */
 
 		{ "status_301", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },						/* Instance status page  	(e.g "static/errors/301.html") */
 		{ "status_302", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },						/* Instance status page  	(e.g "static/errors/302.html") */
