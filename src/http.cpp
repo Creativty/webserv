@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 18:33:49 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/17 23:33:48 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/18 16:10:03 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -113,14 +113,14 @@ void				HTTP_request_debug(HTTP_Request& req) {
 				}
 			}
 
-			{ /* Query */
-				printf("    Query");
-				if (uri.query.count == 0) {
+			{ /* params */
+				printf("    params");
+				if (uri.params.count == 0) {
 					printf(" is empty");
 				}
 				printf("\n");
 
-				for_table_begin(uri.query, const hash_table<string_view>, param) {
+				for_table_begin(uri.params, const hash_table<string_view>, param) {
 					printf("        \"%.*s\" = \"%.*s\"\n", param.key.len, param.key.text, param.value.len, param.value.text);
 				} for_table_end ;
 			}

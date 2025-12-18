@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:42:31 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/18 14:48:11 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/18 15:32:35 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -164,6 +164,7 @@ static void				WEBSERV_route_delete(Route& route) {
 		} break ;
 	}
 	route.path.free();
+	WEBSERV_uri_delete(route.uri);
 }
 
 static Route_Server		WEBSERV_route_server_make(void) {
@@ -291,12 +292,13 @@ static b32				WEBSERV_config_parse_route_path(Parser_Context& ctx, Route& route,
 
 	/* TODO(xenobas): Switch from string to WEBSERV_URI */
 	const string_view&	str = *(value.String);
-	if (!str.has_prefix("/")) {
+	if (!str.has_prefix("/") || str.has("?") || str.has("#") || str.has("&")) {
 		context_error(VALUE_INVALID, value.pos, "uri path component");
 		return (0);
 	}
 
 	route.path = string_view::alloc(str);
+	route.uri = WEBSERV_uri_decode(str);
 	return (1);
 }
 static b32				WEBSERV_config_parse_route_kind(Parser_Context& ctx, Route& route, const TOML_Value& value) {

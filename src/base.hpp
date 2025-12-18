@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/17 15:56:46 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/16 14:09:38 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/18 18:07:24 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -42,6 +42,10 @@ typedef const char*	cstring;
 
 #define I64_MIN (-9223372036854775807ll)
 #define I64_MAX (+9223372036854775807ll)
+
+#define FD_STDIN  0
+#define FD_STDOUT 1
+#define FD_STDERR 1
 
 template <typename T>
 void		MEM_zero(T& value) {

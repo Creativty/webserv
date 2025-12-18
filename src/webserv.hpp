@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/18 14:46:57 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/18 18:58:11 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,6 +22,7 @@
 
 #include <cerrno>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <cstdarg>
 
@@ -161,7 +162,7 @@ struct TOML_Document {
 struct WEBSERV_URI {
 	/* Commented outs are unused, since WEBSERV does not have a proxy mode where the members are needed */
 	dynamic_array<string_view>	path;
-	hash_table<string_view>		query;
+	hash_table<string_view>		params;
 	b32							is_file;
 
 	/* string_view				domain; */
@@ -221,7 +222,8 @@ struct WEBSERV_Route_CGI {
 	hash_table<string_view>		env;
 };
 struct WEBSERV_Route {
-	string_view				path;
+	string_view				path; /* TODO(xenobas): Rename to ID/Key */
+	WEBSERV_URI				uri;
 
 	b32						cascade;
 	WEBSERV_Route_Kind		kind;

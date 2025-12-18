@@ -6,7 +6,7 @@
 /*   By: xenobas <rahimos.123@gmail.com>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/17 21:32:19 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/18 15:03:57 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/18 19:46:18 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,6 +16,27 @@ string_view		strconv_i64(i64 n) {
 	string_builder	b;
 
 	b.write(n);
+	return (b.to_string());
+}
+
+template <typename T>
+string_view		ENV_string(const string_view& name, T value, b32 is_header = 0) {
+	string_builder	b;
+
+	if (is_header) {
+		b.write("HTTP");
+
+		string_view	name_iter;
+		string_view	name_temp = name;
+		while (name_temp.split_iter("-", name_iter)) {
+			b.write('_');
+			b.write_uppercase(name_iter);
+		}
+	} else {
+		b.write(name);
+	}
+	b.write('=');
+	b.write(value);
 	return (b.to_string());
 }
 
@@ -162,6 +183,18 @@ struct WEBSERV_Interest {
 	HTTP_Request			client_req;
 	HTTP_Response			client_res;
 	struct sockaddr_in		client_sockaddr;
+
+	i32						process_id;
+	struct {
+		i32					read;
+		i32					write;
+		i32					parent;
+		i32					remote[2];
+	}						process_fds;
+	char**					process_envp;
+	char**					process_argv;
+	HTTP_Request			process_req;
+	HTTP_Response			process_res;
 };
 struct WEBSERV_Context {
 	WEBSERV_Config			config;
@@ -187,15 +220,24 @@ void			HTTP_response_delete(HTTP_Response& response) {
 	}
 }
 void			WEBSERV_interest_close(WEBSERV_Interest& interest) {
-	::close(interest.fd);
 	switch (interest.type) {
 		case WEBSERV_INTEREST_SERVER: {
+			::close(interest.fd);
 		} break ;
 		case WEBSERV_INTEREST_CLIENT: {
+			::close(interest.fd);
 			HTTP_request_delete(interest.client_req);
 			HTTP_response_delete(interest.client_res);
 		} break ;
 		case WEBSERV_INTEREST_PROCESS: {
+			i32	fd_read = interest.process_fds.read;
+			::close(fd_read);
+
+			i32	fd_write = interest.process_fds.write;
+			::close(fd_write);
+
+			HTTP_request_delete(interest.client_req);
+			HTTP_response_delete(interest.client_res);
 		} break ;
 	}
 }
@@ -274,6 +316,43 @@ b32				WEBSERV_context_interest_make_server(WEBSERV_Context& context, i32 idx, i
 
 	return (1);
 }
+b32				WEBSERV_context_interest_make_process(WEBSERV_Context& context,
+										i32 id, char** envp, char** argv, i32 fd_read, i32 fd_write, i32 fd_parent) {
+	i32					fd = fd_write;
+	WEBSERV_Interest	interest; MEM_zero(interest);
+
+	interest.fd = fd;
+	interest.type = WEBSERV_INTEREST_PROCESS;
+
+	interest.timestamp = OS_timestamp_now();
+
+	interest.process_id = id;
+	interest.process_envp = envp;
+	interest.process_argv = argv;
+	interest.process_fds.read = fd_read;
+	interest.process_fds.write = fd_write;
+	interest.process_fds.parent = fd_parent;
+	interest.process_req = HTTP_request_make();
+	MEM_zero(interest.process_res);
+
+	struct epoll_event	event_register; MEM_zero(event_register);
+	event_register.events  = EPOLLIN | EPOLLRDHUP | EPOLLHUP | EPOLLERR;
+	event_register.data.fd = fd;
+
+	i32					ret_ctl = ::epoll_ctl(context.fd_events, EPOLL_CTL_ADD, fd, &event_register);
+	if (ret_ctl == -1) {
+		WEBSERV_interest_close(interest);
+
+		CLI_show_error_runtime("Could not add server to epoll's internal data structure");
+		CLI_show_extra("Reason", "%m");
+
+		::close(fd);
+		return (0);
+	}
+
+	context.interests.set(fd, interest);
+	return (1);
+}
 
 void			WEBSERV_context_server_make(WEBSERV_Context& context, i32 idx) {
 	const WEBSERV_Instance&	instance = context.config.instances[idx];
@@ -288,7 +367,7 @@ void			WEBSERV_context_server_make(WEBSERV_Context& context, i32 idx) {
 	
 	const i32				opts[] = { 1 };
 	if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opts, size_of(opts)) == -1) {
-		CLI_show_error_runtime("Could not set server socket to non-blocking mode");
+		CLI_show_error_runtime("Could not set server socket to reusable mode");
 		CLI_show_extra("Reason", "%m");
 
 		::close(fd);
@@ -447,6 +526,78 @@ void			WEBSERV_context_response_from_file(WEBSERV_Context& context, WEBSERV_Inte
 	unused(fd);
 }
 
+char**			WEBSERV_context_response_cgi_env(WEBSERV_Context& context, WEBSERV_Interest& interest, HTTP_Request& req, const string_view& script_name, const string_view& path_info) {
+	dynamic_array<char*>		env;
+	string_view					entry;
+
+	const WEBSERV_Instance&		instance = context.config.instances[interest.server_idx];
+
+	entry = ENV_string("GATEWAY_INTERFACE", "CGI/1.1");
+	env.push(entry.text);
+
+	entry = ENV_string("PATH_INFO", path_info);
+	env.push(entry.text);
+
+	string_view	params_string;
+	i32			params_start = req.uri.str.index("?");
+	if (params_start >= 0)
+		params_string = req.uri.str.slice(params_start + 1);
+	entry = ENV_string("QUERY_STRING", params_string);
+	env.push(entry.text);
+
+	entry = ENV_string("REQUEST_METHOD", WEBSERV_method_cstr(req.method));
+	env.push(entry.text);
+
+	entry = ENV_string("SCRIPT_NAME", script_name);
+	env.push(entry.text);
+
+	entry = ENV_string("SERVER_PORT", cast(i64)instance.port);
+	env.push(entry.text);
+
+	entry = ENV_string("SERVER_PROTOCOL", req.protocol);
+	env.push(entry.text);
+
+	if (req.headers.has("Authorization")) {
+		entry = ENV_string("AUTH_TYPE", req.headers.get("Authorization"));
+		env.push(entry.text);
+	}
+	if (req.headers.has("Content-Length")) {
+		entry = ENV_string("CONTENT_LENGTH", req.headers.get("Content-Length"));
+		env.push(entry.text);
+	}
+	if (req.headers.has("Content-Type")) {
+		entry = ENV_string("CONTENT_TYPE", req.headers.get("Content-Type"));
+		env.push(entry.text);
+	}
+
+	for_table_begin(req.headers, const hash_table<string_view>, header) {
+		entry = ENV_string(header.key, header.value, /* is_header = */ 1);
+		env.push(entry.text);
+	} for_table_end;
+
+	/* NOTE(xenobas): NULL terminated array of strings */
+	env.push(NULL);
+
+	return (cast(char**)env.data);
+}
+char**			WEBSERV_context_response_cgi_args(WEBSERV_Context& context, WEBSERV_Interest& interest, HTTP_Request& req, const string_view& interpreter_path, const string_view& script_path) {
+	dynamic_array<char*>		args;
+	string_view					arg;
+
+	unused(context);
+	unused(interest);
+	unused(req);
+
+	arg = string_view::alloc(interpreter_path);
+	args.push(arg.text);
+
+	arg = string_view::alloc(script_path);
+	args.push(arg.text);
+
+	args.push(NULL);
+	return ((char**)args.data);
+}
+
 void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest& interest) {
 	if (interest.type != WEBSERV_INTEREST_CLIENT) {
 		return ;
@@ -456,16 +607,60 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 	WEBSERV_Instance&	instance = context.config.instances[interest.server_idx];
 	/* TODO(xenobas): Can check for host later */
 
-	string_view			_route_path = WEBSERV_http_route_pick(instance, req);
-	if (!instance.routes.has(_route_path)) {
+	string_view			_route_id = WEBSERV_http_route_pick(instance, req);
+	if (!instance.routes.has(_route_id)) {
 		WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_FOUND);
 		return ;
 	}
-	WEBSERV_Route&		route = instance.routes.get(_route_path);
+	WEBSERV_Route&		route = instance.routes.get(_route_id);
 	if ((req.method & route.methods_whitelist) == 0x0) {
 		WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_METHOD_NOT_ALLOWED);
 		return ;
 	}
+
+	i32					builder_index = 0;
+
+	string_builder		builder_path_match;
+	builder_path_match.write('/');
+	for (i32 i = 0; builder_index < req.uri.path.len && builder_index < route.uri.path.len; ++builder_index, ++i) {
+		if (req.uri.path[builder_index] != route.uri.path[builder_index]) {
+			break ;
+		}
+
+		if (i > 0) {
+			builder_path_match.write('/');
+		}
+		builder_path_match.write(req.uri.path[builder_index]);
+	}
+
+	string_view			cgi_script_file;
+	if (route.kind == WEBSERV_ROUTE_CGI && builder_index < req.uri.path.len) { /* NOTE(xenoas): Add script location */
+		builder_path_match.write('/');
+		builder_path_match.write(req.uri.path[builder_index]);
+
+		cgi_script_file = req.uri.path[builder_index];
+
+		++builder_index;
+	}
+
+	string_builder		builder_path_extra;
+	if (!req.uri.is_file || builder_index < req.uri.path.len) {
+		builder_path_extra.write('/');
+	}
+	for (i32 i = 0; builder_index < req.uri.path.len; ++builder_index, ++i) {
+
+		if (i > 0) {
+			builder_path_extra.write('/');
+		}
+		builder_path_extra.write(req.uri.path[builder_index]);
+	}
+
+	i32			fd_client = interest.fd;
+	string_view	path_match = builder_path_match.to_view();
+	string_view	path_extra = builder_path_extra.to_view();
+
+	/* CLI_debug("Path / Match: %.*s", path_match.len, path_match.text); */
+	/* CLI_debug("Path / Extra: %.*s", path_extra.len, path_extra.text); */
 
 	switch (route.kind) {
 		case WEBSERV_ROUTE_SERVER: {
@@ -475,6 +670,160 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 		case WEBSERV_ROUTE_REDIRECT: {
 		} break ;
 		case WEBSERV_ROUTE_CGI: {
+			/* TODO(xenobas): On chunked requests remove the header and assemble the body */
+			/*				- Request request_cgi_normalize(const Request&) */
+			/* TODO(xenobas): Use env from CGI config */
+
+			/* SECTION(xenobas): Process path builder */
+			
+			string_builder	process_path_builder;
+			
+			string_view		directory = route.CGI.directory;
+			process_path_builder.write(directory);
+			if (!directory.has_suffix("/")) process_path_builder.write("/");
+
+			process_path_builder.write(cgi_script_file);
+
+			string_view			process_path = process_path_builder.to_view();
+
+			/* SECTION(xenobas): Interpreter picker */
+
+			string_view			interpreter_path;
+			for_table_begin(route.CGI.interpreters, const hash_table<string_view>, kv) {
+				const string_view&	ext = kv.key;
+				const string_view&	path = kv.value;
+
+				if (process_path.has_suffix(ext) && process_path.len > ext.len + 1 && process_path[process_path.len - ext.len - 1] == '.') {
+					interpreter_path = path;
+					continue ;
+				}
+			} for_table_end;
+
+			if (!interpreter_path) {
+				CLI_debug("CGI Script at \"%.*s\" has no interpreters configured", process_path.len, process_path.text);
+
+				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_FOUND);
+
+				return ;
+			}
+			if (!OS_access_file(process_path, F_OK | X_OK)) {
+				CLI_debug("CGI Script at \"%.*s\" does not exist or has misconfigured modifiers", process_path.len, process_path.text);
+
+				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_FOUND);
+
+				return ;
+			}
+
+			CLI_debug("CGI Script at \"%.*s\" is to be run via \"%.*s\"", process_path.len, process_path.text, interpreter_path.len, interpreter_path.text);
+
+			i32					process_pipe_in[2]; // 1 is for write?
+			i32					ret_pipe_in  = ::pipe(process_pipe_in);
+			if (ret_pipe_in == -1) {
+				CLI_show_error_runtime("Could not create pipe for process input");
+				CLI_show_extra("Reason", "%m");
+
+				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_SERVER_ERROR);
+
+				return ;
+			}
+
+			i32					process_pipe_out[2]; // 0 is for read
+			i32					ret_pipe_out = ::pipe(process_pipe_out);
+			if (ret_pipe_out == -1) {
+				::close(process_pipe_in[0]);
+				::close(process_pipe_in[1]);
+
+				CLI_show_error_runtime("Could not create pipe for process output");
+				CLI_show_extra("Reason", "%m");
+
+				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_SERVER_ERROR);
+
+				return ;
+			}
+
+			char**				process_envp = WEBSERV_context_response_cgi_env(context, interest, req, path_match, path_extra);
+			char**				process_argv = WEBSERV_context_response_cgi_args(context, interest, req, interpreter_path, process_path);
+
+			i32					process_id = ::fork();
+			b32					process_ok = 1;
+			b32					process_fatal = 0;
+			if (process_id > 0) { /* SECTION(xenobas): Parent process */
+				i32					fd_read = process_pipe_in[0];
+				i32					fd_write = process_pipe_out[1];
+				i32					fd_parent = fd_client;
+
+				i32					fd_remote[2] = { process_pipe_in[1], process_pipe_out[0] };
+				for (i32 i = 0; i < 2; ++i) ::close(fd_remote[i]);
+
+				process_ok = WEBSERV_context_interest_make_process(context, process_id, process_envp, process_argv, fd_read, fd_write, fd_parent);
+				if (process_ok)
+					CLI_debug("Created Process with ID %08d", process_id);
+
+				return ;
+			} else if (process_id == 0) { /* SECTION(xenobas): Child process */
+				i32					fd_read = process_pipe_out[0];
+				if (::dup2(fd_read, FD_STDIN) == -1) {
+					CLI_show_error_runtime("Could not duplicate file descriptor for process input");
+					CLI_show_extra("Reason", "%m");
+
+					process_ok = 0;
+					context.ok = 0;
+					goto CGI_label_cleanup;
+				}
+
+				i32					fd_write = process_pipe_in[1];
+				if (::dup2(fd_write, FD_STDOUT) == -1) {
+					CLI_show_error_runtime("Could not duplicate filed descriptor for process output");
+					CLI_show_extra("Reason", "%m");
+
+					process_ok = 0;
+					context.ok = 0;
+					goto CGI_label_cleanup;
+				}
+
+				i32					fd_remote[2] = { process_pipe_in[0], process_pipe_out[1] };
+				for (i32 i = 0; i < 2; ++i) ::close(fd_remote[i]);
+
+				i32					ret_exec = ::execve(process_argv[0], process_argv, process_envp);
+				if (ret_exec == -1) {
+					CLI_show_error_runtime("CGI script execution threw an error");
+					CLI_show_extra("Reason", "%m");
+
+					context.ok = 0;
+					process_ok = 0;
+					process_fatal = 1;
+
+					goto CGI_label_cleanup;
+				}
+			} else if (process_id == -1) {
+				CLI_show_error_runtime("Could not create fork process for CGI");
+				CLI_show_extra("Reason", "%m");
+
+				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_SERVER_ERROR);
+
+				process_ok = 0;
+			}
+CGI_label_cleanup:
+			if (!process_ok) {
+				for (i32 i = 0; i < 2; ++i) {
+					::close(process_pipe_in[i]);
+					::close(process_pipe_out[i]);
+				}
+				for (i32 i = 0; process_argv[i]; ++i) {
+					delete[]	process_argv[i];
+				}
+				delete[]		process_argv;
+				for (i32 i = 0; process_envp[i]; ++i) {
+					delete[]	process_envp[i];
+				}
+				delete[]		process_envp;
+			}
+			if (process_fatal) {
+				::exit(32);
+			}
+			if (!context.ok) {
+				return ;
+			}
 		} break ;
 		case WEBSERV_ROUTE_COUNT:
 		case WEBSERV_ROUTE_INVALID:
@@ -562,6 +911,8 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 	::signal(SIGPIPE, SIG_IGN);
 	// for (i32 frame = 0; frame < (1000 / 100) * 30; ++frame) {
 	for (i32 req_count = 0; req_count < 3;) {
+		if (!context.ok) break;
+
 		const u64				events_cap = 128;
 		struct epoll_event		events_arr[events_cap];
 		i32						events_len = ::epoll_wait(context.fd_events, events_arr, events_cap, 100);
@@ -577,7 +928,12 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 			break ;
 		}
 
+		if (events_len > 0) {
+			CLI_debug("Polled %d events", events_len);
+		}
 		for (i32 event_idx = 0; event_idx < events_len; ++event_idx) {
+			if (!context.ok) break;
+
 			struct epoll_event&	event = events_arr[event_idx];
 
 			if (!context.interests.has(event.data.fd)) {
@@ -683,10 +1039,22 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 					}
 				} break ;
 				case WEBSERV_INTEREST_PROCESS: {
+					i32	fd_read = interest.process_fds.read;
+					i32	fd_write = interest.process_fds.write;
+					i32	fd_parent = interest.process_fds.parent;
+
+					b32	event_type_stop = event.events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR);
+					b32	event_type_read = event.events & EPOLLIN;
+					b32	event_type_write = event.events & EPOLLOUT;
+
+					if (event_type_stop) {
+						WEBSERV_context_interest_delete(context, interest);
+					}
 					CLI_todo("WEBSERV_INTEREST_PROCESS");
 				} break ;
 			}
 		}
+		if (!context.ok) break ;
 
 		i64	ts_curr = OS_timestamp_now();
 		for (i32 interest_idx = 0; interest_idx < context.interests.cap; ++interest_idx) {

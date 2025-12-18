@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 13:58:18 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/16 19:41:18 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/18 16:40:03 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -27,6 +27,16 @@ void		string_builder::write(char ch) {
 }
 void		string_builder::write(const string_view& str) {
 	this->data.push(str.len, (char*)str.text);
+}
+void		string_builder::write_uppercase(const string_view& str) {
+	for (i32 i = 0; i < str.len; ++i) {
+		char	b = str[i];
+		if (b >= 'a' && b <= 'z') {
+			b ^= 32;
+		}
+
+		this->data.push(b);
+	}
 }
 void		string_builder::write(const char* str) {
 	i32	len = 0;

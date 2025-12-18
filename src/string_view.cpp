@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/16 09:19:09 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/18 13:48:40 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/18 16:03:35 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -100,12 +100,15 @@ const char&				string_view::operator[](i32 index) const {
 }
 
 string_view				string_view::slice(i32 begin, i32 end) const {
-	if (begin < 0 || begin >= this->len)
+	if (begin < 0)
 		throw std::out_of_range("string_view::slice parameter begin is out of range");
 	if (end < 0 || end > this->len)
 		throw std::out_of_range("string_view::slice parameter end is out of range");
 	if (end < begin)
 		throw std::out_of_range("string_view::slice parameter end is invalid");
+	if (begin > this->len) {
+		return (string_view());
+	}
 	return (string_view(&this->text[begin], end - begin));
 }
 string_view				string_view::slice(i32 begin) const {

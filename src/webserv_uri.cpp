@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 16:30:27 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/18 16:20:23 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/18 16:23:17 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,7 +17,7 @@ WEBSERV_URI			WEBSERV_uri_make(const string_view& str) {
 	WEBSERV_URI	uri;
 
 	uri.path = dynamic_array<string_view>();
-	uri.query = hash_table<string_view>();
+	uri.params = hash_table<string_view>();
 	uri.is_file = !str.has_suffix("/");
 
 	uri.str = string_view::alloc(str);
@@ -31,10 +31,10 @@ void				WEBSERV_uri_delete(WEBSERV_URI& uri) {
 	}
 	uri.path.free();
 
-	for_table_begin(uri.query, hash_table<string_view>, param) {
+	for_table_begin(uri.params, hash_table<string_view>, param) {
 		param.value.free();
 	} for_table_end ;
-	uri.query.free();
+	uri.params.free();
 
 	uri.str.free();
 }
@@ -172,8 +172,8 @@ static void			WEBSERV_uri_debug(const WEBSERV_URI& uri) {
 		}
 	}
 	printf(" ]\n");
-	printf("Query Table:\n");
-	for_table_begin(uri.query, hash_table<string_view>, param) {
+	printf("params Table:\n");
+	for_table_begin(uri.params, hash_table<string_view>, param) {
 		printf("  %.*s = %.*s\n", param.key.len, param.key.text, param.value.len, param.value.text);
 	} for_table_end ;
 }
@@ -190,12 +190,12 @@ WEBSERV_URI			WEBSERV_uri_decode(const string_view& str) {
 		}
 
 		string_view	view_path = uri.str;
-		string_view	view_query = "";
+		string_view	view_params = "";
 
-		i32			index_query = view_path.index("?");
-		if (index_query > -1) {
-			view_path = uri.str.slice(0, index_query);
-			view_query = uri.str.slice(index_query + 1);
+		i32			index_params = view_path.index("?");
+		if (index_params > -1) {
+			view_path = uri.str.slice(0, index_params);
+			view_params = uri.str.slice(index_params + 1);
 		}
 
 		string_view	comp;
@@ -208,7 +208,7 @@ WEBSERV_URI			WEBSERV_uri_decode(const string_view& str) {
 		}
 
 		string_view	pair;
-		while (view_query.split_iter("&", pair)) {
+		while (view_params.split_iter("&", pair)) {
 			string_view	view_key, view_val;
 
 			pair.split_iter("=", view_key);
@@ -220,7 +220,7 @@ WEBSERV_URI			WEBSERV_uri_decode(const string_view& str) {
 			string_view	key = WEBSERV_uri_decode_comp(view_key, /* is_query_param = */ 1);
 			string_view	val = WEBSERV_uri_decode_comp(view_val, /* is_query_param = */ 1);
 
-			uri.query.set(key, val);
+			uri.params.set(key, val);
 			key.free();
 		}
 
@@ -228,6 +228,8 @@ WEBSERV_URI			WEBSERV_uri_decode(const string_view& str) {
 	}
 	return (uri);
 }
+
+/* DANGER(xenobas): Does not encode query parameters properly using form style encoding */
 string_view			WEBSERV_uri_encode(const WEBSERV_URI& uri, b32 write_trailing_slash) {
 	string_builder	builder;
 
@@ -245,12 +247,12 @@ string_view			WEBSERV_uri_encode(const WEBSERV_URI& uri, b32 write_trailing_slas
 			builder.write('/');
 		}
 
-		/* SECTION: Query */
+		/* SECTION: params */
 		u32	count = 0;
-		if (uri.query.count > 0) {
+		if (uri.params.count > 0) {
 			builder.write('?');
 		}
-		for_table_begin(uri.query, const hash_table<string_view>, param) {
+		for_table_begin(uri.params, const hash_table<string_view>, param) {
 			if (count > 0) {
 				builder.write('&');
 			}
