@@ -6,7 +6,7 @@
 /*   By: xenobas <rahimos.123@gmail.com>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/17 21:32:19 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/18 23:56:10 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/19 14:31:46 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -263,10 +263,14 @@ void			WEBSERV_interest_close(WEBSERV_Interest& interest) {
 			delete[]		process_envp;
 
 			i32	fd_read = interest.process_fds.read;
-			::close(fd_read);
+			if (fd_read >= 0) {
+				::close(fd_read);
+			}
 
 			i32	fd_write = interest.process_fds.write;
-			::close(fd_write);
+			if (fd_write >= 0) {
+				::close(fd_write);
+			}
 
 			HTTP_request_delete(interest.client_req);
 			HTTP_response_delete(interest.client_res);
@@ -796,7 +800,7 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 
 			CLI_debug("CGI Script at \"%.*s\" is to be run via \"%.*s\"", process_path.len, process_path.text, interpreter_path.len, interpreter_path.text);
 
-			i32					process_pipe_in[2]; // 1 is for write?
+			i32					process_pipe_in[2];
 			i32					ret_pipe_in  = ::pipe(process_pipe_in);
 			if (ret_pipe_in == -1) {
 				CLI_show_error_runtime("Could not create pipe for process input");
@@ -807,7 +811,7 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 				return ;
 			}
 
-			i32					process_pipe_out[2]; // 0 is for read
+			i32					process_pipe_out[2];
 			i32					ret_pipe_out = ::pipe(process_pipe_out);
 			if (ret_pipe_out == -1) {
 				::close(process_pipe_in[0]);
@@ -943,8 +947,9 @@ b32				WEBSERV_context_response_write(WEBSERV_Context& context, WEBSERV_Interest
 
 	if (!interest.client_wait_on_cgi) {
 		WEBSERV_context_interest_delete(context, interest);
+		return (1);
 	}
-	return (1);
+	return (0);
 }
 void			WEBSERV_context_process_write(WEBSERV_Context& context, WEBSERV_Interest& interest) {
 	if (interest.type != WEBSERV_INTEREST_PROCESS) {
@@ -987,6 +992,7 @@ void			WEBSERV_context_process_write(WEBSERV_Context& context, WEBSERV_Interest&
 			return ;
 		}
 
+		::close(interest.process_fds.write);
 		interest.process_fds.write = -1;
 	}
 }
@@ -1086,7 +1092,6 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 					}
 
 					if (WEBSERV_context_interest_make_client(context, server_idx, fd_client, sockaddr)) {
-						req_count++;
 						CLI_debug("Accepted connection from %u.%u.%u.%u:%u",
 							(cast(u8*)(&sockaddr.sin_addr.s_addr))[0],
 							(cast(u8*)(&sockaddr.sin_addr.s_addr))[1],
@@ -1167,7 +1172,10 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 					if (event_type_write) {
 						// CLI_debug("Event client::write");
 
-						WEBSERV_context_response_write(context, interest);
+						b32	res_done = WEBSERV_context_response_write(context, interest);
+						if (res_done) {
+							req_count++;
+						}
 						continue ;
 					}
 				} break ;
