@@ -19,6 +19,9 @@
 - [ ] Restore directory listing functionality
 - [ ] Restore upload functionality
 - [ ] Restore redirection functionality
+- [ ] Add script_executable config for self-executable CGI's
 - [ ] Forbidden functions removal
 - [ ] Pessimist code path testing
-- [ ] Add script_executable config for self-executable CGI's
+- [ ] Siege testing
+- [ ] 42 testing
+- [ ] Evaluation page
