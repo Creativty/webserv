@@ -278,6 +278,29 @@ void			WEBSERV_interest_close(WEBSERV_Interest& interest) {
 	}
 }
 
+b32                WEBSERV_filedesc_cloexec(i32 fd) {
+    if (fd < 0) {
+        return (0);
+    }
+
+    i32 ret_flags = ::fcntl(fd, F_GETFD);
+    if (ret_flags == -1) {
+        return (0);
+    }
+
+    i32 ret_set = ::fcntl(fd, F_SETFD, ret_flags | FD_CLOEXEC);
+    if (ret_set == -1) {
+        return (0);
+    }
+
+    i32 ret_flags_new = ::fcntl(fd, F_GETFD);
+    if (ret_flags_new == -1 || !(ret_flags_new & FD_CLOEXEC)) {
+        return (0);
+    }
+
+    return (1);
+}
+
 b32				WEBSERV_context_interest_unregister(WEBSERV_Context& context, WEBSERV_Interest& interest) {
 	switch (interest.type) {
 	case WEBSERV_INTEREST_SERVER:
@@ -468,8 +491,7 @@ void			WEBSERV_context_server_make(WEBSERV_Context& context, i32 idx) {
 		return ;
 	}
 
-	i32						ret_fcntl = ::fcntl(fd, F_SETFL, FD_CLOEXEC);
-	if (ret_fcntl == -1) {
+	if (!WEBSERV_filedesc_cloexec(fd)) {
 		::close(fd);
 
 		CLI_show_error_runtime("Could not set server file descriptor to close-on-exec");
@@ -887,6 +909,7 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 					context.ok = 0;
 					goto CGI_label_cleanup;
 				}
+                ::close(fd_read); process_pipe_out[0] = -1;
 
 				i32					fd_write = process_pipe_in[1];
 				if (::dup2(fd_write, FD_STDOUT) == -1) {
@@ -897,6 +920,7 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 					context.ok = 0;
 					goto CGI_label_cleanup;
 				}
+                ::close(fd_write); process_pipe_in[1] = -1;
 
 				i32					fd_remote[2] = { process_pipe_in[0], process_pipe_out[1] };
 				for (i32 i = 0; i < 2; ++i) ::close(fd_remote[i]);
@@ -923,8 +947,12 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 CGI_label_cleanup:
 			if (!process_ok) {
 				for (i32 i = 0; i < 2; ++i) {
-					::close(process_pipe_in[i]);
-					::close(process_pipe_out[i]);
+                    if (process_pipe_in[i] >= 0) {
+                        ::close(process_pipe_in[i]);
+                    }
+                    if (process_pipe_out[i] >= 0) {
+                        ::close(process_pipe_out[i]);
+                    }
 				}
 				for (i32 i = 0; process_argv[i]; ++i) {
 					delete[]	process_argv[i];
@@ -1043,6 +1071,16 @@ WEBSERV_Context	WEBSERV_context_make(const WEBSERV_Config& config) {
 		context.ok = 0;
 		return (context);
 	}
+    if (!WEBSERV_filedesc_cloexec(context.fd_events)) {
+        ::close(context.fd_events);
+
+		CLI_show_error_runtime("Could not set events file descriptor as close-on-exec");
+		CLI_show_extra("Reason", "%m");
+
+		context.ok = 0;
+		return (context);
+    }
+
 	return (context);
 }
 void			WEBSERV_context_delete(WEBSERV_Context& context) {
@@ -1074,7 +1112,7 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 	}
 
 	::signal(SIGPIPE, SIG_IGN);
-	for (i32 req_count = 0; req_count < 1;) {
+	for (i32 req_count = 0; req_count < 2;) {
 		if (!context.ok) break;
 
 		const u64				events_cap = 128;
@@ -1121,10 +1159,10 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 
 						continue ;
 					}
-					if (::fcntl(fd_client, F_SETFD, FD_CLOEXEC) == -1) {
+					if (!WEBSERV_filedesc_cloexec(fd_client)) {
 						::close(fd_client);
 
-						CLI_show_error_runtime("Could not set file descriptor to close-on-exec");
+						CLI_show_error_runtime("Could not set client file descriptor to close-on-exec");
 						CLI_show_extra("Reason", "%m");
 
 						continue ;

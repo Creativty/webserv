@@ -6,6 +6,7 @@
 - [x] Fix Formatting
 - [ ] Forbidden functions removal
 - [x] Client Timeouts
+- [ ] On client hang up kill respective child process
 - [ ] Pessimist code path testing
 - [x] CGI Path resolution
     - Assuming CGI route on /cgi

@@ -94,7 +94,7 @@ routes = [
 			interpreters = {
 				py  = "/usr/bin/python3",
 				sh  = "/usr/bin/bash",
-				php  = "/usr/bin/php",
+				# php  = "/usr/bin/php",
 
 			},
 		}

@@ -3,12 +3,12 @@ from sys import argv
 from time import sleep
 
 if __name__ == '__main__':
-    sleep(60)
+    sleep(2)
     print("<!DOCTYPE html>")
     print("<html>")
     print("<body>")
     print("  <h1>Slow</h1>", flush = True)
-    sleep(2)
+    sleep(30)
     print("  <h2>argv</h2>")
     print("  <ul>")
     for arg in argv:
