@@ -6,13 +6,15 @@
 /*   By: xenobas <rahimos.123@gmail.com>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/17 21:52:38 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/18 14:43:10 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/19 22:45:40 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef INT_TABLE_HPP
 #define INT_TABLE_HPP
 #include "base.hpp"
+
+#define I64_TABLE_CAP_INITIAL 128
 
 template <typename T>
 struct i64_table {
@@ -103,7 +105,7 @@ struct i64_table {
 	/* TODO(xenobas): This shit does not work, use bucket addressing instead */
 	void		set(const i64& key, const T& value) {
 		if (this->count >= this->cap / 2)
-			this->resize(this->cap == 0 ? 8 : this->cap * 2);
+			this->resize(this->cap == 0 ? I64_TABLE_CAP_INITIAL : this->cap * 2);
 		size_t	index = this->hash(key, (size_t)this->cap);
 		while (this->items[index].used) {
 			if (this->items[index].key == key) {

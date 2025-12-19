@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/27 10:16:13 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/18 14:47:20 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/19 22:48:31 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -31,7 +31,7 @@ void			CLI_debug_internal(const char* file, i32 line, const char *label, const c
 #ifdef DEBUG
 	va_list	args;
 	va_start(args, fmt);
-	fprintf(stdout, "%s:%d: %s: ", file, line, label);
+	fprintf(stdout, "%s:%04d: %s: ", file, line, label);
 	vfprintf(stdout, fmt, args);
 	fprintf(stdout, "\n");
 	va_end(args);

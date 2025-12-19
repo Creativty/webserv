@@ -4,10 +4,8 @@
 - [x] Remove all usage of std::string where not required
 - [x] Remove all usage of std::map where not required
 - [x] Fix Formatting
-- [ ] Forbidden functions removal
 - [x] Client Timeouts
-- [ ] On client hang up kill respective child process
-- [ ] Pessimist code path testing
+- [x] On client hang up kill respective child process
 - [x] CGI Path resolution
     - Assuming CGI route on /cgi
     - No other route even if it is CGI should be definable under /cgi/*
@@ -16,3 +14,11 @@
       <===============><==============>
          SCRIPT_NAME       PATH_INFO
     ```
+    -
+- [ ] Restore file server functionality
+- [ ] Restore directory listing functionality
+- [ ] Restore upload functionality
+- [ ] Restore redirection functionality
+- [ ] Forbidden functions removal
+- [ ] Pessimist code path testing
+- [ ] Add script_executable config for self-executable CGI's

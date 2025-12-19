@@ -5,6 +5,8 @@ webserv
 *.d
 *.o
 *.swp
+*.log 
+__pycache__/
 
 # Configuration files
 *.toml

@@ -21,7 +21,8 @@ else:
     body = "<p>Unsupported method</p>"
 
 # --- Response body ---
-print(f"""
+print("")
+print(f"""<!DOCTYPE html>
 <html>
   <head><title>CGI Example</title></head>
   <body>
@@ -29,5 +30,4 @@ print(f"""
     <p>Method: {method}</p>
     {body}
   </body>
-</html>
-""")
+</html>""")
