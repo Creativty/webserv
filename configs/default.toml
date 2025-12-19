@@ -81,6 +81,9 @@ routes = [
 [[instance]] # Common Gateway Interface Example
 port = 8081
 addr = "127.0.0.1"
+http = {
+	timeout = 600_000,
+}
 routes = [
 	{
 		path = "/cgi",
@@ -91,6 +94,8 @@ routes = [
 			interpreters = {
 				py  = "/usr/bin/python3",
 				sh  = "/usr/bin/bash",
+				php  = "/usr/bin/php",
+
 			},
 		}
 	}

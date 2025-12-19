@@ -7,7 +7,7 @@
 - [ ] Forbidden functions removal
 - [x] Client Timeouts
 - [ ] Pessimist code path testing
-- [ ] CGI Path resolution
+- [x] CGI Path resolution
     - Assuming CGI route on /cgi
     - No other route even if it is CGI should be definable under /cgi/*
     - ```

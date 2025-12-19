@@ -6,7 +6,7 @@
 /*   By: xenobas <rahimos.123@gmail.com>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/17 21:32:19 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/19 14:31:46 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/19 16:49:55 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -184,7 +184,7 @@ struct	WEBSERV_Interest {
 
 	HTTP_Request			client_req;
 	HTTP_Response			client_res;
-	b32						client_wait_on_cgi;
+	b32						client_process_await;
 	struct sockaddr_in		client_sockaddr;
 
 	i32						process_id;
@@ -294,7 +294,7 @@ b32				WEBSERV_context_interest_unregister(WEBSERV_Context& context, WEBSERV_Int
 			WEBSERV_Interest&	parent = context.interests.get(interest.process_fds.parent);
 
 			parent.timestamp = OS_timestamp_now();
-			parent.client_wait_on_cgi = 0;
+			parent.client_process_await = 0;
 		}
 		if (interest.process_fds.read >= 0) { /* NOTE(xenobas): fd_read */
 			i32	ret_ctl = ::epoll_ctl(context.fd_events, EPOLL_CTL_DEL, interest.process_fds.read, NULL);
@@ -333,10 +333,10 @@ b32				WEBSERV_context_interest_make_client(WEBSERV_Context& context, i32 srv, i
 
 	interest.client_req = HTTP_request_make();
 	interest.client_sockaddr = sockaddr;
-	interest.client_wait_on_cgi = 0;
+	interest.client_process_await = 0;
 
 	struct epoll_event	event_register; MEM_zero(event_register);
-	event_register.events  = EPOLLIN | EPOLLHUP | EPOLLERR;
+	event_register.events  = EPOLLIN | EPOLLRDHUP | EPOLLHUP | EPOLLERR;
 	event_register.data.fd = fd;
 
 	i32					ret_ctl = ::epoll_ctl(context.fd_events, EPOLL_CTL_ADD, fd, &event_register);
@@ -389,6 +389,12 @@ b32				WEBSERV_context_interest_make_process(WEBSERV_Context& context,
 
 	interest.fd = fd;
 	interest.type = WEBSERV_INTEREST_PROCESS;
+
+	if (context.interests.has(fd_parent)) {
+		WEBSERV_Interest&	parent = context.interests.get(fd_parent);
+
+		interest.server_idx = parent.server_idx;
+	}
 
 	interest.timestamp = OS_timestamp_now();
 
@@ -449,6 +455,7 @@ void			WEBSERV_context_server_make(WEBSERV_Context& context, i32 idx) {
 		context.ok = 0;
 		return ;
 	}
+	CLI_debug("Instance %d has socket of file descriptor %d", idx, fd);
 	
 	const i32				opts[] = { 1 };
 	if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opts, size_of(opts)) == -1) {
@@ -458,6 +465,17 @@ void			WEBSERV_context_server_make(WEBSERV_Context& context, i32 idx) {
 		::close(fd);
 		context.ok = 0;
 
+		return ;
+	}
+
+	i32						ret_fcntl = ::fcntl(fd, F_SETFL, FD_CLOEXEC);
+	if (ret_fcntl == -1) {
+		::close(fd);
+
+		CLI_show_error_runtime("Could not set server file descriptor to close-on-exec");
+		CLI_show_extra("Reason", "%m");
+
+		context.ok = 0;
 		return ;
 	}
 
@@ -550,6 +568,25 @@ void			WEBSERV_response_message_write_content_status(HTTP_Response& response, st
 
 }
 
+HTTP_Response&	WEBSERV_context_response(WEBSERV_Context& context, WEBSERV_Interest& interest, HTTP_Status status_code) {
+	HTTP_Response		response;
+
+	response.status_code = status_code;
+
+	response.headers = HTTP_Headers();
+	response.headers.case_insensitive = 1;
+
+	response.is_file = 0;
+	response.content_body.len = 0;
+	response.content_body.bytes = NULL;
+
+	response.write_idx = 0;
+	response.write_str = string_view();
+
+	unused(context);
+	interest.client_res = response;
+	return (interest.client_res);
+}
 void			WEBSERV_context_response_from_status(WEBSERV_Context& context, WEBSERV_Interest& interest, HTTP_Status status_code) {
 	HTTP_Response		response;
 	WEBSERV_Instance&	instance = context.config.instances[interest.server_idx];
@@ -603,12 +640,6 @@ void			WEBSERV_context_response_from_content(WEBSERV_Context& context, WEBSERV_I
 
 	unused(context);
 	interest.client_res = response;
-}
-void			WEBSERV_context_response_from_file(WEBSERV_Context& context, WEBSERV_Interest& interest, HTTP_Status status_code, i32 fd) { /* Transfer-Encoding: chunked */
-	unused(context);
-	unused(interest);
-	unused(status_code);
-	unused(fd);
 }
 
 char**			WEBSERV_context_response_cgi_env(WEBSERV_Context& context, WEBSERV_Interest& interest, HTTP_Request& req, const string_view& script_name, const string_view& path_info) {
@@ -790,7 +821,7 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 
 				return ;
 			}
-			if (!OS_access_file(process_path, F_OK | X_OK)) {
+			if (!OS_access_file(process_path, F_OK | X_OK)) { /* TODO(xenobas): Are we sure we need executable modifier */
 				CLI_debug("CGI Script at \"%.*s\" does not exist or has misconfigured modifiers", process_path.len, process_path.text);
 
 				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_FOUND);
@@ -844,7 +875,7 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 				if (process_ok)
 					CLI_debug("Created Process with ID %8d", process_id);
 
-				interest.client_wait_on_cgi = 1;
+				interest.client_process_await = 1;
 				return ;
 			} else if (process_id == 0) { /* SECTION(xenobas): Child process */
 				i32					fd_read = process_pipe_out[0];
@@ -904,10 +935,10 @@ CGI_label_cleanup:
 				}
 				delete[]		process_envp;
 			}
-			if (process_fatal) {
-				::exit(32);
-			}
 			if (!context.ok) {
+				if (process_fatal) {
+					::exit(32);
+				}
 				return ;
 			}
 		} break ;
@@ -945,7 +976,7 @@ b32				WEBSERV_context_response_write(WEBSERV_Context& context, WEBSERV_Interest
 		return (0);
 	}
 
-	if (!interest.client_wait_on_cgi) {
+	if (!interest.client_process_await) {
 		WEBSERV_context_interest_delete(context, interest);
 		return (1);
 	}
@@ -1043,7 +1074,7 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 	}
 
 	::signal(SIGPIPE, SIG_IGN);
-	for (i32 req_count = 0; req_count < 3;) {
+	for (i32 req_count = 0; req_count < 1;) {
 		if (!context.ok) break;
 
 		const u64				events_cap = 128;
@@ -1090,6 +1121,14 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 
 						continue ;
 					}
+					if (::fcntl(fd_client, F_SETFD, FD_CLOEXEC) == -1) {
+						::close(fd_client);
+
+						CLI_show_error_runtime("Could not set file descriptor to close-on-exec");
+						CLI_show_extra("Reason", "%m");
+
+						continue ;
+					}
 
 					if (WEBSERV_context_interest_make_client(context, server_idx, fd_client, sockaddr)) {
 						CLI_debug("Accepted connection from %u.%u.%u.%u:%u",
@@ -1103,7 +1142,7 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 				} break ;
 				case WEBSERV_INTEREST_CLIENT: {
 					i32	fd_client = interest.fd;
-					b32	event_type_stop = event.events & (EPOLLHUP | EPOLLERR);
+					b32	event_type_stop = event.events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR);
 					b32	event_type_read = event.events & EPOLLIN;
 					b32	event_type_write = event.events & EPOLLOUT;
 
@@ -1152,7 +1191,7 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 						}
 						if (HTTP_request_is_done(interest.client_req)) {
 							struct epoll_event	event_mod; MEM_zero(event_mod);
-							event_mod.events = EPOLLOUT | EPOLLHUP | EPOLLERR;
+							event_mod.events = EPOLLOUT | EPOLLRDHUP | EPOLLHUP | EPOLLERR;
 							event_mod.data.fd = interest.fd;
 
 							i32					ret_ctl = ::epoll_ctl(context.fd_events, EPOLL_CTL_MOD, fd_client, &event_mod);
@@ -1186,7 +1225,7 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 
 					b32	event_type_stop = event.events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR);
 					if (event_type_stop) {
-						CLI_debug("Event process::stop");
+						CLI_debug("Event process::stop id %8d", process_id);
 						if (event.events & EPOLLERR) {
 							CLI_show_error_runtime("Process %8d had an error occur", process_id);
 						}
@@ -1196,7 +1235,61 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 							dynamic_array<byte>&	stream = interest.process_read_stream;
 							string_view				content = string_view(cast(char*)stream.data, stream.len);
 
-							WEBSERV_context_response_from_content(context, parent, HTTP_STATUS_OK, string_view::alloc(content));
+							i32						process_status = 0;
+							i32						process_waited = ::waitpid(process_id, &process_status, WNOHANG);
+							CLI_debug("Process %8d is waiting for status %d with return %d", process_id, process_status, process_waited);
+							if (WIFEXITED(process_status) && WEXITSTATUS(process_status) == 0) {
+								HTTP_Response&		response = WEBSERV_context_response(context, parent, HTTP_STATUS_OK);
+
+								string_view			content_header = string_view();
+								b32					content_length_is_set = 0;
+								while (content.split_iter("\n", content_header)) {
+									if (content_header.len == 0) break ;
+									
+									string_view	name;
+									content_header.split_iter(":", name);
+
+									string_view	value = content_header.trim();
+									if (!name || !value) break ;
+
+									response.headers.set(name, string_view::alloc(value));
+									if (name.eq_insensitive("Content-Length")) {
+										content_length_is_set = 1;
+									}
+								}
+
+								string_view			content_body = string_view::alloc(content);
+								response.content_body.len = cast(i32)content_body.len;
+								response.content_body.bytes = cast(byte*)content_body.text;
+
+								if (!content_length_is_set) {
+									string_builder	content_length;
+
+									content_length.write(cast(i64)response.content_body.len);
+									response.headers.set("Content-Length", content_length.to_string());
+								}
+
+								{
+									string_builder	content_builder;
+									WEBSERV_response_message_write_prelude(response, content_builder);
+									content_builder.write(content_body);
+
+									CLI_debug("event process::queue %d bytes", content_builder.data.len);
+
+									response.write_idx = 0;
+									response.write_str = content_builder.to_string();
+								}
+							} else {
+								if (process_waited == -1) {
+									CLI_show_error_runtime("Process %8d could not query status", process_id);
+									CLI_show_extra("Reason", "%m");
+								}
+								WEBSERV_context_response_from_status(context, parent, HTTP_STATUS_SERVER_ERROR);
+								/* NOTE(xenobas): There is a possibility of zombie processes */
+							}
+
+						} else {
+							CLI_show_error_runtime("Could not find client that triggered process %8d", process_id);
 						}
 
 						WEBSERV_context_interest_delete(context, interest);
@@ -1266,6 +1359,15 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 			}
 
 			CLI_debug("Interest associated with file descriptor %3d has timed out", interest.fd);
+			if (interest.type == WEBSERV_INTEREST_PROCESS) {
+				i32	fd_parent = interest.process_fds.parent;
+				if (context.interests.has(fd_parent)) {
+					WEBSERV_Interest&	parent = context.interests.get(fd_parent);
+
+					WEBSERV_context_response_from_status(context, parent, HTTP_STATUS_SERVER_ERROR);
+				}
+				/* TODO(xenobas): Kill zombie process */
+			}
 			WEBSERV_context_interest_delete(context, interest);
 			// req_count++;
 		}

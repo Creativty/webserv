@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/16 09:19:09 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/18 16:03:35 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/19 15:09:54 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -240,6 +240,9 @@ i32						string_view::count(const string_view& str) const {
 
 static b32				match_space(byte b) {
 	return (b == 0x20 || b == 0x09 || b == 0x0a || b == 0x0b || b == 0x0c || b == 0x0d);
+}
+string_view				string_view::trim(void) const {
+	return (this->trim_left().trim_right());
 }
 string_view				string_view::trim_left(void) const {
 	i32	left = 0;

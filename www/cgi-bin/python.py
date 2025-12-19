@@ -4,7 +4,6 @@ import sys
 import time
 
 # --- Required CGI headers ---
-time.sleep(5)
 # print("HTTP/1.0 200 OK\r\n")
 # print("Content-Type: text/html\r\n")
 

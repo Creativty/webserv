@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/16 09:16:21 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/18 13:48:40 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/19 15:09:15 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -55,6 +55,7 @@ struct string_view {
 	int					count(const string_view& str) const;
 	int					count(char ch) const;
 
+	string_view			trim(void) const;
 	string_view			trim_left(void) const;
 	string_view			trim_right(void) const;
 
