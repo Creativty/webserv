@@ -25,6 +25,6 @@
 	header("Content-Type: text/html");
 	$req_lines = explode("\n", $req_content);
 	foreach ($req_lines as $req_line) {
-		echo "<li>$req_line<li>\n";
+		echo "<li>$req_line</li>\n";
 	}
 ?>
