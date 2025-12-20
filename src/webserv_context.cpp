@@ -6,7 +6,7 @@
 /*   By: xenobas <rahimos.123@gmail.com>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/17 21:32:19 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/20 15:14:52 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/20 15:47:02 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -406,6 +406,10 @@ void			HTTP_response_delete(HTTP_Response& response) {
 		content.free();
 	}
 }
+void			HTTP_response_cors(HTTP_Response& response) {
+	response.headers.set("Access-Control-Allow-Origin", string_view::alloc("*"));
+}
+
 void			WEBSERV_interest_close(WEBSERV_Interest& interest) {
 	switch (interest.type) {
 		case WEBSERV_INTEREST_SERVER: {
@@ -789,6 +793,8 @@ HTTP_Response&	WEBSERV_context_response(WEBSERV_Context& context, WEBSERV_Intere
 	response.headers = HTTP_Headers();
 	response.headers.case_insensitive = 1;
 
+	HTTP_response_cors(response);
+
 	response.is_file = 0;
 	response.content_body.len = 0;
 	response.content_body.bytes = NULL;
@@ -800,6 +806,7 @@ HTTP_Response&	WEBSERV_context_response(WEBSERV_Context& context, WEBSERV_Intere
 	interest.client_res = response;
 	return (interest.client_res);
 }
+
 void			WEBSERV_context_response_from_status(WEBSERV_Context& context, WEBSERV_Interest& interest, HTTP_Status status_code) {
 	HTTP_Response		response;
 	WEBSERV_Instance&	instance = context.config.instances[interest.server_idx];
@@ -816,6 +823,8 @@ void			WEBSERV_context_response_from_status(WEBSERV_Context& context, WEBSERV_In
 	response.is_file = 0;
 	response.content_body.len = cast(i32)content.len;
 	response.content_body.bytes = cast(byte*)content.text;
+
+	HTTP_response_cors(response);
 
 	response.headers.set("Content-Type", string_view::alloc("text/html"));
 	response.headers.set("Content-Length", strconv_i64(response.content_body.len));
@@ -846,6 +855,8 @@ void			WEBSERV_context_response_from_content(WEBSERV_Context& context, WEBSERV_I
 	response.content_body.len = cast(i32)content_owned.len;
 	response.content_body.bytes = cast(byte*)content_owned.text;
 
+	HTTP_response_cors(response);
+
 	response.headers.set("Content-Type", string_view::alloc(mime));
 	response.headers.set("Content-Length", strconv_i64(response.content_body.len));
 
@@ -875,6 +886,8 @@ void			WEBSERV_context_response_from_redirect(WEBSERV_Context& context, WEBSERV_
 	response.is_file = 0;
 	response.content_body.len = cast(i32)content.len;
 	response.content_body.bytes = cast(byte*)content.text;
+
+	HTTP_response_cors(response);
 
 	response.headers.set("Location", string_view::alloc(location));
 	response.headers.set("Content-Type", string_view::alloc("text/html"));
