@@ -1121,8 +1121,9 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 			builder_resource_path.write(files_directory);
 			builder_resource_path.write(path_extra);
 
-			string_view	resource_path = builder_resource_path.to_view();
 			builder_resource_path.write('\0'); /* NOTE(xenobas): NULL-terminated for passing directly to syscalls */
+			string_view	resource_path = builder_resource_path.to_view();
+			--resource_path.len;
 
 			if (OS_test_file_read(resource_path)) { /* NOTE(xenobas): File check */
 				CLI_debug("Client is being served file at \"%.*s\"",
@@ -1293,8 +1294,9 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 			if (!file_directory.has_suffix("/")) file_path_builder.write("/");
 			file_path_builder.write(path_extra);
 
-			string_view			file_path = file_path_builder.to_view();
 			file_path_builder.write('\0'); /* NOTE(xenobas): Guarantees NULL termination for usage with syscalls */
+			string_view			file_path = file_path_builder.to_view();
+			--file_path.len; /* NOTE(xenobas): Avoid use-after-free */
 
 			if (req.method & WEBSERV_METHOD_DELETE) {
 				if (!OS_test_file_exists(file_path)) {
