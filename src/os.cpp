@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 17:02:26 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/20 14:46:31 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/20 17:46:04 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -58,7 +58,7 @@ b32			OS_write_file(const string_view& path, const string_view& content, i32 fla
 	byte	path_cstr[PATH_CAP + 1] = { 0 };
 	MEM_copy((byte*)path.text, path.len, path_cstr, PATH_CAP);
 
-	i32		fd = ::open((char*)path_cstr, flags | O_WRONLY, 0755);
+	i32		fd = ::open((char*)path_cstr, flags | O_WRONLY, 0666);
 	if (fd == -1) {
 		return (0);
 	}

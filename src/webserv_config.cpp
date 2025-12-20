@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:42:31 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/18 15:32:35 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/20 16:56:51 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -290,7 +290,6 @@ static b32				WEBSERV_config_parse_route_path(Parser_Context& ctx, Route& route,
 		return (0);
 	}
 
-	/* TODO(xenobas): Switch from string to WEBSERV_URI */
 	const string_view&	str = *(value.String);
 	if (!str.has_prefix("/") || str.has("?") || str.has("#") || str.has("&")) {
 		context_error(VALUE_INVALID, value.pos, "uri path component");
@@ -846,7 +845,6 @@ static void				WEBSERV_config_parse_instance_routes(Parser_Context& ctx, const T
 			continue ;
 		}
 
-		/* TODO(xenobas): Move this to inside of respective parser to get better position for error reporting */
 		b32		path_ok = !instance.routes.has(route.path);
 		if (!path_ok) {
 			/* NOTE(xenobas): Due to the deletion below, we have to clone it */

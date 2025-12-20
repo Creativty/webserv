@@ -74,7 +74,6 @@ routes = [
 		type = "Upload",
 		props = {
 			directory = "www/storage",
-			max_file_size = 256_000, # bytes
 		},
 	},
 ]

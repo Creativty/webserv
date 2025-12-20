@@ -6,7 +6,7 @@
 /*   By: xenobas <rahimos.123@gmail.com>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/17 21:32:19 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/20 16:47:41 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/20 17:50:17 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,6 +19,101 @@
 #ifndef CONTEXT_STREAM_BASELINE
 #define CONTEXT_STREAM_BASELINE (1024 * 1024 * 4)
 #endif
+
+enum HTTP_Status {
+	HTTP_STATUS_PROCESSING			=  102,
+    HTTP_STATUS_OK					=  200,
+    HTTP_STATUS_CREATED				=  201,
+    HTTP_STATUS_ACCEPTED			=  202,
+	HTTP_STATUS_NO_CONTENT			=  204,
+	HTTP_STATUS_MULTIPLE_CHOICES	=  300,
+	HTTP_STATUS_MOVED_PERMANENTLY	=  301,
+	HTTP_STATUS_FOUND				=  302,
+	HTTP_STATUS_SEE_OTHER			=  303,
+	HTTP_STATUS_TEMPORARY_REDIRECT	=  307,
+	HTTP_STATUS_PERMANENT_REDIRECT	=  308,
+    HTTP_STATUS_BAD_REQUEST			=  400,
+    HTTP_STATUS_UNAUTHORIZED		=  401,
+    HTTP_STATUS_FORBIDDEN			=  403,
+    HTTP_STATUS_NOT_FOUND			=  404,
+	HTTP_STATUS_METHOD_NOT_ALLOWED	=  405,
+	HTTP_STATUS_CONTENT_TOO_LARGE	=  413,
+    HTTP_STATUS_SERVER_ERROR		=  500,
+	HTTP_STATUS_NOT_IMPLEMENTED		=  501,
+	HTTP_STATUS_BAD_GATEWAY			=  502,
+	HTTP_STATUS_GATEWAY_TIMEOUT		=  504,
+};
+
+struct HTTP_Response {
+	i32				write_idx;
+	string_view		write_str;
+
+	HTTP_Status		status_code;
+	HTTP_Headers	headers;
+
+	b32				is_file;
+	union {
+		i32			content_fd;
+		struct {
+			byte*	bytes;
+			i32		len;
+		}			content_body;
+	};
+};
+
+enum	WEBSERV_Interest_Type {
+	WEBSERV_INTEREST_SERVER,
+	WEBSERV_INTEREST_CLIENT,
+	WEBSERV_INTEREST_PROCESS,
+};
+struct	WEBSERV_Interest {
+	i32						fd;
+	WEBSERV_Interest_Type	type;
+
+	i64						timestamp; /* NOTE(xenobas): Last event timestamp */
+	i32						server_idx; /* NOTE(xenobas): context.config.instances[server_idx] */
+
+	HTTP_Request			client_req;
+	HTTP_Response			client_res;
+	i32						client_process_fd;
+	b32						client_process_await;
+	struct sockaddr_in		client_sockaddr;
+
+	i32						process_id;
+	struct {
+		b32					done;
+
+		i32					read;
+		i32					write;
+		i32					parent;
+		i32					remote[2];
+	}						process_fds;
+	char**					process_envp;
+	char**					process_argv;
+
+	dynamic_array<byte>		process_read_stream;
+
+	dynamic_array<byte>		process_write_stream;
+	i32						process_write_offset;
+};
+struct	WEBSERV_Task {
+	i64			id;
+	i32			fd;
+
+	byte*		data_arr;
+	i32			data_len;
+	i32			data_idx;
+};
+struct	WEBSERV_Context {
+	WEBSERV_Config			config;
+	b32						ok;
+
+	i32								fd_events;
+	i64_table<WEBSERV_Interest>		interests;
+
+	i64						tasks_id;
+	i64_table<WEBSERV_Task>	tasks;
+};
 
 template <typename T>
 string_view		ENV_string(const string_view& name, T value, b32 is_header = 0) {
@@ -41,30 +136,7 @@ string_view		ENV_string(const string_view& name, T value, b32 is_header = 0) {
 	return (b.to_string());
 }
 
-enum HTTP_Status {
-	HTTP_STATUS_PROCESSING			=  102,
-    HTTP_STATUS_OK					=  200,
-    HTTP_STATUS_CREATED				=  201,
-	HTTP_STATUS_NO_CONTENT			=  204,
-	HTTP_STATUS_MULTIPLE_CHOICES	=  300,
-	HTTP_STATUS_MOVED_PERMANENTLY	=  301,
-	HTTP_STATUS_FOUND				=  302,
-	HTTP_STATUS_SEE_OTHER			=  303,
-	HTTP_STATUS_TEMPORARY_REDIRECT	=  307,
-	HTTP_STATUS_PERMANENT_REDIRECT	=  308,
-    HTTP_STATUS_BAD_REQUEST			=  400,
-    HTTP_STATUS_UNAUTHORIZED		=  401,
-    HTTP_STATUS_FORBIDDEN			=  403,
-    HTTP_STATUS_NOT_FOUND			=  404,
-	HTTP_STATUS_METHOD_NOT_ALLOWED	=  405,
-	HTTP_STATUS_CONTENT_TOO_LARGE	=  413,
-    HTTP_STATUS_SERVER_ERROR		=  500,
-	HTTP_STATUS_NOT_IMPLEMENTED		=  501,
-	HTTP_STATUS_BAD_GATEWAY			=  502,
-	HTTP_STATUS_GATEWAY_TIMEOUT		=  504,
-};
-
-string_view		HTTP_status_as_string(HTTP_Status status) {
+string_view			HTTP_status_as_string(HTTP_Status status) {
 	switch (status) {
 		case HTTP_STATUS_PROCESSING: {
 			return ("101");
@@ -77,6 +149,9 @@ string_view		HTTP_status_as_string(HTTP_Status status) {
 		} break ;
 		case HTTP_STATUS_CREATED: {
 			return ("201");
+		} break ;
+		case HTTP_STATUS_ACCEPTED: {
+			return ("202");
 		} break ;
 		case HTTP_STATUS_NO_CONTENT: {
 			return ("204");
@@ -129,7 +204,7 @@ string_view		HTTP_status_as_string(HTTP_Status status) {
 	}
 	return ("500");
 }
-string_view		HTTP_status_as_text(HTTP_Status status) {
+string_view			HTTP_status_as_text(HTTP_Status status) {
 	switch (status) {
 		case HTTP_STATUS_PROCESSING: {
 			return ("Processing");
@@ -142,6 +217,9 @@ string_view		HTTP_status_as_text(HTTP_Status status) {
 		} break ;
 		case HTTP_STATUS_CREATED: {
 			return ("Created");
+		} break ;
+		case HTTP_STATUS_ACCEPTED: {
+			return ("Accepted");
 		} break ;
 		case HTTP_STATUS_NO_CONTENT: {
 			return ("No Content");
@@ -194,7 +272,7 @@ string_view		HTTP_status_as_text(HTTP_Status status) {
 	}
 	return ("Internal Server Error");
 }
-HTTP_Status		HTTP_status_from_string(string_view	code) {
+HTTP_Status			HTTP_status_from_string(string_view	code) {
 	if (code == "102") {
 		return (HTTP_STATUS_PROCESSING);
 	}
@@ -203,6 +281,9 @@ HTTP_Status		HTTP_status_from_string(string_view	code) {
 	}
     if (code == "201") {
 		return (HTTP_STATUS_CREATED);
+	}
+    if (code == "202") {
+		return (HTTP_STATUS_ACCEPTED);
 	}
 	if (code == "204") {
 		return (HTTP_STATUS_NO_CONTENT);
@@ -258,7 +339,7 @@ HTTP_Status		HTTP_status_from_string(string_view	code) {
 	return (HTTP_STATUS_NOT_IMPLEMENTED);
 }
 
-string_view		HTTP_mime_from_name(const string_view& filename) {
+string_view			HTTP_mime_from_name(const string_view& filename) {
     if (filename.has_suffix(".html")) return ("text/html");
     if (filename.has_suffix(".htm") ) return ("text/html");
     if (filename.has_suffix(".css") ) return ("text/css");
@@ -312,68 +393,7 @@ string_view		HTTP_mime_from_name(const string_view& filename) {
     return ("text/plain");
 }
 
-/* TODO(xenobas): Continue with response work */
-struct HTTP_Response {
-	i32				write_idx;
-	string_view		write_str;
-
-	HTTP_Status		status_code;
-	HTTP_Headers	headers;
-
-	b32				is_file;
-	union {
-		i32			content_fd;
-		struct {
-			byte*	bytes;
-			i32		len;
-		}			content_body;
-	};
-};
-
-enum	WEBSERV_Interest_Type {
-	WEBSERV_INTEREST_SERVER,
-	WEBSERV_INTEREST_CLIENT,
-	WEBSERV_INTEREST_PROCESS,
-};
-struct	WEBSERV_Interest {
-	i32						fd;
-	WEBSERV_Interest_Type	type;
-
-	i64						timestamp; /* NOTE(xenobas): Last event timestamp */
-	i32						server_idx; /* NOTE(xenobas): context.config.instances[server_idx] */
-
-	HTTP_Request			client_req;
-	HTTP_Response			client_res;
-	i32						client_process_fd;
-	b32						client_process_await;
-	struct sockaddr_in		client_sockaddr;
-
-	i32						process_id;
-	struct {
-		b32					done;
-
-		i32					read;
-		i32					write;
-		i32					parent;
-		i32					remote[2];
-	}						process_fds;
-	char**					process_envp;
-	char**					process_argv;
-
-	dynamic_array<byte>		process_read_stream;
-
-	dynamic_array<byte>		process_write_stream;
-	i32						process_write_offset;
-};
-struct	WEBSERV_Context {
-	WEBSERV_Config			config;
-	b32						ok;
-
-	i32							fd_events;
-	i64_table<WEBSERV_Interest>	interests;
-};
-
-string_view		strconv_i64(i64 n) {
+string_view			strconv_i64(i64 n) {
 	string_builder	b;
 
 	b.write(n);
@@ -671,6 +691,37 @@ b32				WEBSERV_context_interest_make_process(WEBSERV_Context& context,
 	
 	context.interests.set(interest.fd, interest);
 	return (1);
+}
+
+i64				WEBSERV_context_task_make_id(WEBSERV_Context& context) {
+	i64	task_id = context.tasks_id;
+	do {
+		task_id = ++context.tasks_id;
+	} while (context.tasks.has(task_id));
+	return (task_id);
+}
+i64				WEBSERV_context_task_make_upload(WEBSERV_Context& context, const HTTP_Request& req, i32 fd) {
+	i64	id = WEBSERV_context_task_make_id(context);
+
+	WEBSERV_Task		task; MEM_zero(task);
+	task.id = id;
+	task.fd = fd;
+
+	dynamic_array<byte>	body = HTTP_request_body(req);
+	task.data_arr = body.data;
+	task.data_len = body.len;
+	task.data_idx = 0;
+
+	context.tasks.set(id, task);
+	return (id);
+}
+void			WEBSERV_context_task_delete(WEBSERV_Context& context, WEBSERV_Task& task) {
+	CLI_debug("Task %d is done", task.id);
+
+	if (task.fd >= 0) ::close(task.fd);
+	delete[]	task.data_arr;
+
+	context.tasks.unset(task.id);
 }
 
 void			WEBSERV_context_server_make(WEBSERV_Context& context, i32 idx) {
@@ -1046,8 +1097,6 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 	if (!req.uri.is_file || builder_index < req.uri.path.len) {
 		builder_path_extra.write('/');
 	}
-
-	i32					path_extra_index = builder_index;
 	for (i32 i = 0; builder_index < req.uri.path.len; ++builder_index, ++i) {
 
 		if (i > 0) {
@@ -1277,14 +1326,81 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 				return ;
 			}
 
-			unused(path_extra_index);
-
 			if (req.method & WEBSERV_METHOD_POST) {
-				/* Create resource */
-			}
+				if (OS_test_file_exists(file_path)) {
+					CLI_show_error_runtime("Client cannot POST file \"%.*s\" that already exists",
+								file_path.len, file_path.text);
 
-			if (req.method & (WEBSERV_METHOD_POST | WEBSERV_METHOD_PUT)) {
-				/* Queue up task for writing */
+					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_BAD_REQUEST);
+					return ;
+				}
+
+				i32	fd = ::open(file_path.text, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+				if (fd == -1) {
+					CLI_show_error_runtime("Client could not create file at \"%.*s\"",
+								file_path.len, file_path.text);
+					CLI_show_extra("Reason", "%m");
+
+					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_SERVER_ERROR);
+					return ;
+				}
+				if (!WEBSERV_filedesc_cloexec(fd)) {
+					::close(fd);
+
+					CLI_show_error_runtime("Could not set task file descriptor to close-on-exec");
+					CLI_show_extra("Reason", "%m");
+
+					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_SERVER_ERROR);
+					return ;
+				}
+
+				i64	id = WEBSERV_context_task_make_upload(context, req, fd);
+				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_CREATED);
+
+				CLI_debug("Client has initiated POST task with id %ld", id);
+				return ;
+			}
+			if (req.method & WEBSERV_METHOD_PUT) {
+				if (!OS_test_file_exists(file_path)) {
+					CLI_show_error_runtime("Client cannot PUT file \"%.*s\" that doesn't exist",
+								file_path.len, file_path.text);
+
+					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_FOUND);
+					return ;
+				}
+				if (!OS_test_file_write(file_path)) {
+					CLI_show_error_runtime("Client cannot PUT file \"%.*s\"",
+								file_path.len, file_path.text);
+					CLI_show_extra("Reason", "%m");
+
+					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_FOUND);
+					return ;
+				}
+
+				i32	fd = ::open(file_path.text, O_WRONLY | O_CREAT | O_TRUNC);
+				if (fd == -1) {
+					CLI_show_error_runtime("Client could not update file at \"%.*s\"",
+								file_path.len, file_path.text);
+					CLI_show_extra("Reason", "%m");
+
+					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_SERVER_ERROR);
+					return ;
+				}
+				if (!WEBSERV_filedesc_cloexec(fd)) {
+					::close(fd);
+
+					CLI_show_error_runtime("Could not set task file descriptor to close-on-exec");
+					CLI_show_extra("Reason", "%m");
+
+					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_SERVER_ERROR);
+					return ;
+				}
+
+				i64	id = WEBSERV_context_task_make_upload(context, req, fd);
+				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_ACCEPTED);
+
+				CLI_debug("Client has initiated PUT task with id %ld", id);
+				return ;
 			}
 		} break ;
 		case WEBSERV_ROUTE_REDIRECT: {
@@ -1659,6 +1775,9 @@ WEBSERV_Context	WEBSERV_context_make(const WEBSERV_Config& config) {
 	context.ok = 1;
 	context.config = config;
 
+	context.tasks_id = 0;
+	context.tasks = i64_table<WEBSERV_Task>();
+
 	context.interests = i64_table<WEBSERV_Interest>();
 	context.fd_events = ::epoll_create(SOMAXCONN);
 	if (context.fd_events == -1) {
@@ -1691,8 +1810,19 @@ void			WEBSERV_context_delete(WEBSERV_Context& context) {
 	}
 	context.interests.free();
 
+	for (i32 i = 0; i < context.tasks.cap; ++i) {
+		if (!context.tasks.items[i].used) {
+			continue ;
+		}
+
+		WEBSERV_Task&	task = context.tasks.items[i].value;
+		WEBSERV_context_task_delete(context, task);
+	}
+	context.tasks.free();
+
 	::close(context.fd_events);
 }
+
 b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 	WEBSERV_Context	context = WEBSERV_context_make(config);
 	if (!context.ok) {
@@ -1709,12 +1839,12 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 	}
 
 	::signal(SIGPIPE, SIG_IGN);
-	for (i32 req_count = 0; req_count < 32;) {
+	for (i32 req_count = 0; req_count < 2 || context.tasks.count > 0;) {
 		if (!context.ok) break;
 
 		const u64				events_cap = 128;
 		struct epoll_event		events_arr[events_cap];
-		i32						events_len = ::epoll_wait(context.fd_events, events_arr, events_cap, 100);
+		i32						events_len = ::epoll_wait(context.fd_events, events_arr, events_cap, 16);
 		if (events_len == -1) {
 			if (errno == EINTR) {
 				continue ;
@@ -1992,6 +2122,34 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 			}
 			WEBSERV_context_interest_delete(context, interest);
 		}
+		for (i32 task_idx = 0; task_idx < context.tasks.cap; ++task_idx) {
+			if (!context.tasks.items[task_idx].used) {
+				continue ;
+			}
+
+			WEBSERV_Task&	task = context.tasks.items[task_idx].value;
+			if (task.data_idx >= task.data_len) {
+				WEBSERV_context_task_delete(context, task);
+				continue ;
+			}
+
+			i32				data_cap = task.data_len - task.data_idx;
+			if (data_cap > CONTEXT_BUFFER_CAPACITY) {
+				data_cap = CONTEXT_BUFFER_CAPACITY;
+			}
+
+			i64				ret = ::write(task.fd, &task.data_arr[task.data_idx], cast(u64)data_cap);
+			if (ret == -1) {
+				CLI_show_error_runtime("Could not write task %d file chunk at file descriptor %d", task.id, task.fd);
+				CLI_show_extra("Reason", "%m");
+
+				WEBSERV_context_task_delete(context, task);
+				continue ;
+			}
+
+			task.data_idx += ret;
+		}
+
 		CLI_flush();
 	}
 
