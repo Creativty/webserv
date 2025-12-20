@@ -6,12 +6,14 @@ webserv
 *.o
 *.swp
 *.log 
+*.data
 __pycache__/
 
 # Configuration files
 *.toml
 !configs/*.toml
 
+# Uploaded files
 www/storage/
 
 # Editor specific files
