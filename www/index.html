@@ -24,6 +24,14 @@
 				-webkit-user-select: none;
 				user-select: none;
 			}
+			textarea, pre {
+				padding-inline: 1rem;
+				padding-block: 1rem;
+			}
+		}
+		pre.stderr {
+			color: #ffffff;
+			background-color: #D93526;
 		}
 		ul, ol {
 			padding-left: 1rem;
@@ -256,6 +264,60 @@
 			}
 		});
 	</script>
+	<!-- CGI Demo -->
+	<script type="module">
+		document.addEventListener("DOMContentLoaded", () => {
+			const form = document.querySelector("form#form_list");
+
+			const stdout = document.querySelector("form#form_list + pre.stdout");
+			const stderr = document.querySelector("form#form_list > pre.stderr");
+			stderr.innerText = "";
+			stderr.style.display = "none";
+
+			form.addEventListener("submit", async (ev) => {
+				ev.preventDefault();
+
+				stdout.innerText = "";
+				stderr.innerText = "";
+				stderr.style.display = "none";
+
+				try {
+					const form = ev.target;
+					form.disabled = true;
+
+					const data = new FormData(form);
+					const lines = data.get("lines");
+
+					const url = new URL(form.action);
+					const method = form.method;
+
+					const res = await fetch(url, {
+						method: method,
+						headers: {
+							"Content-Type": "text/plain",
+						},
+
+						body: lines,
+					});
+					console.log(res.ok, res.status, res.statusText);
+
+					if (!res.ok) {
+						throw new Error(`${res.status} ${res.statusText}`);
+					}
+
+					const code = await res.text();
+					stdout.innerText = code;
+				} catch (error) {
+					stderr.innerText = "Error: " + error.message;
+					stderr.style.display = null;
+
+					console.error(error);
+				} finally {
+					form.disabled = false;
+				}
+			});
+		});
+	</script>
 	</head>
 <body>
 	<header class="container">
@@ -435,8 +497,29 @@
 		<section id="section_cgi">
 			<hgroup>
 				<h2>Common Gateway Interface</h2>
-				<a href="https://en.wikipedia.org/wiki/Common_Gateway_Interface" target="_blank">Mafiyach...</a>
+				<a href="https://en.wikipedia.org/wiki/Common_Gateway_Interface" target="_blank">Bugs in this one are incredibly dangerous</a>
 			</hgroup>
+			<div class="container grid">
+				<form id="form_list" action="http://localhost:8081/cgi/html_list.php" method="POST">
+					<fieldset>
+						<label>
+							Text
+							<textarea
+								name="lines"
+								placeholder="My line of text..."
+								autocomplete="off"
+
+								title="'My line' becomes '<li>My line</li>' "
+								required
+							></textarea>
+						</label>
+					</fieldset>
+					<pre class="stderr"></pre>
+					<input type="submit" value="Submit">
+				</form>
+				<pre class="stdout">
+				</pre>
+			</div>
 		</section>
 	</main>
 </body>
