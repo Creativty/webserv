@@ -12,9 +12,7 @@ __pycache__/
 *.toml
 !configs/*.toml
 
-# Images
-www/assets/images/*
-!www/assets/images/1337.jpeg
+www/storage/
 
 # Editor specific files
 tags
