@@ -1375,7 +1375,7 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 								file_path.len, file_path.text);
 					CLI_show_extra("Reason", "%m");
 
-					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_FOUND);
+					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_UNAUTHORIZED);
 					return ;
 				}
 
