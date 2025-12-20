@@ -4,6 +4,7 @@ addr = "0.0.0.0"
 # host = "shit.com"
 http = {
 	status_404 = "./configs/not_found.html", # Settings the default error page
+	request_body_limit = 4_194_304, # 4MiB
 }
 routes = [
 	{

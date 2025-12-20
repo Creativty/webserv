@@ -380,6 +380,15 @@ string_view		strconv_i64(i64 n) {
 	return (b.to_string());
 }
 
+u32					HTTP_request_body_size(const HTTP_Request& req) {
+	u32	body_size = 0;
+	for (i32 chunk_index = 0; chunk_index < req.chunks.len; ++chunk_index) {
+		const HTTP_Chunk&	chunk = req.chunks[chunk_index];
+
+		body_size += cast(u32)chunk.size;
+	}
+	return (body_size);
+}
 dynamic_array<byte>	HTTP_request_body(const HTTP_Request& req) {
 	dynamic_array<byte>	body;
 
@@ -1742,6 +1751,28 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 						if (!HTTP_request_read(interest.client_req, buff_arr, cast(i32)buff_len)) {
 							CLI_show_error_runtime("Client sent unsupported HTTP request");
 						}
+
+						WEBSERV_Instance&	instance = context.config.instances[interest.server_idx];
+						u32					req_body_size = HTTP_request_body_size(interest.client_req);
+						if (req_body_size > instance.request_body_limit) {
+							struct epoll_event	event_mod; MEM_zero(event_mod);
+							event_mod.events = EPOLLOUT | EPOLLRDHUP | EPOLLHUP | EPOLLERR;
+							event_mod.data.fd = interest.fd;
+
+							i32					ret_ctl = ::epoll_ctl(context.fd_events, EPOLL_CTL_MOD, fd_client, &event_mod);
+							if (ret_ctl == -1) {
+								CLI_show_error_runtime("Could not modify interest inside epoll's internal data structure");
+
+								WEBSERV_context_interest_delete(context, interest);
+								continue ;
+							}
+
+							CLI_debug("Client dropped due to content too large", buff_len);
+
+							WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_CONTENT_TOO_LARGE);
+							continue ;
+						}
+
 						if (HTTP_request_is_done(interest.client_req)) {
 							struct epoll_event	event_mod; MEM_zero(event_mod);
 							event_mod.events = EPOLLOUT | EPOLLRDHUP | EPOLLHUP | EPOLLERR;
