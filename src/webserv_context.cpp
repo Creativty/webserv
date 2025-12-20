@@ -6,7 +6,7 @@
 /*   By: xenobas <rahimos.123@gmail.com>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/17 21:32:19 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/20 15:47:02 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/20 16:47:41 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -825,11 +825,14 @@ void			WEBSERV_context_response_from_status(WEBSERV_Context& context, WEBSERV_In
 	response.headers = HTTP_Headers();
 	response.headers.case_insensitive = 1;
 
+	response.is_file = 0;
+
 	string_builder		content_builder;
-	WEBSERV_response_message_write_content_status(response, content_builder, instance);
+	if (status_code != HTTP_STATUS_NO_CONTENT) {
+		WEBSERV_response_message_write_content_status(response, content_builder, instance);
+	}
 
 	string_view			content = content_builder.to_string();
-	response.is_file = 0;
 	response.content_body.len = cast(i32)content.len;
 	response.content_body.bytes = cast(byte*)content.text;
 
@@ -1043,6 +1046,8 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 	if (!req.uri.is_file || builder_index < req.uri.path.len) {
 		builder_path_extra.write('/');
 	}
+
+	i32					path_extra_index = builder_index;
 	for (i32 i = 0; builder_index < req.uri.path.len; ++builder_index, ++i) {
 
 		if (i > 0) {
@@ -1051,9 +1056,12 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 		builder_path_extra.write(req.uri.path[builder_index]);
 	}
 
-	i32			fd_client = interest.fd;
-	string_view	path_match = builder_path_match.to_view();
-	string_view	path_extra = builder_path_extra.to_view();
+	i32				fd_client = interest.fd;
+	string_view		path_match = builder_path_match.to_view();
+	string_view		path_extra = builder_path_extra.to_view();
+	while (path_extra.has_suffix("/")) {
+		--path_extra.len;
+	}
 
 	switch (route.kind) {
 		case WEBSERV_ROUTE_SERVER: {
@@ -1218,6 +1226,66 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 			return ;
 		} break ;
 		case WEBSERV_ROUTE_UPLOAD: {
+			const string_view&	file_directory = route.Upload.directory;
+			u32					file_capacity = route.Upload.max_file_size;
+
+			i32					file_slash_count = path_extra.count("/");
+			if (!path_extra || (file_slash_count > 1 || !path_extra.has_prefix("/"))) {
+				CLI_debug("Client has sent invalid path \"%.*s\" for file deletion request",
+							path_extra.len, path_extra.text);
+
+				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_BAD_REQUEST);
+				return ;
+			}
+
+			string_builder		file_path_builder;
+
+			file_path_builder.write(file_directory);
+			if (!file_directory.has_suffix("/")) file_path_builder.write("/");
+			file_path_builder.write(path_extra);
+
+			string_view			file_path = file_path_builder.to_view();
+			file_path_builder.write('\0'); /* NOTE(xenobas): Guarantees NULL termination for usage with syscalls */
+
+			if (req.method & WEBSERV_METHOD_DELETE) {
+				if (!OS_test_file_exists(file_path)) {
+					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_FOUND);
+					return ;
+				}
+				if (!OS_test_file_write(file_path)) {
+					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_UNAUTHORIZED);
+					return ;
+				}
+				if (!OS_delete_file(file_path)) {
+					CLI_show_error_runtime("Could not delete file at \"%.*s\"",
+											file_path.len, file_path.text);
+					CLI_show_extra("Reason", "%m");
+
+					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_SERVER_ERROR);
+					return ;
+				}
+
+				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NO_CONTENT);
+				return ;
+			}
+
+			u32					file_size = HTTP_request_body_size(req);
+			if (file_size > file_capacity) {
+				CLI_debug("Client cannot upload file due to content too large");
+
+				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_CONTENT_TOO_LARGE);
+				return ;
+			}
+
+			unused(path_extra_index);
+
+			if (req.method & WEBSERV_METHOD_POST) {
+				/* Create resource */
+			}
+
+			if (req.method & (WEBSERV_METHOD_POST | WEBSERV_METHOD_PUT)) {
+				/* Queue up task for writing */
+			}
 		} break ;
 		case WEBSERV_ROUTE_REDIRECT: {
 			const string_view&	status = route.Redirect.status;
