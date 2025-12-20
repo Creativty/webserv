@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/20 14:50:11 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/20 22:39:13 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -206,6 +206,8 @@ enum WEBSERV_Route_Kind {
 	WEBSERV_ROUTE_COUNT,
 };
 struct WEBSERV_Route_Server {
+	string_view	fallback;
+
 	string_view	directory;
 	b32			directory_list;
 };

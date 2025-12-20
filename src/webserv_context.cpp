@@ -6,7 +6,7 @@
 /*   By: xenobas <rahimos.123@gmail.com>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/17 21:32:19 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/20 17:50:17 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/21 00:27:49 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -1043,6 +1043,65 @@ char**			WEBSERV_context_response_cgi_args(WEBSERV_Context& context, WEBSERV_Int
 	return ((char**)args.data);
 }
 
+void			WEBSERV_path_split(const WEBSERV_Route& route, const HTTP_Request& req,
+								string_builder& builder_match, string_builder& builder_extra, string_view& cgi_script_file) {
+	i32	builder_index = 0;
+
+	if (route.path.has_prefix(".")) {
+		for (; builder_index < req.uri.path.len; ++builder_index) {
+			string_view	component = req.uri.path[builder_index];
+
+			builder_match.write("/");
+			builder_match.write(component);
+			if (component.has_suffix(route.path)) {
+				if (route.kind == WEBSERV_ROUTE_CGI) {
+					cgi_script_file = component;
+				}
+
+				break ;
+			}
+		}
+		for (; builder_index < req.uri.path.len; ++builder_index) {
+			string_view	component = req.uri.path[builder_index];
+
+			builder_extra.write("/");
+			builder_extra.write(component);
+		}
+		return ;
+	}
+
+	builder_match.write('/');
+	for (i32 i = 0; builder_index < req.uri.path.len && builder_index < route.uri.path.len; ++builder_index, ++i) {
+		if (req.uri.path[builder_index] != route.uri.path[builder_index]) {
+			break ;
+		}
+
+		if (i > 0) {
+			builder_match.write('/');
+		}
+		builder_match.write(req.uri.path[builder_index]);
+	}
+
+	if (route.kind == WEBSERV_ROUTE_CGI && builder_index < req.uri.path.len) {
+		builder_match.write('/');
+		builder_match.write(req.uri.path[builder_index]);
+
+		cgi_script_file = req.uri.path[builder_index];
+
+		++builder_index;
+	}
+
+	if (!req.uri.is_file || builder_index < req.uri.path.len) {
+		builder_extra.write('/');
+	}
+	for (i32 i = 0; builder_index < req.uri.path.len; ++builder_index, ++i) {
+
+		if (i > 0) {
+			builder_extra.write('/');
+		}
+		builder_extra.write(req.uri.path[builder_index]);
+	}
+}
 void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest& interest) {
 	if (interest.type != WEBSERV_INTEREST_CLIENT) {
 		return ;
@@ -1068,42 +1127,11 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 		return ;
 	}
 
-	i32					builder_index = 0;
-
-	string_builder		builder_path_match;
-	builder_path_match.write('/');
-	for (i32 i = 0; builder_index < req.uri.path.len && builder_index < route.uri.path.len; ++builder_index, ++i) {
-		if (req.uri.path[builder_index] != route.uri.path[builder_index]) {
-			break ;
-		}
-
-		if (i > 0) {
-			builder_path_match.write('/');
-		}
-		builder_path_match.write(req.uri.path[builder_index]);
-	}
-
 	string_view			cgi_script_file;
-	if (route.kind == WEBSERV_ROUTE_CGI && builder_index < req.uri.path.len) { /* NOTE(xenoas): Add script location */
-		builder_path_match.write('/');
-		builder_path_match.write(req.uri.path[builder_index]);
-
-		cgi_script_file = req.uri.path[builder_index];
-
-		++builder_index;
-	}
-
+	string_builder		builder_path_match;
 	string_builder		builder_path_extra;
-	if (!req.uri.is_file || builder_index < req.uri.path.len) {
-		builder_path_extra.write('/');
-	}
-	for (i32 i = 0; builder_index < req.uri.path.len; ++builder_index, ++i) {
 
-		if (i > 0) {
-			builder_path_extra.write('/');
-		}
-		builder_path_extra.write(req.uri.path[builder_index]);
-	}
+	WEBSERV_path_split(route, req, builder_path_match, builder_path_extra, cgi_script_file);
 
 	i32				fd_client = interest.fd;
 	string_view		path_match = builder_path_match.to_view();
@@ -1111,6 +1139,10 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 	while (path_extra.has_suffix("/")) {
 		--path_extra.len;
 	}
+
+	CLI_debug("Client request path \"%.*s\"/\"%.*s\"", path_match.len, path_match.text, path_extra.len, path_extra.text);
+
+	/* TODO(xenobas): Protect against path traversal */
 
 	switch (route.kind) {
 		case WEBSERV_ROUTE_SERVER: {
@@ -1160,6 +1192,8 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 			}
 
 			if (!OS_test_dir_read(resource_path)) { /* NOTE(xenobas): Directory check */
+				CLI_debug("Could not find resource directory at \"%.*s\"", resource_path.len, resource_path.text);
+
 				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_FOUND);
 				return ;
 			}
@@ -1207,9 +1241,6 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 					if (name == "." || name == "..") continue ;
 
 					string_builder	builder_href;
-					if (req.uri.path.len == 0) {
-						builder_href.write("/");
-					}
 					for (i32 i = 0; i < req.uri.path.len; ++i) {
 						builder_href.write("/");
 						builder_href.write(req.uri.path[i]);
@@ -1253,6 +1284,8 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 			}
 
 			if (HTTP_mime_from_name(resource_path) != "text/plain") {
+				CLI_debug("Could not find resource at \"%.*s\"", resource_path.len, resource_path.text);
+
 				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_FOUND);
 				return ;
 			}
@@ -1261,11 +1294,13 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 			if (!resource_path.has_suffix("/")) {
 				builder_resource_path.write("/");
 			}
-			builder_resource_path.write("index.html");
+			builder_resource_path.write(route.Server.fallback);
 
 			string_view	fallback_data;
 			string_view	fallback_path = builder_resource_path.to_view();
 			if (!OS_read_file(fallback_path, fallback_data)) {
+				CLI_debug("Could not find resource fallback at \"%.*s\"", fallback_path.len, fallback_path.text);
+
 				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_FOUND);
 				return ;
 			}
@@ -1446,13 +1481,6 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 
 			if (!interpreter_path) {
 				CLI_debug("CGI Script at \"%.*s\" has no interpreters configured", process_path.len, process_path.text);
-
-				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_FOUND);
-
-				return ;
-			}
-			if (!OS_access_file(process_path, F_OK)) {
-				CLI_debug("CGI Script at \"%.*s\" does not exist", process_path.len, process_path.text);
 
 				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_FOUND);
 
@@ -1744,6 +1772,10 @@ b32				WEBSERV_context_process_watch(WEBSERV_Context& context, WEBSERV_Interest&
 		}
 	}
 
+	for_table_begin(response.headers, const hash_table<string_view>, header) {
+		CLI_debug("HEADER | %.*s: %.*s", header.key.len, header.key.text, header.value.len, header.value.text);
+	} for_table_end; 
+
 	response.status_code = content_status;
 
 	string_view			content_body = string_view::alloc(content);
@@ -1841,7 +1873,9 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 	}
 
 	::signal(SIGPIPE, SIG_IGN);
-	for (i32 req_count = 0; req_count < 2 || context.tasks.count > 0;) {
+	/* for (i32 req_count = 0; req_count < 128 || context.tasks.count > 0;) { */
+	for (;;) {
+		i32	req_count = 0;
 		if (!context.ok) break;
 
 		const u64				events_cap = 128;
@@ -2010,18 +2044,25 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 						if (event.events & EPOLLERR) {
 							CLI_show_error_runtime("Process %d had an error occur", process_id);
 						}
-
-						i32	ret_ctl = ::epoll_ctl(context.fd_events, EPOLL_CTL_DEL, interest.process_fds.read, NULL);
-						if (ret_ctl == -1) {
-							CLI_show_error_runtime("Could not remove process read interest from epoll's internal data structure");
-							CLI_show_extra("Reason", "%m");
-
-							continue ;
+						if (event.events & EPOLLRDHUP) {
+							CLI_debug("Process %d stopped due to RDHUP", process_id);
 						}
 
-						interest.process_fds.done = 1;
-						CLI_debug("Process %d marked for cleanup", process_id);
-						continue ;
+						if (event.events & EPOLLHUP) {
+							// CLI_debug("Process %d stopped due to HUP", process_id);
+						}
+
+						// i32	ret_ctl = ::epoll_ctl(context.fd_events, EPOLL_CTL_DEL, interest.process_fds.read, NULL);
+						// if (ret_ctl == -1) {
+						// 	CLI_show_error_runtime("Could not remove process read interest from epoll's internal data structure");
+						// 	CLI_show_extra("Reason", "%m");
+
+						// 	continue ;
+						// }
+
+						// interest.process_fds.done = 1;
+						// CLI_debug("Process %d marked for cleanup", process_id);
+						// continue ;
 					}
 
 					b32	event_type_read = event.events & EPOLLIN;
@@ -2149,7 +2190,7 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 				continue ;
 			}
 
-			task.data_idx += ret;
+			task.data_idx += cast(i32)ret;
 		}
 
 		CLI_flush();

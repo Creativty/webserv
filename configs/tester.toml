@@ -1,0 +1,48 @@
+[[instance]]
+addr = "0.0.0.0"
+port = 8080
+routes = [
+	{
+		path = "/",
+		type = "Server",
+		props = {
+			directory = "testers/YoupiBanane/",
+			directory_list = true,
+		}
+	},
+	{
+		path = "/directory",
+		type = "Server",
+		props = {
+			fallback = "youpi.bad_extension",
+
+			directory = "testers/YoupiBanane/",
+		}
+	},
+	{
+		path = ".bla",
+
+		type = "CGI",
+		props = {
+			directory = "testers/YoupiBanane/",
+			interpreters = {
+				bla = "testers/ubuntu_cgi_tester",
+			}
+		}
+	},
+	{
+		path = "/put_test",
+		type = "Upload",
+		props = {
+			directory = "testers/YoupiBanane/trash/",
+		}
+	},
+	{
+		path = "/post_body",
+		type = "Upload",
+		props = {
+			directory = "testers/YoupiBanane/trash/",
+			max_file_size = 100,
+		}
+	},
+]

@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:42:31 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/20 16:56:51 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/20 22:41:20 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -128,6 +128,7 @@ static void				WEBSERV_route_delete(Route& route) {
 		case WEBSERV_ROUTE_SERVER: {
 			Route_Server&	server = route.Server;
 
+			server.fallback.free();
 			server.directory.free();
 		} break ;
 		case WEBSERV_ROUTE_REDIRECT: {
@@ -171,6 +172,7 @@ static Route_Server		WEBSERV_route_server_make(void) {
 	Route_Server	server;
 	MEM_zero(server);
 
+	server.fallback = string_view::alloc("index.html");
 	server.directory = string_view();
 	server.directory_list = 0;
 	return (server);
@@ -291,8 +293,8 @@ static b32				WEBSERV_config_parse_route_path(Parser_Context& ctx, Route& route,
 	}
 
 	const string_view&	str = *(value.String);
-	if (!str.has_prefix("/") || str.has("?") || str.has("#") || str.has("&")) {
-		context_error(VALUE_INVALID, value.pos, "uri path component");
+	if ((!str.has_prefix("/") && !str.has_prefix(".")) || str.has("?") || str.has("#") || str.has("&")) {
+		context_error(VALUE_INVALID, value.pos, "uri path component or extension");
 		return (0);
 	}
 
@@ -320,6 +322,20 @@ static b32				WEBSERV_config_parse_route_kind(Parser_Context& ctx, Route& route,
 }
 
 /* SECTION: Route basic parsers */
+static void				WEBSERV_route_parse_server_fallback(Parser_Context& ctx, WEBSERV_Route_Server& server, const TOML_Value& value) {
+	if (!CONTEXT_parse_expect(ctx, value, TOML_VALUE_STRING)) {
+		return ;
+	}
+	if (value.String == 0 || !(bool)(*value.String)) {
+		context_error(VALUE_INVALID, value.pos, "directory path");
+		return ;
+	}
+
+	const string_view&	fallback = *value.String;
+
+	server.fallback.free(); /* NOTE(xenobas): Free old value */
+	server.fallback = string_view::alloc(fallback);
+}
 static void				WEBSERV_route_parse_server_directory(Parser_Context& ctx, WEBSERV_Route_Server& server, const TOML_Value& value) {
 	if (!CONTEXT_parse_expect(ctx, value, TOML_VALUE_STRING)) {
 		return ;
@@ -494,6 +510,8 @@ static b32				WEBSERV_route_parse_server(Parser_Context& ctx, Route& route, cons
 
 	Entry	entries[] = {
 		{ "directory", WEBSERV_route_parse_server_directory, /* required = */ 1, 0 },
+
+		{ "fallback", WEBSERV_route_parse_server_fallback, /* required = */ 0, 0 },
 		{ "directory_list", WEBSERV_route_parse_server_directory_list, /* required = */ 0, 0 },
 	};
 
