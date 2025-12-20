@@ -44,6 +44,8 @@ void				HTTP_request_delete(HTTP_Request& req) {
 	} for_table_end ;
 	req.headers.free();
 
+	req.protocol.free();
+
 	req.chunks.free();
 	req.buff.free();
 
@@ -336,7 +338,7 @@ static void			HTTP_request_read_stage_version(HTTP_Request& req) {
 		return ;
 	}
 
-	req.protocol = str.slice(0, idx_end);
+	req.protocol = string_view::alloc(str.slice(0, idx_end));
 	req.buff_index += idx_end + sep.len;
 
 	if (WEBSERV_http_version_supported(req.protocol)) {

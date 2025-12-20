@@ -62,7 +62,7 @@ struct dynamic_array {
 
 	void	resize(i32 new_cap) {
 		T*	old_data = this->data;
-		T*	new_data = new T[new_cap];
+		T*	new_data = new T[new_cap]();
 		for (i32 i = 0; i < this->len && i < new_cap; ++i)
 			new_data[i] = old_data[i];
 
@@ -90,17 +90,18 @@ struct dynamic_array {
 		}
 		return (this->data[this->len++] = item);
 	};
-	T&		push(i32 size, const T* array) {
-		i32	offset = this->len;
-		if (size > 0) {
-			if (this->len + size > this->cap) {
-				resize_fit(this->len + size);
-			}
-			for (i32 i = 0; i < size; ++i)  {
-				this->data[this->len++] = array[i];
-			}
+	void	push(i32 size, const T* array) {
+		if (size <= 0) {
+			return ;
 		}
-		return (this->data[offset]);
+
+		if (this->len + size >= this->cap) {
+			resize_fit(this->len + size);
+		}
+
+		for (i32 i = 0; i < size; ++i)  {
+			this->data[this->len++] = array[i];
+		}
 	};
 	T		pop(void) {
 		if (this->len <= 0)
