@@ -21,7 +21,7 @@
 - [x] Restore redirection functionality
 - [x] Answer whether to make directory listing stricter that requires '/' suffix, and maybe redirect there? (NO)
 - [x] Add script_executable config for self-executable CGI's ? (NO)
-- [ ] Forbidden functions removal (Make sure fprintf is passable; we can just use std::..fprintf., and ask about ::fcntl)
+- [x] Forbidden functions removal (Make sure std::fprintf is passable; we can just use std::..std::fprintf., and ask about ::fcntl)
 - [ ] Pessimist code path testing
 - [ ] Siege testing
 - [ ] 42 testing

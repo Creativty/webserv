@@ -766,54 +766,54 @@ static void			TOML_parse_stmt(TOML_Document& document, TOML_Parser& parser) {
 }
 
 static void			TOML_value_debug(const TOML_Value& value, i32 indent = 0, string_view key = "") {
-	printf("%*s%.*s", indent * 2, "", key.len, key.text);
+	std::printf("%*s%.*s", indent * 2, "", key.len, key.text);
 	if (key) {
-		printf(" = ");
+		std::printf(" = ");
 	}
 
 	switch (value.kind) {
 	case TOML_VALUE_BOOLEAN:
-		printf("%s\n", value.Boolean ? "true" : "false");
+		std::printf("%s\n", value.Boolean ? "true" : "false");
 		break ;
 	case TOML_VALUE_NUMBER:
-		printf("%ld\n", value.Number);
+		std::printf("%ld\n", value.Number);
 		break ;
 	case TOML_VALUE_STRING: {
 		if (value.String == 0) {
-			printf("nil\n");
+			std::printf("nil\n");
 			return ;
 		}
 		const TOML_String&	str = *value.String;
-		printf("\"%.*s\"\n", str.len, str.text);
+		std::printf("\"%.*s\"\n", str.len, str.text);
 	} break ;
 	case TOML_VALUE_ARRAY_TABLES:
 	case TOML_VALUE_ARRAY: {
 		if (value.Array == 0) {
-			printf("nil\n");
+			std::printf("nil\n");
 			return ;
 		}
 		const TOML_Array&	arr = *value.Array;
-		printf("%s %d elements\n", value.kind == TOML_VALUE_ARRAY ? "array" : "tables array", arr.len);
+		std::printf("%s %d elements\n", value.kind == TOML_VALUE_ARRAY ? "array" : "tables array", arr.len);
 		for (i32 i = 0; i < arr.len; ++i) {
 			TOML_value_debug(arr[i], indent + 1);
 		}
 	} break ;
 	case TOML_VALUE_TABLE: {
 		if (value.Table == 0) {
-			printf("nil\n");
+			std::printf("nil\n");
 			return ;
 		}
 
 		const TOML_Table&		tbl = *value.Table;
 
-		printf("table %d entries\n", tbl.count);
+		std::printf("table %d entries\n", tbl.count);
 		for_table_begin(tbl, const TOML_Table, entry) {
 			TOML_value_debug(entry.value, indent + 1, entry.key);
 		} for_table_end ;
 	} break ;
 	case TOML_VALUE_NIL:
 	default:
-		printf("nil\n");
+		std::printf("nil\n");
 	}
 }
 

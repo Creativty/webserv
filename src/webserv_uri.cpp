@@ -163,18 +163,18 @@ static void			WEBSERV_uri_encoded_write(string_builder& builder, const string_vi
 }
 
 static void			WEBSERV_uri_debug(const WEBSERV_URI& uri) {
-	printf("String: \"%.*s\"\n", uri.str.len, uri.str.text);
-	printf("Path: [ ");
+	std::printf("String: \"%.*s\"\n", uri.str.len, uri.str.text);
+	std::printf("Path: [ ");
 	for	(i32 i = 0; i < uri.path.len; ++i) {
-		printf("\"%.*s\"", uri.path[i].len, uri.path[i].text);
+		std::printf("\"%.*s\"", uri.path[i].len, uri.path[i].text);
 		if (i + 1 < uri.path.len) {
-			printf(", ");
+			std::printf(", ");
 		}
 	}
-	printf(" ]\n");
-	printf("params Table:\n");
+	std::printf(" ]\n");
+	std::printf("params Table:\n");
 	for_table_begin(uri.params, hash_table<string_view>, param) {
-		printf("  %.*s = %.*s\n", param.key.len, param.key.text, param.value.len, param.value.text);
+		std::printf("  %.*s = %.*s\n", param.key.len, param.key.text, param.value.len, param.value.text);
 	} for_table_end ;
 }
 

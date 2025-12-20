@@ -31,9 +31,9 @@ void			CLI_debug_internal(const char* file, i32 line, const char *label, const c
 #ifdef DEBUG
 	va_list	args;
 	va_start(args, fmt);
-	fprintf(stdout, "%s:%04d: %s: ", file, line, label);
-	vfprintf(stdout, fmt, args);
-	fprintf(stdout, "\n");
+	std::fprintf(stdout, "%s:%04d: %s: ", file, line, label);
+	std::vfprintf(stdout, fmt, args);
+	std::fprintf(stdout, "\n");
 	va_end(args);
 #else
 	unused(fmt);
@@ -44,23 +44,23 @@ void			CLI_debug_internal(const char* file, i32 line, const char *label, const c
 }
 
 void			CLI_show_help(FILE* stream) {
-	fprintf(stream, "%.*s: 42 Webserv implementation\n", CLI_exec_path.len, CLI_exec_path.text);
-	fprintf(stream, "Usage:\n");
-	fprintf(stream, "    %.*s <config_file>\n", CLI_exec_path.len, CLI_exec_path.text);
-	fprintf(stream, "Parameters:\n");
-	fprintf(stream, "    --help        Displays this help message\n");
-	fprintf(stream, "    <config_toml> Input file in TOML syntax for describing server instances\n");
+	std::fprintf(stream, "%.*s: 42 Webserv implementation\n", CLI_exec_path.len, CLI_exec_path.text);
+	std::fprintf(stream, "Usage:\n");
+	std::fprintf(stream, "    %.*s <config_file>\n", CLI_exec_path.len, CLI_exec_path.text);
+	std::fprintf(stream, "Parameters:\n");
+	std::fprintf(stream, "    --help        Displays this help message\n");
+	std::fprintf(stream, "    <config_toml> Input file in TOML syntax for describing server instances\n");
 }
 void			CLI_show_extra(const char* prefix, const char* fmt, ...) {
 	va_list	args;
 	va_start(args, fmt);
 	if (CLI_is_tty) {
-		fprintf(stderr, "    " TERMINAL_COLOR_WHITE "%s" TERMINAL_STYLE_RESET": ", prefix);
+		std::fprintf(stderr, "    " TERMINAL_COLOR_WHITE "%s" TERMINAL_STYLE_RESET": ", prefix);
 	} else {
-		fprintf(stderr, "    %s: ", prefix);
+		std::fprintf(stderr, "    %s: ", prefix);
 	}
-	vfprintf(stderr, fmt, args);
-	fprintf(stderr, "\n");
+	std::vfprintf(stderr, fmt, args);
+	std::fprintf(stderr, "\n");
 	va_end(args);
 }
 
@@ -68,12 +68,12 @@ static void		CLI_show_error_file(const char* fmt, ...) {
 	va_list	args;
 	va_start(args, fmt);
 	if (CLI_is_tty) {
-		fprintf(stderr, "%.*s: " TERMINAL_COLOR_RED "File Error" TERMINAL_STYLE_RESET ": ", CLI_exec_path.len, CLI_exec_path.text);
+		std::fprintf(stderr, "%.*s: " TERMINAL_COLOR_RED "File Error" TERMINAL_STYLE_RESET ": ", CLI_exec_path.len, CLI_exec_path.text);
 	} else {
-		fprintf(stderr, "%.*s: File Error: ", CLI_exec_path.len, CLI_exec_path.text);
+		std::fprintf(stderr, "%.*s: File Error: ", CLI_exec_path.len, CLI_exec_path.text);
 	}
-	vfprintf(stderr, fmt, args);
-	fprintf(stderr, "\n");
+	std::vfprintf(stderr, fmt, args);
+	std::fprintf(stderr, "\n");
 	va_end(args);
 }
 void			CLI_show_error_file_ext(string_view file_path) {
@@ -99,12 +99,12 @@ void			CLI_show_error_syntax(const Position pos, const char* fmt, ...) {
 	va_list	args;
 	va_start(args, fmt);
 	if (CLI_is_tty) {
-		fprintf(stderr, "%.*s:%d:%d: " TERMINAL_COLOR_RED "Syntax Error" TERMINAL_STYLE_RESET ": ", pos.file.len, pos.file.text, pos.col, pos.row);
+		std::fprintf(stderr, "%.*s:%d:%d: " TERMINAL_COLOR_RED "Syntax Error" TERMINAL_STYLE_RESET ": ", pos.file.len, pos.file.text, pos.col, pos.row);
 	} else {
-		fprintf(stderr, "%.*s:%d:%d: Syntax Error: ", pos.file.len, pos.file.text, pos.col, pos.row);
+		std::fprintf(stderr, "%.*s:%d:%d: Syntax Error: ", pos.file.len, pos.file.text, pos.col, pos.row);
 	}
-	vfprintf(stderr, fmt, args);
-	fprintf(stderr, "\n");
+	std::vfprintf(stderr, fmt, args);
+	std::fprintf(stderr, "\n");
 	va_end(args);
 }
 
@@ -131,26 +131,26 @@ static void		CLI_show_error_toml_line(const TOML_Document& document, const Posit
 	i32			col_space = 5;
 
 	string_view	line = source.slice(line_begin, line_end);
-	fprintf(stderr, "%*d |    ", col_space, pos.col);
+	std::fprintf(stderr, "%*d |    ", col_space, pos.col);
 	for (i32 i = 0; i < line.len; ++i) {
 		if (line[i] == '\t') {
-			fprintf(stderr, TERMINAL_COLOR_BLACK "\\>  " TERMINAL_STYLE_RESET);
+			std::fprintf(stderr, TERMINAL_COLOR_BLACK "\\>  " TERMINAL_STYLE_RESET);
 		} else {
-			fprintf(stderr, "%c", line[i]);
+			std::fprintf(stderr, "%c", line[i]);
 		}
 	}
-	fprintf(stderr, "\n");
+	std::fprintf(stderr, "\n");
 
 	i32	cursor = line_begin;
-	fprintf(stderr, "%*s |    ", col_space, "");
+	std::fprintf(stderr, "%*s |    ", col_space, "");
 	while (cursor < pos.index) {
-		fprintf(stderr, " ");
+		std::fprintf(stderr, " ");
 		if (source[cursor] == '\t') {
-			fprintf(stderr, "   ");
+			std::fprintf(stderr, "   ");
 		}
 		cursor++;
 	}
-	fprintf(stderr, "^\n");
+	std::fprintf(stderr, "^\n");
 }
 void			CLI_show_errors_toml(const TOML_Document& document) {
 	const dynamic_array<TOML_Error>&	errors = document.errors;
@@ -238,24 +238,24 @@ void			CLI_show_error_config(const char* fmt, ...) {
 	va_list	args;
 	va_start(args, fmt);
 	if (CLI_is_tty) {
-		fprintf(stderr, TERMINAL_COLOR_RED "Config Error" TERMINAL_STYLE_RESET ": ");
+		std::fprintf(stderr, TERMINAL_COLOR_RED "Config Error" TERMINAL_STYLE_RESET ": ");
 	} else {
-		fprintf(stderr, "Config Error: ");
+		std::fprintf(stderr, "Config Error: ");
 	}
-	vfprintf(stderr, fmt, args);
-	fprintf(stderr, "\n");
+	std::vfprintf(stderr, fmt, args);
+	std::fprintf(stderr, "\n");
 	va_end(args);
 }
 void			CLI_show_error_config(const Position pos, const char* fmt, ...) {
 	va_list	args;
 	va_start(args, fmt);
 	if (CLI_is_tty) {
-		fprintf(stderr, "%.*s:%d:%d: " TERMINAL_COLOR_RED "Config Error" TERMINAL_STYLE_RESET ": ", pos.file.len, pos.file.text, pos.col, pos.row);
+		std::fprintf(stderr, "%.*s:%d:%d: " TERMINAL_COLOR_RED "Config Error" TERMINAL_STYLE_RESET ": ", pos.file.len, pos.file.text, pos.col, pos.row);
 	} else {
-		fprintf(stderr, "%.*s:%d:%d: Config Error: ", pos.file.len, pos.file.text, pos.col, pos.row);
+		std::fprintf(stderr, "%.*s:%d:%d: Config Error: ", pos.file.len, pos.file.text, pos.col, pos.row);
 	}
-	vfprintf(stderr, fmt, args);
-	fprintf(stderr, "\n");
+	std::vfprintf(stderr, fmt, args);
+	std::fprintf(stderr, "\n");
 	va_end(args);
 }
 void			CLI_show_errors_config(const WEBSERV_Config& config) {
@@ -348,12 +348,12 @@ void			CLI_show_error_runtime(const char* fmt, ...) {
 	va_list	args;
 	va_start(args, fmt);
 	if (CLI_is_tty) {
-		fprintf(stderr, TERMINAL_COLOR_RED "Runtime Error" TERMINAL_STYLE_RESET ": ");
+		std::fprintf(stderr, TERMINAL_COLOR_RED "Runtime Error" TERMINAL_STYLE_RESET ": ");
 	} else {
-		fprintf(stderr, "Runtime Error: ");
+		std::fprintf(stderr, "Runtime Error: ");
 	}
-	vfprintf(stderr, fmt, args);
-	fprintf(stderr, "\n");
+	std::vfprintf(stderr, fmt, args);
+	std::fprintf(stderr, "\n");
 	va_end(args);
 }
 

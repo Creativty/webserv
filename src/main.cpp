@@ -82,15 +82,15 @@ i32	main(i32 argc, cstring argv[]) {
 		const WEBSERV_Instance&	instance = config.instances[0];
 		for (i32 i = 0; i < cast(i32)count_of(paths); ++i) {
 			const string_view	key = WEBSERV_http_route_pick(instance, paths[i]);
-			printf("path \"%-24s\" ", paths[i]);
+			std::printf("path \"%-24s\" ", paths[i]);
 			if (!key) {
-				printf("key not found\n");
+				std::printf("key not found\n");
 			} else {
-				printf("key \"%.*s\" was found ", key.len, key.text);
+				std::printf("key \"%.*s\" was found ", key.len, key.text);
 
 				const WEBSERV_Route&	route = instance.routes.get(key);
 				b32						method_ok = WEBSERV_http_route_method_test(route, methods[i]);
-				printf("method is %s\n", method_ok ? "allowed" : "forbidden");
+				std::printf("method is %s\n", method_ok ? "allowed" : "forbidden");
 			}
 		}
 	}

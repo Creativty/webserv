@@ -6,7 +6,6 @@
 #include <cstring>
 #include <arpa/inet.h>
 #include <cstdlib>
-#include <stdio.h>
 #include <fstream>
 #include <sys/stat.h>
 #include <fcntl.h>

@@ -52,103 +52,103 @@ void				HTTP_request_delete(HTTP_Request& req) {
 	req = HTTP_request_make();
 }
 void				HTTP_request_debug(HTTP_Request& req) {
-	printf("=== HTTP_Request  BEGIN ===\n");
+	std::printf("=== HTTP_Request  BEGIN ===\n");
 		{ /* Parsing status */
 			char	buff[64] = { 0 };
 			if (HTTP_request_is_error(req)) {
-				snprintf(buff, 64, "has failed");
+				std::snprintf(buff, 64, "has failed");
 			} else if (HTTP_request_is_done(req)) {
-				snprintf(buff, 64, "is done");
+				std::snprintf(buff, 64, "is done");
 			} else {
-				snprintf(buff, 64, "is waiting for more bytes, thus incomplete");
+				std::snprintf(buff, 64, "is waiting for more bytes, thus incomplete");
 			}
-			printf("    Parsing %s\n", buff);
+			std::printf("    Parsing %s\n", buff);
 		}
 		{ /* Method */
 			char	buff[64] = { 0 };
 			switch (req.method) {
 			case WEBSERV_METHOD_PATCH:
-				snprintf(buff, 64, "PATCH");
+				std::snprintf(buff, 64, "PATCH");
 				break ;
 			case WEBSERV_METHOD_TRACE:
-				snprintf(buff, 64, "TRACE");
+				std::snprintf(buff, 64, "TRACE");
 				break ;
 			case WEBSERV_METHOD_OPTIONS:
-				snprintf(buff, 64, "OPTIONS");
+				std::snprintf(buff, 64, "OPTIONS");
 				break ;
 			case WEBSERV_METHOD_CONNECT:
-				snprintf(buff, 64, "CONNECT");
+				std::snprintf(buff, 64, "CONNECT");
 				break ;
 			case WEBSERV_METHOD_HEAD:
-				snprintf(buff, 64, "HEAD");
+				std::snprintf(buff, 64, "HEAD");
 				break ;
 			case WEBSERV_METHOD_DELETE:
-				snprintf(buff, 64, "DELETE");
+				std::snprintf(buff, 64, "DELETE");
 				break ;
 			case WEBSERV_METHOD_PUT:
-				snprintf(buff, 64, "PUT");
+				std::snprintf(buff, 64, "PUT");
 				break ;
 			case WEBSERV_METHOD_POST:
-				snprintf(buff, 64, "POST");
+				std::snprintf(buff, 64, "POST");
 				break ;
 			case WEBSERV_METHOD_GET:
-				snprintf(buff, 64, "GET");
+				std::snprintf(buff, 64, "GET");
 				break ;
 			case WEBSERV_METHOD_INVALID:
 			default:
-				snprintf(buff, 64, "UNKNOWN %d", req.method);
+				std::snprintf(buff, 64, "UNKNOWN %d", req.method);
 				break ;
 			}
-			printf("    Method %s\n", buff);
+			std::printf("    Method %s\n", buff);
 		}
 		{ /* URI */
 			const WEBSERV_URI& uri = req.uri;
 
 			{ /* Path */
-				printf("    Path");
+				std::printf("    Path");
 				if (uri.path.len == 0) {
-					printf(" is empty");
+					std::printf(" is empty");
 				}
-				printf("\n");
+				std::printf("\n");
 				for	(i32 i = 0; i < uri.path.len; ++i) {
-					printf("        \"%.*s\"\n", uri.path[i].len, uri.path[i].text);
+					std::printf("        \"%.*s\"\n", uri.path[i].len, uri.path[i].text);
 				}
 			}
 
 			{ /* params */
-				printf("    params");
+				std::printf("    params");
 				if (uri.params.count == 0) {
-					printf(" is empty");
+					std::printf(" is empty");
 				}
-				printf("\n");
+				std::printf("\n");
 
 				for_table_begin(uri.params, const hash_table<string_view>, param) {
-					printf("        \"%.*s\" = \"%.*s\"\n", param.key.len, param.key.text, param.value.len, param.value.text);
+					std::printf("        \"%.*s\" = \"%.*s\"\n", param.key.len, param.key.text, param.value.len, param.value.text);
 				} for_table_end ;
 			}
 		}
 		{ /* Headers */
 			const HTTP_Headers& headers = req.headers;
 
-			printf("    Headers \n");
+			std::printf("    Headers \n");
 			for_table_begin(headers, const HTTP_Headers, header) {
-				printf("        \"%.*s\" = \"%.*s\"\n", header.key.len, header.key.text, header.value.len, header.value.text);
+				std::printf("        \"%.*s\" = \"%.*s\"\n", header.key.len, header.key.text, header.value.len, header.value.text);
 			} for_table_end ;
 		}
 		{ /* Body */
 			char	buff[64] = { 0 };
 			if (req.content_length >= 0) {
-				snprintf(buff, 64, "content length %ld bytes", req.content_length);
+				std::snprintf(buff, 64, "content length %ld bytes", req.content_length);
 			} else {
-				snprintf(buff, 64, "connection-close-bound bytes");
+				std::snprintf(buff, 64, "connection-close-bound bytes");
 			}
 
 			for (i32 i = 0; i < req.chunks.len; ++i) {
 				const HTTP_Chunk&	chunk = req.chunks[i];
-				printf("chunk containing %d %s starts at %d", chunk.size, chunk.size == 1 ? "byte" : "bytes", chunk.index);
+				std::printf("chunk containing %d %s starts at %d", chunk.size, chunk.size == 1 ? "byte" : "bytes", chunk.index);
 			}
 		}
-	printf("=== HTTP_Request   END  ===\n");
+	std::printf("=== HTTP_Request   END  ===\n");
 }
 
 b32					HTTP_request_is_done(const HTTP_Request& req) {
