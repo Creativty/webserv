@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/18 22:05:50 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/20 14:50:11 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -343,6 +343,8 @@ b32					OS_write_file(const string_view& path, const string_view& content, b32 o
 b32					OS_delete_file(const string_view& path);
 b32					OS_stat_file(const string_view& path, struct stat* buf = 0);
 b32					OS_access_file(const string_view& _path, i32 flags = F_OK);
+
+i64					OS_file_size(const char* path);
 
 b32					OS_test_file_read(const string_view& path, b32 strict_regular = 0);
 b32					OS_test_file_write(const string_view& path, b32 strict_regular = 0);

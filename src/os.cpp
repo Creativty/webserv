@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 17:02:26 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/18 15:00:43 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/20 14:46:31 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -101,6 +101,20 @@ b32			OS_stat_file(const string_view& _path, struct stat* buf = 0) {
 b32			OS_access_file(const string_view& _path, i32 flags = F_OK) {
 	std::string	path = _path.to_string();
 	return (::access(path.c_str(), flags) == 0);
+}
+
+i64			OS_file_size(const char* path) {
+	if (path == NULL) {
+		return (-1);
+	}
+
+	struct stat	stat_buf; MEM_zero(stat_buf);
+	i32			stat_ret = ::stat(path, &stat_buf);
+	if (stat_ret == -1) {
+		return (-1);
+	}
+
+	return (cast(i64)stat_buf.st_size);
 }
 
 b32			OS_test_file_read(const string_view& path, b32 strict_regular = 0) {

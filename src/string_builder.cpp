@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 13:58:18 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/18 16:40:03 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/20 14:41:06 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -45,6 +45,13 @@ void		string_builder::write(const char* str) {
 	}
 
 	this->data.push(len, (char*)str);
+}
+
+char		string_builder::pop(void) {
+	if (this->data.len <= 0) {
+		return ('\0');
+	}
+	return (this->data.pop());
 }
 
 static void	write_number(string_builder& builder, i64 n) {

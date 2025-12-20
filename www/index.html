@@ -90,7 +90,7 @@
 				const img = document.createElement("img");
 				img.width = 32;
 				img.height = 32;
-				img.src = "images/undo.svg";
+				img.src = "assets/images/undo.svg";
 				img.style.cursor = "pointer";
 
 				const undo_location = undo_history.length > 1 ? undo_history[undo_history.length - 2] : url_initial;
@@ -129,7 +129,7 @@
 				const img = document.createElement("img");
 				img.width = 32;
 				img.height = 32;
-				img.src = (is_folder ? "images/folder.svg" : "images/file.svg");
+				img.src = (is_folder ? "assets/images/folder.svg" : "assets/images/file.svg");
 
 				if (is_folder) {
 					img.style.cursor = "pointer";

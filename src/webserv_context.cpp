@@ -6,11 +6,19 @@
 /*   By: xenobas <rahimos.123@gmail.com>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/17 21:32:19 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/19 23:05:13 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/20 15:14:52 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "webserv.hpp"
+
+#ifndef CONTEXT_BUFFER_CAPACITY
+#define CONTEXT_BUFFER_CAPACITY (8192)
+#endif
+
+#ifndef CONTEXT_STREAM_BASELINE
+#define CONTEXT_STREAM_BASELINE (1024 * 1024 * 4)
+#endif
 
 template <typename T>
 string_view		ENV_string(const string_view& name, T value, b32 is_header = 0) {
@@ -38,7 +46,12 @@ enum HTTP_Status {
     HTTP_STATUS_OK					=  200,
     HTTP_STATUS_CREATED				=  201,
 	HTTP_STATUS_NO_CONTENT			=  204,
+	HTTP_STATUS_MULTIPLE_CHOICES	=  300,
 	HTTP_STATUS_MOVED_PERMANENTLY	=  301,
+	HTTP_STATUS_FOUND				=  302,
+	HTTP_STATUS_SEE_OTHER			=  303,
+	HTTP_STATUS_TEMPORARY_REDIRECT	=  307,
+	HTTP_STATUS_PERMANENT_REDIRECT	=  308,
     HTTP_STATUS_BAD_REQUEST			=  400,
     HTTP_STATUS_UNAUTHORIZED		=  401,
     HTTP_STATUS_FORBIDDEN			=  403,
@@ -68,8 +81,23 @@ string_view		HTTP_status_as_string(HTTP_Status status) {
 		case HTTP_STATUS_NO_CONTENT: {
 			return ("204");
 		} break ;
+		case HTTP_STATUS_MULTIPLE_CHOICES: {
+			return ("300");
+		} break ;
 		case HTTP_STATUS_MOVED_PERMANENTLY: {
 			return ("301");
+		} break ;
+		case HTTP_STATUS_FOUND: {
+			return ("302");
+		} break ;
+		case HTTP_STATUS_SEE_OTHER: {
+			return ("303");
+		} break ;
+		case HTTP_STATUS_TEMPORARY_REDIRECT: {
+			return ("307");
+		} break ;
+		case HTTP_STATUS_PERMANENT_REDIRECT: {
+			return ("308");
 		} break ;
 		case HTTP_STATUS_BAD_REQUEST: {
 			return ("400");
@@ -118,8 +146,23 @@ string_view		HTTP_status_as_text(HTTP_Status status) {
 		case HTTP_STATUS_NO_CONTENT: {
 			return ("No Content");
 		} break ;
+		case HTTP_STATUS_MULTIPLE_CHOICES: {
+			return ("Multiple Choices");
+		} break ;
 		case HTTP_STATUS_MOVED_PERMANENTLY: {
 			return ("Moved Permanently");
+		} break ;
+		case HTTP_STATUS_FOUND: {
+			return ("Found");
+		} break ;
+		case HTTP_STATUS_SEE_OTHER: {
+			return ("See Other");
+		} break ;
+		case HTTP_STATUS_TEMPORARY_REDIRECT: {
+			return ("Temporary Redirect");
+		} break ;
+		case HTTP_STATUS_PERMANENT_REDIRECT: {
+			return ("Permanent Redirect");
 		} break ;
 		case HTTP_STATUS_BAD_REQUEST: {
 			return ("Bad Request");
@@ -164,8 +207,23 @@ HTTP_Status		HTTP_status_from_string(string_view	code) {
 	if (code == "204") {
 		return (HTTP_STATUS_NO_CONTENT);
 	}
+	if (code == "300") {
+		return (HTTP_STATUS_MULTIPLE_CHOICES);
+	}
 	if (code == "301") {
 		return (HTTP_STATUS_MOVED_PERMANENTLY);
+	}
+	if (code == "302") {
+		return (HTTP_STATUS_FOUND);
+	}
+	if (code == "303") {
+		return (HTTP_STATUS_SEE_OTHER);
+	}
+	if (code == "307") {
+		return (HTTP_STATUS_TEMPORARY_REDIRECT);
+	}
+	if (code == "308") {
+		return (HTTP_STATUS_PERMANENT_REDIRECT);
 	}
     if (code == "400") {
 		return (HTTP_STATUS_BAD_REQUEST);
@@ -198,6 +256,60 @@ HTTP_Status		HTTP_status_from_string(string_view	code) {
 		return (HTTP_STATUS_GATEWAY_TIMEOUT);
 	}
 	return (HTTP_STATUS_NOT_IMPLEMENTED);
+}
+
+string_view		HTTP_mime_from_name(const string_view& filename) {
+    if (filename.has_suffix(".html")) return ("text/html");
+    if (filename.has_suffix(".htm") ) return ("text/html");
+    if (filename.has_suffix(".css") ) return ("text/css");
+    if (filename.has_suffix(".js")  ) return ("application/javascript");
+    if (filename.has_suffix(".json")) return ("application/json");
+    if (filename.has_suffix(".xml") ) return ("application/xml");
+    if (filename.has_suffix(".pdf") ) return ("application/pdf");
+
+    // Images
+    if (filename.has_suffix(".png") ) return ("image/png");
+    if (filename.has_suffix(".jpg") ) return ("image/jpeg");
+    if (filename.has_suffix(".jpeg")) return ("image/jpeg");
+    if (filename.has_suffix(".gif") ) return ("image/gif");
+    if (filename.has_suffix(".bmp") ) return ("image/bmp");
+    if (filename.has_suffix(".ico") ) return ("image/x-icon");
+    if (filename.has_suffix(".svg") ) return ("image/svg+xml");
+    if (filename.has_suffix(".webp")) return ("image/webp");
+
+    // Audio
+    if (filename.has_suffix(".mp3") ) return ("audio/mpeg");
+    if (filename.has_suffix(".wav") ) return ("audio/wav");
+    if (filename.has_suffix(".ogg") ) return ("audio/ogg");
+
+    // Video
+    if (filename.has_suffix(".mp4") ) return ("video/mp4");
+    if (filename.has_suffix(".webm")) return ("video/webm");
+    if (filename.has_suffix(".avi") ) return ("video/x-msvideo");
+    if (filename.has_suffix(".mov") ) return ("video/quicktime");
+    if (filename.has_suffix(".mkv") ) return ("video/x-matroska");
+
+    // Fonts
+    if (filename.has_suffix(".ttf") ) return ("font/ttf");
+    if (filename.has_suffix(".otf") ) return ("font/otf");
+    if (filename.has_suffix(".woff")) return ("font/woff");
+    if (filename.has_suffix(".woff2")) return ("font/woff2");
+
+    // Archives
+    if (filename.has_suffix(".zip") ) return ("application/zip");
+    if (filename.has_suffix(".rar") ) return ("application/vnd.rar");
+    if (filename.has_suffix(".7z")  ) return ("application/x-7z-compressed");
+    if (filename.has_suffix(".tar") ) return ("application/x-tar");
+    if (filename.has_suffix(".gz")  ) return ("application/gzip");
+
+    // Scripts / Code
+    if (filename.has_suffix(".php") ) return ("application/x-httpd-php");
+    if (filename.has_suffix(".py")  ) return ("text/x-python");
+    if (filename.has_suffix(".cpp") ) return ("text/x-c++src");
+    if (filename.has_suffix(".c")   ) return ("text/x-csrc");
+    if (filename.has_suffix(".sh")  ) return ("application/x-sh");
+
+    return ("text/plain");
 }
 
 /* TODO(xenobas): Continue with response work */
@@ -717,18 +829,54 @@ void			WEBSERV_context_response_from_status(WEBSERV_Context& context, WEBSERV_In
 
 	interest.client_res = response;
 }
-void			WEBSERV_context_response_from_content(WEBSERV_Context& context, WEBSERV_Interest& interest, HTTP_Status status_code, string_view content) { /* Can be either chunked or regular stream */
-	HTTP_Response		response;
+void			WEBSERV_context_response_from_content(WEBSERV_Context& context, WEBSERV_Interest& interest, HTTP_Status status_code, string_view content, string_view mime = "text/html", b32 content_allocated = 0) { /* Can be either chunked or regular stream */
+	HTTP_Response	response;
 
 	response.status_code = status_code;
 
 	response.headers = HTTP_Headers();
 	response.headers.case_insensitive = 1;
 
+	string_view		content_owned = content;
+	if (!content_allocated) {
+		content_owned = string_view::alloc(content);
+	}
+
+	response.is_file = 0;
+	response.content_body.len = cast(i32)content_owned.len;
+	response.content_body.bytes = cast(byte*)content_owned.text;
+
+	response.headers.set("Content-Type", string_view::alloc(mime));
+	response.headers.set("Content-Length", strconv_i64(response.content_body.len));
+
+	string_builder	message;
+	WEBSERV_response_message_write_prelude(response, message);
+	message.write(content_owned);
+
+	response.write_idx = 0;
+	response.write_str = message.to_string();
+
+	unused(context);
+	interest.client_res = response;
+}
+void			WEBSERV_context_response_from_redirect(WEBSERV_Context& context, WEBSERV_Interest& interest, HTTP_Status status_code, string_view location) {
+	HTTP_Response		response;
+	WEBSERV_Instance&	instance = context.config.instances[interest.server_idx];
+
+	response.status_code = status_code;
+
+	response.headers = HTTP_Headers();
+	response.headers.case_insensitive = 1;
+
+	string_builder		content_builder;
+	WEBSERV_response_message_write_content_status(response, content_builder, instance);
+
+	string_view			content = content_builder.to_string();
 	response.is_file = 0;
 	response.content_body.len = cast(i32)content.len;
 	response.content_body.bytes = cast(byte*)content.text;
 
+	response.headers.set("Location", string_view::alloc(location));
 	response.headers.set("Content-Type", string_view::alloc("text/html"));
 	response.headers.set("Content-Length", strconv_i64(response.content_body.len));
 
@@ -887,10 +1035,179 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 
 	switch (route.kind) {
 		case WEBSERV_ROUTE_SERVER: {
+			b32					files_list = route.Server.directory_list;
+			const string_view&	files_directory = route.Server.directory;
+
+			string_builder		builder_resource_path;
+			builder_resource_path.write(files_directory);
+			builder_resource_path.write(path_extra);
+
+			string_view	resource_path = builder_resource_path.to_view();
+			builder_resource_path.write('\0'); /* NOTE(xenobas): NULL-terminated for passing directly to syscalls */
+
+			if (OS_test_file_read(resource_path)) { /* NOTE(xenobas): File check */
+				CLI_debug("Client is being served file at \"%.*s\"",
+							resource_path.len, resource_path.text);
+
+				i64			resource_size = OS_file_size(resource_path.text);
+				if (resource_size == -1) {
+					CLI_show_error_runtime("Could not query file \"%s\" size", resource_path.text);
+					if (errno != 0) {
+						CLI_show_extra("Reason", "%m");
+					}
+
+					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_SERVER_ERROR);
+					return ;
+				}
+
+				string_view	resource_mime = HTTP_mime_from_name(resource_path);
+				if (resource_size > CONTEXT_STREAM_BASELINE) { /* Transfer-Encoding: chunked */
+					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_IMPLEMENTED);
+					return ;
+				}
+
+				string_view	resource_data;
+				if (!OS_read_file(resource_path, resource_data)) {
+					CLI_show_error_runtime("Could not query file \"%s\" size", resource_path.text);
+					CLI_show_extra("Reason", "%m");
+
+					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_SERVER_ERROR);
+					return ;
+				}
+
+				WEBSERV_context_response_from_content(context, interest, HTTP_STATUS_OK, resource_data, /* mime = */ resource_mime, /* content_allocated = */ 1);
+				return ;
+			}
+
+			if (!OS_test_dir_read(resource_path)) { /* NOTE(xenobas): Directory check */
+				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_FOUND);
+				return ;
+			}
+			if (files_list) {
+				CLI_debug("Client is being served directory listing at \"%.*s\"",
+							resource_path.len, resource_path.text);
+
+				string_builder	builder_html;
+
+				DIR*			dir_handle = ::opendir(resource_path.text);
+				if (dir_handle == NULL) {
+					CLI_show_error_runtime("Client could not be served directory listing");
+					CLI_show_extra("Reason", "%m");
+
+					return ;
+				}
+
+				builder_html.write(
+					"<!DOCTYPE html>\n"
+					"<html>\n"
+					"  <head>\n"
+					"    <title>Directory Listing for ");
+				if (!path_extra.has_prefix("/")) {
+					builder_html.write("/");
+				}
+				builder_html.write(path_extra);
+				builder_html.write("</title>\n"
+					"  </head>\n"
+					"  <body>\n"
+					"    <h1>Directory Listing for "
+				);
+				if (!path_extra.has_prefix("/")) {
+					builder_html.write("/");
+				}
+				builder_html.write(path_extra);
+				builder_html.write("</h1>\n"
+					"    <ul>\n");
+
+				errno = 0;
+				struct dirent*	dir_entry = NULL;
+				while ((dir_entry = ::readdir(dir_handle))) {
+					const char*	name_cstr = dir_entry->d_name;
+
+					string_view	name(name_cstr);
+					if (name == "." || name == "..") continue ;
+
+					string_builder	builder_href;
+					if (req.uri.path.len == 0) {
+						builder_href.write("/");
+					}
+					for (i32 i = 0; i < req.uri.path.len; ++i) {
+						builder_href.write("/");
+						builder_href.write(req.uri.path[i]);
+					}
+					{
+						builder_href.write("/");
+						builder_href.write(name);
+					}
+					string_view		href = builder_href.to_view();
+					
+					string_builder	builder_attr;
+					if (dir_entry->d_type == DT_DIR) {
+						builder_attr.write("data-folder ");
+					}
+					string_view		attr = builder_attr.to_view();
+
+					builder_html.write("    <li>" "<a href=\"");
+					builder_html.write(href);
+					builder_html.write("\" ");
+					builder_html.write(attr);
+					builder_html.write(">");
+					builder_html.write(name);
+					builder_html.write("</a>" "</li>" "\n");
+				}
+				::closedir(dir_handle);
+
+				builder_html.write("    </ul>\n");
+				builder_html.write("  </body>\n");
+				builder_html.write("</html>");
+
+				if (errno != 0) {
+					CLI_show_error_runtime("Client could not be served directory listing");
+					CLI_show_extra("Reason", "%m");
+
+					return ;
+				}
+				
+				string_view		html = builder_html.to_view();
+				WEBSERV_context_response_from_content(context, interest, HTTP_STATUS_OK, html, /* mime = */ "text/html");
+				return ;
+			}
+
+			if (HTTP_mime_from_name(resource_path) != "text/plain") {
+				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_FOUND);
+				return ;
+			}
+			builder_resource_path.pop();
+
+			if (!resource_path.has_suffix("/")) {
+				builder_resource_path.write("/");
+			}
+			builder_resource_path.write("index.html");
+
+			string_view	fallback_data;
+			string_view	fallback_path = builder_resource_path.to_view();
+			if (!OS_read_file(fallback_path, fallback_data)) {
+				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_FOUND);
+				return ;
+			}
+
+			CLI_debug("Client is being served fallback at \"%.*s\"",
+						fallback_path.len, fallback_path.text);
+			WEBSERV_context_response_from_content(context, interest, HTTP_STATUS_OK, fallback_data, /* mime = */ HTTP_mime_from_name(fallback_path), /* content_allocated = */ 1);
+			return ;
 		} break ;
 		case WEBSERV_ROUTE_UPLOAD: {
 		} break ;
 		case WEBSERV_ROUTE_REDIRECT: {
+			const string_view&	status = route.Redirect.status;
+			const string_view&	location = route.Redirect.location;
+			HTTP_Status			status_code = HTTP_status_from_string(status);
+
+			CLI_debug("Client redirected from \"%.*s\" to \"%.*s\"",
+						path_match.len, path_match.text,
+						location.len, location.text);
+
+			WEBSERV_context_response_from_redirect(context, interest, status_code, location);
+			return ;
 		} break ;
 		case WEBSERV_ROUTE_CGI: {
 			/* TODO(xenobas): Use env from CGI config */
@@ -1068,6 +1385,7 @@ CGI_label_cleanup:
 			CLI_show_error_runtime("Route kind of value %d is supposed to be unreachable", cast(i32)route.kind);
 		} break ;
 	}
+
 	WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_IMPLEMENTED);
 }
 b32				WEBSERV_context_response_write(WEBSERV_Context& context, WEBSERV_Interest& interest) {
@@ -1301,7 +1619,7 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 	}
 
 	::signal(SIGPIPE, SIG_IGN);
-	for (i32 req_count = 0; req_count < 8;) {
+	for (i32 req_count = 0; req_count < 32;) {
 		if (!context.ok) break;
 
 		const u64				events_cap = 128;
@@ -1393,7 +1711,7 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 						continue ;
 					}
 					if (event_type_read) {
-						const u64	buff_cap = 8192;
+						const u64	buff_cap = CONTEXT_BUFFER_CAPACITY;
 						byte		buff_arr[buff_cap];
 						i64			buff_len = ::read(fd_client, buff_arr, buff_cap);
 						if (buff_len <= 0) {
@@ -1466,7 +1784,7 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 					if (event_type_read) {
 						dynamic_array<byte>&	process_stream = interest.process_read_stream;
 
-						const u64	buff_cap = 8192;
+						const u64	buff_cap = CONTEXT_BUFFER_CAPACITY;
 						byte		buff_arr[buff_cap];
 						i64			buff_len = ::read(fd_read, buff_arr, buff_cap);
 						if (buff_len <= 0) {

@@ -19,8 +19,9 @@
 - [ ] Restore directory listing functionality
 - [ ] Restore upload functionality
 - [ ] Restore redirection functionality
+- [ ] Answer whether to make directory listing stricter that requires '/' suffix, and maybe redirect there?
 - [ ] Add script_executable config for self-executable CGI's
-- [ ] Forbidden functions removal
+- [ ] Forbidden functions removal (Make sure printf is passable; we can just use std::..printf., and ask about ::fcntl)
 - [ ] Pessimist code path testing
 - [ ] Siege testing
 - [ ] 42 testing
