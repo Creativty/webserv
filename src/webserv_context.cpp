@@ -1479,18 +1479,6 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 
 			char**				process_envp = WEBSERV_context_response_cgi_env(context, interest, req, process_path, path_extra);
 			char**				process_argv = WEBSERV_context_response_cgi_args(context, interest, req, interpreter_path, process_path);
-			for (i32 i = 0; process_argv[i]; ++i) {
-				CLI_debug("CGI argument %2d: \"%s\"", i, process_argv[i]);
-			}
-
-			#if 0
-			{
-				CLI_debug("Process \"%.*s\" environment", process_path.len, process_path.text);
-				for (i32 i = 0; process_envp[i]; ++i) {
-					CLI_debug("\t%s", process_envp[i]);
-				}
-			}
-			#endif
 
 			i32					process_id = ::fork();
 			b32					process_ok = 1;
@@ -1622,7 +1610,8 @@ b32				WEBSERV_context_response_write(WEBSERV_Context& context, WEBSERV_Interest
 			CLI_show_error_runtime("Could not write response to client");
 			CLI_show_extra("Reason", "%m");
 
-			/* TODO(xenobas): Close connection */
+			WEBSERV_context_interest_delete(context, interest);
+			return (1);
 		}
 		else if (write_ret >= 0) {
 			res.write_idx += cast(i32)write_ret;
@@ -1740,7 +1729,6 @@ b32				WEBSERV_context_process_watch(WEBSERV_Context& context, WEBSERV_Interest&
 		string_view	value = content_header.trim();
 		if (!name || !value) break ;
 
-		/* CLI_debug("\t%.*s: %.*s", name.len, name.text, value.len, value.text); */
 
 		response.headers.set(name, string_view::alloc(value));
 		if (name.eq_insensitive("Content-Length")) {
@@ -1752,10 +1740,6 @@ b32				WEBSERV_context_process_watch(WEBSERV_Context& context, WEBSERV_Interest&
 			content_status = HTTP_status_from_string(status_code);
 		}
 	}
-
-	for_table_begin(response.headers, const hash_table<string_view>, header) {
-		CLI_debug("HEADER | %.*s: %.*s", header.key.len, header.key.text, header.value.len, header.value.text);
-	} for_table_end; 
 
 	response.status_code = content_status;
 
@@ -1854,13 +1838,15 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 	}
 
 	::signal(SIGPIPE, SIG_IGN);
-	for (;;) {
+	const u32	timeout = 1000 * 8;
+	i64			time_since_last_event = OS_timestamp_now();
+	for (; OS_timestamp_now() - time_since_last_event < timeout;) {
 		i32	req_count = 0;
 		if (!context.ok) break;
 
 		const u64				events_cap = 128;
 		struct epoll_event		events_arr[events_cap];
-		i32						events_len = ::epoll_wait(context.fd_events, events_arr, events_cap, 16);
+		i32						events_len = ::epoll_wait(context.fd_events, events_arr, events_cap, 100);
 		if (events_len == -1) {
 			if (errno == EINTR) {
 				continue ;
@@ -1948,8 +1934,6 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 						if (HTTP_request_is_done(interest.client_req)) {
 							u32					req_body_size = HTTP_request_body_size(interest.client_req);
 							if (req_body_size > instance.request_body_limit) {
-								CLI_debug("Terminated content too large with size %d", req_body_size);
-
 								struct epoll_event	event_mod; MEM_zero(event_mod);
 								event_mod.events = EPOLLOUT | EPOLLRDHUP | EPOLLHUP | EPOLLERR;
 								event_mod.data.fd = interest.fd;
@@ -2074,21 +2058,12 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 						if (WEBSERV_context_process_watch(context, interest)) {
 							continue ;
 						}
-
-						// i32	ret_ctl = ::epoll_ctl(context.fd_events, EPOLL_CTL_DEL, interest.process_fds.read, NULL);
-						// if (ret_ctl == -1) {
-						// 	CLI_show_error_runtime("Could not remove process read interest from epoll's internal data structure");
-						// 	CLI_show_extra("Reason", "%m");
-
-						// 	continue ;
-						// }
-
-						// interest.process_fds.done = 1;
-						// CLI_debug("Process %d marked for cleanup", process_id);
-						// continue ;
 					}
 				} break ;
 			}
+		}
+		if (events_len > 0) {
+			time_since_last_event = OS_timestamp_now();
 		}
 		if (!context.ok) break ;
 
