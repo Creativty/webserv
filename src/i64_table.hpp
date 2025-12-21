@@ -6,7 +6,7 @@
 /*   By: xenobas <rahimos.123@gmail.com>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/17 21:52:38 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/19 22:45:40 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/21 05:16:39 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -102,7 +102,7 @@ struct i64_table {
 		this->destroy();
 	}
 
-	/* TODO(xenobas): This shit does not work, use bucket addressing instead */
+	/* TODO(xenobas): Risky business */
 	void		set(const i64& key, const T& value) {
 		if (this->count >= this->cap / 2)
 			this->resize(this->cap == 0 ? I64_TABLE_CAP_INITIAL : this->cap * 2);

@@ -7,14 +7,14 @@ if __name__ == '__main__':
     print("<!DOCTYPE html>")
     print("<html>")
     print("<body>")
+    sleep(2)
     print("  <h1>Slow</h1>", flush = True)
-    sleep(30)
     print("  <h2>argv</h2>")
     print("  <ul>")
     for arg in argv:
         print(f"    <li>\"{arg}\"</li>")
     print("  </ul>", flush = True)
-    sleep(3)
+    sleep(2)
     print("  <hr>");
     print("  <h2>envp</h2>")
     print("  <ul>")

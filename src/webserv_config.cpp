@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:42:31 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/20 22:41:20 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/21 05:35:29 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -208,7 +208,6 @@ static Instance			WEBSERV_instance_make(void) {
 
 	instance.port		= 0;
 	instance.addr.blob	= 0;
-	instance.host		= string_view();
 
 	instance.timeout = 5000;
 	instance.request_body_limit = U32_MAX;
@@ -220,7 +219,6 @@ static Instance			WEBSERV_instance_make(void) {
 	return (instance);
 }
 static void				WEBSERV_instance_delete(Instance& instance) {
-	instance.host.free();
 
 	for_table_begin(instance.status, hash_table<string_view>, kv) {
 		string_view&	html = kv.value;
@@ -943,21 +941,6 @@ static void				WEBSERV_config_parse_instance_port(Parser_Context& ctx, const TOM
 
 	instance.port = cast(u16)port_signed;
 }
-static void				WEBSERV_config_parse_instance_host(Parser_Context& ctx, const TOML_Value& value) {
-	Config&				config = ctx.config;
-	Instance&			instance = ctx.instance;
-
-	if (!CONTEXT_parse_expect(ctx, value, TOML_VALUE_STRING)) {
-		return ;
-	}
-	if (value.String == 0 || !(bool)(*(value.String))) {
-		config_error(STRING_EMPTY, value.pos, "host name");
-		return ;
-	}
-
-	const string_view&	host = *value.String;
-	instance.host = string_view::alloc(host);
-}
 static void				WEBSERV_config_parse_instance_request_body_limit(Parser_Context& ctx, const string_view& key, const TOML_Value& value) {
 	Instance&	instance = ctx.instance;
 	unused(key);
@@ -1034,15 +1017,26 @@ static void				WEBSERV_config_parse_instance_http(Parser_Context& ctx, const TOM
 		{ "request_body_limit", WEBSERV_config_parse_instance_request_body_limit, /* required = */ 0, 0 },	/* Instance host			(e.g "website.com") */
 		{ "timeout", WEBSERV_config_parse_instance_timeout, /* required = */ 0, 0 },	/* Instance timeout			(e.g 5000ms) */
 
-		{ "status_301", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },						/* Instance status page  	(e.g "static/errors/301.html") */
-		{ "status_302", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },						/* Instance status page  	(e.g "static/errors/302.html") */
-		{ "status_304", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },						/* Instance status page  	(e.g "static/errors/304.html") */
-		{ "status_400", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },						/* Instance status page  	(e.g "static/errors/400.html") */
-		{ "status_401", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },						/* Instance status page  	(e.g "static/errors/401.html") */
-		{ "status_403", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },						/* Instance status page  	(e.g "static/errors/403.html") */
-		{ "status_404", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },						/* Instance status page  	(e.g "static/errors/404.html") */
-		{ "status_500", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },						/* Instance status page  	(e.g "static/errors/500.html") */
-		{ "status_501", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },						/* Instance status page  	(e.g "static/errors/501.html") */
+		{ "status_102", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
+		{ "status_200", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
+		{ "status_201", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
+		{ "status_202", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
+		{ "status_300", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
+		{ "status_301", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
+		{ "status_302", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
+		{ "status_303", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
+		{ "status_307", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
+		{ "status_308", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
+		{ "status_400", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
+		{ "status_401", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
+		{ "status_403", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
+		{ "status_404", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
+		{ "status_405", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
+		{ "status_413", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
+		{ "status_500", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
+		{ "status_501", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
+		{ "status_502", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
+		{ "status_504", WEBSERV_config_parse_instance_status, /* required = */ 0, 0 },
 	};
 
 	for_table_begin(*value.Table, const TOML_Table, kv) {
@@ -1087,7 +1081,6 @@ static void				WEBSERV_config_parse_instance(Config& config, const TOML_Value& v
 		{ "port", WEBSERV_config_parse_instance_port, /* required = */ 1, 0 }, 		/* Instance port    		(e.g 8080)*/
 		{ "routes", WEBSERV_config_parse_instance_routes, /* required = */ 1, 0 },	/* Instance routes			(e.g [{ path = "shit" }, {...}])*/
 
-		{ "host", WEBSERV_config_parse_instance_host, /* required = */ 0, 0 }, 		/* Instance host			(e.g "website.com") */
 		{ "http", WEBSERV_config_parse_instance_http, /* required = */ 0, 0 },		/* Instance http settings  	(e.g { request_body_max? = 1024, status_400 = "static/bad_request.html" }) */
 	};
 

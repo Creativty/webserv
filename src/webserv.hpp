@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/20 22:39:13 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/21 05:35:35 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -225,7 +225,7 @@ struct WEBSERV_Route_CGI {
 	hash_table<string_view>		env;
 };
 struct WEBSERV_Route {
-	string_view				path; /* TODO(xenobas): Rename to ID/Key */
+	string_view				path;
 	WEBSERV_URI				uri;
 
 	b32						cascade;
@@ -245,7 +245,6 @@ struct WEBSERV_Route {
 struct WEBSERV_Instance {
 	u16									port;
 	WEBSERV_Address						addr;
-	string_view							host;
 
 	/* Settings */
 	i64									timeout;

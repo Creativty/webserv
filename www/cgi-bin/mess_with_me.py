@@ -6,4 +6,4 @@ if __name__ == '__main__':
     close(1)
     close(2)
     sleep(4)
-    exit(125)
+    exit(0)

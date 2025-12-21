@@ -6,7 +6,7 @@
 /*   By: xenobas <rahimos.123@gmail.com>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/17 21:32:19 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/21 01:39:26 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/21 05:35:01 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -524,7 +524,7 @@ b32				WEBSERV_context_interest_unregister(WEBSERV_Context& context, WEBSERV_Int
 			parent.client_process_fd = -1;
 		}
 
-		if (!interest.process_fds.done && interest.process_fds.read >= 0) { /* NOTE(xenobas): fd_read */
+		if (interest.process_fds.read >= 0) { /* NOTE(xenobas): fd_read */
 			i32	ret_ctl = ::epoll_ctl(context.fd_events, EPOLL_CTL_DEL, interest.process_fds.read, NULL);
 			if (ret_ctl == -1) {
 				CLI_show_error_runtime("Could not remove process read interest from epoll's internal data structure");
@@ -532,7 +532,7 @@ b32				WEBSERV_context_interest_unregister(WEBSERV_Context& context, WEBSERV_Int
 				return (0);
 			}
 		}
-		if (!interest.process_fds.done && interest.process_fds.write >= 0) { /* NOTE(xenobas): fd_write */
+		if (interest.process_fds.write >= 0) { /* NOTE(xenobas): fd_write */
 			i32	ret_ctl = ::epoll_ctl(context.fd_events, EPOLL_CTL_DEL, interest.process_fds.write, NULL);
 			if (ret_ctl == -1) {
 				CLI_show_error_runtime("Could not remove process write interest from epoll's internal data structure");
@@ -550,15 +550,16 @@ void			WEBSERV_context_interest_delete(WEBSERV_Context& context, WEBSERV_Interes
 			CLI_debug("Server %d has been deleted from interests", interest.server_idx);
 		} break ;
 		case WEBSERV_INTEREST_CLIENT: {
-			CLI_debug("Client %u.%u.%u.%u:%u has been deleted from interests",
+			CLI_debug("Client %u.%u.%u.%u:%u has been deleted from interests with file descriptor %d",
 						(cast(u8*)(&interest.client_sockaddr.sin_addr.s_addr))[0],
 						(cast(u8*)(&interest.client_sockaddr.sin_addr.s_addr))[1],
 						(cast(u8*)(&interest.client_sockaddr.sin_addr.s_addr))[2],
 						(cast(u8*)(&interest.client_sockaddr.sin_addr.s_addr))[3],
-						::ntohs(interest.client_sockaddr.sin_port));
+						::ntohs(interest.client_sockaddr.sin_port),
+						interest.fd);
 		} break ;
 		case WEBSERV_INTEREST_PROCESS: {
-			CLI_debug("Process %d has been deleted from interests", interest.process_id);
+			CLI_debug("Process %d has been deleted from interests with file descriptors %d and %d", interest.process_id, interest.process_fds.read, interest.process_fds.write);
 		} break ;
 	}
 	WEBSERV_context_interest_unregister(context, interest);
@@ -1131,7 +1132,6 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 		WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_BAD_REQUEST);
 		return ;
 	}
-	/* TODO(xenobas): Can check for host later */
 
 	string_view			_route_id = WEBSERV_http_route_pick(instance, req);
 	if (!instance.routes.has(_route_id)) {
