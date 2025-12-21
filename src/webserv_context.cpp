@@ -6,7 +6,7 @@
 /*   By: xenobas <rahimos.123@gmail.com>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/17 21:32:19 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/21 00:27:49 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/21 01:39:26 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -1070,6 +1070,22 @@ void			WEBSERV_path_split(const WEBSERV_Route& route, const HTTP_Request& req,
 		return ;
 	}
 
+	if (route.uri.is_file && route.kind == WEBSERV_ROUTE_UPLOAD) {
+		for (; builder_index < req.uri.path.len - 1; ++builder_index) {
+			string_view	component = req.uri.path[builder_index];
+
+			builder_match.write("/");
+			builder_match.write(component);
+		}
+		for (; builder_index < req.uri.path.len; ++builder_index) {
+			string_view	component = req.uri.path[builder_index];
+
+			builder_extra.write("/");
+			builder_extra.write(component);
+		}
+		return ;
+	}
+
 	builder_match.write('/');
 	for (i32 i = 0; builder_index < req.uri.path.len && builder_index < route.uri.path.len; ++builder_index, ++i) {
 		if (req.uri.path[builder_index] != route.uri.path[builder_index]) {
@@ -1102,6 +1118,7 @@ void			WEBSERV_path_split(const WEBSERV_Route& route, const HTTP_Request& req,
 		builder_extra.write(req.uri.path[builder_index]);
 	}
 }
+
 void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest& interest) {
 	if (interest.type != WEBSERV_INTEREST_CLIENT) {
 		return ;
@@ -1357,88 +1374,36 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 
 			u32					file_size = HTTP_request_body_size(req);
 			if (file_size > file_capacity) {
-				CLI_debug("Client cannot upload file due to content too large");
+				CLI_debug("Client cannot upload file of size %d due to content too large", file_size);
 
 				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_CONTENT_TOO_LARGE);
 				return ;
 			}
 
-			if (req.method & WEBSERV_METHOD_POST) {
-				if (OS_test_file_exists(file_path)) {
-					CLI_show_error_runtime("Client cannot POST file \"%.*s\" that already exists",
-								file_path.len, file_path.text);
+			i32	fd = ::open(file_path.text, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+			if (fd == -1) {
+				CLI_show_error_runtime("Client could not create file at \"%.*s\"",
+							file_path.len, file_path.text);
+				CLI_show_extra("Reason", "%m");
 
-					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_BAD_REQUEST);
-					return ;
-				}
-
-				i32	fd = ::open(file_path.text, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-				if (fd == -1) {
-					CLI_show_error_runtime("Client could not create file at \"%.*s\"",
-								file_path.len, file_path.text);
-					CLI_show_extra("Reason", "%m");
-
-					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_SERVER_ERROR);
-					return ;
-				}
-				if (!WEBSERV_filedesc_cloexec(fd)) {
-					::close(fd);
-
-					CLI_show_error_runtime("Could not set task file descriptor to close-on-exec");
-					CLI_show_extra("Reason", "%m");
-
-					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_SERVER_ERROR);
-					return ;
-				}
-
-				i64	id = WEBSERV_context_task_make_upload(context, req, fd);
-				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_CREATED);
-
-				CLI_debug("Client has initiated POST task with id %ld", id);
+				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_SERVER_ERROR);
 				return ;
 			}
-			if (req.method & WEBSERV_METHOD_PUT) {
-				if (!OS_test_file_exists(file_path)) {
-					CLI_show_error_runtime("Client cannot PUT file \"%.*s\" that doesn't exist",
-								file_path.len, file_path.text);
+			if (!WEBSERV_filedesc_cloexec(fd)) {
+				::close(fd);
 
-					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_FOUND);
-					return ;
-				}
-				if (!OS_test_file_write(file_path)) {
-					CLI_show_error_runtime("Client cannot PUT file \"%.*s\"",
-								file_path.len, file_path.text);
-					CLI_show_extra("Reason", "%m");
+				CLI_show_error_runtime("Could not set task file descriptor to close-on-exec");
+				CLI_show_extra("Reason", "%m");
 
-					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_UNAUTHORIZED);
-					return ;
-				}
-
-				i32	fd = ::open(file_path.text, O_WRONLY | O_CREAT | O_TRUNC);
-				if (fd == -1) {
-					CLI_show_error_runtime("Client could not update file at \"%.*s\"",
-								file_path.len, file_path.text);
-					CLI_show_extra("Reason", "%m");
-
-					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_SERVER_ERROR);
-					return ;
-				}
-				if (!WEBSERV_filedesc_cloexec(fd)) {
-					::close(fd);
-
-					CLI_show_error_runtime("Could not set task file descriptor to close-on-exec");
-					CLI_show_extra("Reason", "%m");
-
-					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_SERVER_ERROR);
-					return ;
-				}
-
-				i64	id = WEBSERV_context_task_make_upload(context, req, fd);
-				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_ACCEPTED);
-
-				CLI_debug("Client has initiated PUT task with id %ld", id);
+				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_SERVER_ERROR);
 				return ;
 			}
+
+			i64	id = WEBSERV_context_task_make_upload(context, req, fd);
+			WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_CREATED);
+
+			CLI_debug("Client has initiated POST task with id %ld", id);
+			return ;
 		} break ;
 		case WEBSERV_ROUTE_REDIRECT: {
 			const string_view&	status = route.Redirect.status;
@@ -1456,15 +1421,13 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 			/* TODO(xenobas): Use env from CGI config */
 
 			/* SECTION(xenobas): Process path builder */
-			string_builder	process_path_builder;
-			
-			string_view		directory = route.CGI.directory;
-			process_path_builder.write(directory);
-			if (!directory.has_suffix("/")) process_path_builder.write("/");
+			// string_builder	process_path_builder;
+			// 
+			// process_path_builder.write(directory);
+			// if (!directory.has_suffix("/")) process_path_builder.write("/");
 
-			process_path_builder.write(cgi_script_file);
-
-			string_view			process_path = process_path_builder.to_view();
+			string_view			process_dir = route.CGI.directory;
+			string_view			process_path = cgi_script_file; /* process_path_builder.to_view(); */
 
 			/* SECTION(xenobas): Interpreter picker */
 
@@ -1516,6 +1479,9 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 
 			char**				process_envp = WEBSERV_context_response_cgi_env(context, interest, req, process_path, path_extra);
 			char**				process_argv = WEBSERV_context_response_cgi_args(context, interest, req, interpreter_path, process_path);
+			for (i32 i = 0; process_argv[i]; ++i) {
+				CLI_debug("CGI argument %2d: \"%s\"", i, process_argv[i]);
+			}
 
 			#if 0
 			{
@@ -1545,6 +1511,17 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 
 				return ;
 			} else if (process_id == 0) { /* SECTION(xenobas): Child process */
+				i32	ret_chdir = ::chdir(process_dir.text);
+				if (ret_chdir == -1) {
+					CLI_show_error_runtime("Could not change directory");
+					CLI_show_extra("Reason", "%m");
+
+					process_ok = 0;
+					context.ok = 0;
+					process_fatal = 1;
+					goto CGI_label_cleanup;
+				}
+
 				i32					fd_read = process_pipe_out[0];
 				if (::dup2(fd_read, FD_STDIN) == -1) {
 					CLI_show_error_runtime("Could not duplicate file descriptor for process input");
@@ -1552,6 +1529,8 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 
 					process_ok = 0;
 					context.ok = 0;
+					process_fatal = 1;
+
 					goto CGI_label_cleanup;
 				}
                 ::close(fd_read); process_pipe_out[0] = -1;
@@ -1563,6 +1542,8 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 
 					process_ok = 0;
 					context.ok = 0;
+					process_fatal = 1;
+
 					goto CGI_label_cleanup;
 				}
                 ::close(fd_write); process_pipe_in[1] = -1;
@@ -1873,7 +1854,6 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 	}
 
 	::signal(SIGPIPE, SIG_IGN);
-	/* for (i32 req_count = 0; req_count < 128 || context.tasks.count > 0;) { */
 	for (;;) {
 		i32	req_count = 0;
 		if (!context.ok) break;
@@ -1943,29 +1923,6 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 					b32	event_type_read = event.events & EPOLLIN;
 					b32	event_type_write = event.events & EPOLLOUT;
 
-					if (event_type_stop) {
-						if (event.events & EPOLLERR) {
-							CLI_show_error_runtime("Client had an error occur at the socket level");
-
-							i32	err_code = 0; u64	err_len = size_of(err_code);
-							i32	ret_opt = ::getsockopt(fd_client, SOL_SOCKET, SO_ERROR, &err_code, cast(socklen_t*)&err_len);
-							if (ret_opt == -1) {
-								CLI_show_extra("Reason", "Could not get reason");
-								continue ;
-							}
-							CLI_show_extra("Reason", "%s", ::strerror(err_code));
-						}
-
-						if (interest.client_process_fd >= 0 && context.interests.has(interest.client_process_fd)) {
-							WEBSERV_Interest&	child = context.interests.get(interest.client_process_fd);
-
-							::kill(child.process_id, SIGKILL);
-							WEBSERV_context_interest_delete(context, child);
-						}
-						WEBSERV_context_interest_delete(context, interest);
-						CLI_debug("Client has disconnected", fd_client);
-						continue ;
-					}
 					if (event_type_read) {
 						const u64	buff_cap = CONTEXT_BUFFER_CAPACITY;
 						byte		buff_arr[buff_cap];
@@ -1987,27 +1944,30 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 						}
 
 						WEBSERV_Instance&	instance = context.config.instances[interest.server_idx];
-						u32					req_body_size = HTTP_request_body_size(interest.client_req);
-						if (req_body_size > instance.request_body_limit) {
-							struct epoll_event	event_mod; MEM_zero(event_mod);
-							event_mod.events = EPOLLOUT | EPOLLRDHUP | EPOLLHUP | EPOLLERR;
-							event_mod.data.fd = interest.fd;
 
-							i32					ret_ctl = ::epoll_ctl(context.fd_events, EPOLL_CTL_MOD, fd_client, &event_mod);
-							if (ret_ctl == -1) {
-								CLI_show_error_runtime("Could not modify interest inside epoll's internal data structure");
+						if (HTTP_request_is_done(interest.client_req)) {
+							u32					req_body_size = HTTP_request_body_size(interest.client_req);
+							if (req_body_size > instance.request_body_limit) {
+								CLI_debug("Terminated content too large with size %d", req_body_size);
 
-								WEBSERV_context_interest_delete(context, interest);
+								struct epoll_event	event_mod; MEM_zero(event_mod);
+								event_mod.events = EPOLLOUT | EPOLLRDHUP | EPOLLHUP | EPOLLERR;
+								event_mod.data.fd = interest.fd;
+
+								i32					ret_ctl = ::epoll_ctl(context.fd_events, EPOLL_CTL_MOD, fd_client, &event_mod);
+								if (ret_ctl == -1) {
+									CLI_show_error_runtime("Could not modify interest inside epoll's internal data structure");
+
+									WEBSERV_context_interest_delete(context, interest);
+									continue ;
+								}
+
+								CLI_debug("Client dropped due to content too large", buff_len);
+
+								WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_CONTENT_TOO_LARGE);
 								continue ;
 							}
 
-							CLI_debug("Client dropped due to content too large", buff_len);
-
-							WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_CONTENT_TOO_LARGE);
-							continue ;
-						}
-
-						if (HTTP_request_is_done(interest.client_req)) {
 							struct epoll_event	event_mod; MEM_zero(event_mod);
 							event_mod.events = EPOLLOUT | EPOLLRDHUP | EPOLLHUP | EPOLLERR;
 							event_mod.data.fd = interest.fd;
@@ -2033,37 +1993,35 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 						}
 						continue ;
 					}
+
+					if (event_type_stop) {
+						if (event.events & EPOLLERR) {
+							CLI_show_error_runtime("Client had an error occur at the socket level");
+
+							i32	err_code = 0; u64	err_len = size_of(err_code);
+							i32	ret_opt = ::getsockopt(fd_client, SOL_SOCKET, SO_ERROR, &err_code, cast(socklen_t*)&err_len);
+							if (ret_opt == -1) {
+								CLI_show_extra("Reason", "Could not get reason");
+								continue ;
+							}
+							CLI_show_extra("Reason", "%s", ::strerror(err_code));
+						}
+
+						if (interest.client_process_fd >= 0 && context.interests.has(interest.client_process_fd)) {
+							WEBSERV_Interest&	child = context.interests.get(interest.client_process_fd);
+
+							::kill(child.process_id, SIGKILL);
+							WEBSERV_context_interest_delete(context, child);
+						}
+						WEBSERV_context_interest_delete(context, interest);
+						CLI_debug("Client has disconnected", fd_client);
+						continue ;
+					}
 				} break ;
 				case WEBSERV_INTEREST_PROCESS: {
 					i32	fd_read = interest.process_fds.read;
 					i32	fd_parent = interest.process_fds.parent;
 					i32	process_id = interest.process_id;
-
-					b32	event_type_stop = event.events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR);
-					if (event_type_stop) {
-						if (event.events & EPOLLERR) {
-							CLI_show_error_runtime("Process %d had an error occur", process_id);
-						}
-						if (event.events & EPOLLRDHUP) {
-							CLI_debug("Process %d stopped due to RDHUP", process_id);
-						}
-
-						if (event.events & EPOLLHUP) {
-							// CLI_debug("Process %d stopped due to HUP", process_id);
-						}
-
-						// i32	ret_ctl = ::epoll_ctl(context.fd_events, EPOLL_CTL_DEL, interest.process_fds.read, NULL);
-						// if (ret_ctl == -1) {
-						// 	CLI_show_error_runtime("Could not remove process read interest from epoll's internal data structure");
-						// 	CLI_show_extra("Reason", "%m");
-
-						// 	continue ;
-						// }
-
-						// interest.process_fds.done = 1;
-						// CLI_debug("Process %d marked for cleanup", process_id);
-						// continue ;
-					}
 
 					b32	event_type_read = event.events & EPOLLIN;
 					if (event_type_read) {
@@ -2105,6 +2063,30 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 						WEBSERV_context_process_write(context, interest);
 						continue ;
 					}
+
+					b32	event_type_stop = event.events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR);
+					if (event_type_stop) {
+						if (event.events & EPOLLERR) {
+							CLI_show_error_runtime("Process %d had an error occur", process_id);
+						}
+
+						interest.process_fds.done = 1;
+						if (WEBSERV_context_process_watch(context, interest)) {
+							continue ;
+						}
+
+						// i32	ret_ctl = ::epoll_ctl(context.fd_events, EPOLL_CTL_DEL, interest.process_fds.read, NULL);
+						// if (ret_ctl == -1) {
+						// 	CLI_show_error_runtime("Could not remove process read interest from epoll's internal data structure");
+						// 	CLI_show_extra("Reason", "%m");
+
+						// 	continue ;
+						// }
+
+						// interest.process_fds.done = 1;
+						// CLI_debug("Process %d marked for cleanup", process_id);
+						// continue ;
+					}
 				} break ;
 			}
 		}
@@ -2122,12 +2104,6 @@ b32				WEBSERV_context_run(const WEBSERV_Config& config) {
 			}
 
 			WEBSERV_Instance&	instance = context.config.instances[interest.server_idx];
-
-			if (interest.type == WEBSERV_INTEREST_PROCESS) {
-				if (WEBSERV_context_process_watch(context, interest)) {
-					continue ;
-				}
-			}
 
 			i64	ts_last  = interest.timestamp;
 			i64	duration = ts_curr - ts_last;
