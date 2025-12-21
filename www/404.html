@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta name="color-scheme" content="light dark">
+		<link rel="stylesheet" href="assets/pico.min.css" />
+
+		<title>WEBSERV - S&A</title>
+		<style>
+			:root {
+				--pico-nav-element-spacing-vertical: 0rem;
+				--pico-nav-element-spacing-horizontal: 0.5rem;
+
+				--pico-border-radius: 0.25rem;
+				--pico-typography-spacing-vertical: 1rem;
+				--pico-form-element-spacing-vertical: 0.5rem;
+			}
+			html {
+				scroll-behavior: smooth;
+				img {
+					border-radius: var(--pico-border-radius, 0);
+
+					-webkit-user-select: none;
+					user-select: none;
+				}
+				textarea, pre {
+					padding-inline: 1rem;
+					padding-block: 1rem;
+				}
+			}
+			pre.stderr {
+				color: #ffffff;
+				background-color: #D93526;
+			}
+			ul, ol {
+				padding-left: 1rem;
+				& > li {
+					list-style: none;
+					& > img ~ a {
+						margin-inline: 0.25rem;
+					}
+
+					&#monitor-tools {
+						display: flex;
+						align-items: center;
+						justify-content: center;
+					}
+					&#monitor-folder-empty {
+						text-align: center;
+						text-transform: uppercase;
+					}
+				}
+			}
+		</style>
+		<!-- Dark Mode -->
+		<script type="module">
+			const root = document.querySelector("html");
+			const uri = new URLSearchParams(window.location.search);
+			if (uri.has("dark")) {
+				root.setAttribute("data-theme", "dark");
+			}
+		</script>
+	</head>
+	<body>
+		<header class="container">
+			<nav>
+				<ul>
+					<li><a href="/"><strong>webserv</strong></a></li>
+				</ul>
+				<ul>
+					<li><a href="https://profile.intra.42.fr/users/aindjare" target="_blank">aindjare</a></li>
+					<li><a href="https://profile.intra.42.fr/users/sennakhl" target="_blank">sennakhl</a></li>
+				</ul>
+			</nav>
+		</header>
+		<main class="container">
+			<h1>404 Not Found</h1>
+		</main>
+	</body>
+</html>

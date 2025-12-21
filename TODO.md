@@ -22,11 +22,11 @@
 - [x] Answer whether to make directory listing stricter that requires '/' suffix, and maybe redirect there? (NO)
 - [x] Add script_executable config for self-executable CGI's ? (NO)
 - [x] Forbidden functions removal (Make sure std::fprintf is passable; we can just use std::..std::fprintf., and ask about ::fcntl)
-- [ ] Pessimist code path testing
+- [x] Pessimist code path testing
 - [x] Siege testing
 - [x] 42 testing
 - [ ] Evaluation page
     1. Writing or reading ANY file descriptor without going through the select() (or equivalent) is strictly FORBIDDEN.
         the tasks are not multiplexed strictly speaking
     2. Setup a list of methods accepted for a certain route (e.g., try to delete something with and without permission)
-        do we keep on resetting the timeout on the process per each write/read, or do we keep it fixed to just basic timeout.
+    3. Do we keep on resetting the timeout on the process per each write/read, or do we keep it fixed to just basic timeout.

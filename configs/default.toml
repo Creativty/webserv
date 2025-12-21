@@ -2,7 +2,8 @@
 port = 8080
 addr = "0.0.0.0"
 http = {
-	status_404 = "./configs/not_found.html", # Settings the default error page
+	status_404 = "www/404.html", # Settings the default error page
+
 	request_body_limit = 4_194_304, # 4MiB
 }
 routes = [
