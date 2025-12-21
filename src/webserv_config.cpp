@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:42:31 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/21 05:35:29 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/21 05:36:45 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -152,12 +152,6 @@ static void				WEBSERV_route_delete(Route& route) {
 				kv.value.free();
 			} for_table_end ;
 			cgi.interpreters.free();
-
-			/* CGI Environment */
-			for_table_begin(cgi.env, hash_table<string_view>, kv) {
-				kv.value.free();
-			} for_table_end ;
-			cgi.env.free();
 		} break ;
 		case WEBSERV_ROUTE_COUNT:
 		case WEBSERV_ROUTE_INVALID:
@@ -199,7 +193,6 @@ static Route_CGI		WEBSERV_route_cgi_make(void) {
 
 	cgi.directory = string_view();
 	cgi.interpreters = hash_table<string_view>();
-	cgi.env = hash_table<string_view>();
 	return (cgi);
 }
 
@@ -468,33 +461,6 @@ static void				WEBSERV_route_parse_cgi_interpreters(Parser_Context& ctx, Route_C
 		cgi.interpreters.set(kv.key, path);
 	} for_table_end ;
 }
-static void				WEBSERV_route_parse_cgi_env(Parser_Context& ctx, Route_CGI& cgi, const TOML_Value& value) {
-	if (!CONTEXT_parse_expect(ctx, value, TOML_VALUE_TABLE)) {
-		return ;
-	}
-	if (value.Table == 0) {
-		context_error(VALUE_INVALID, value.pos, "environment table { KEY = VALUE, ... }");
-		return ;
-	}
-
-	const TOML_Table&	table = *value.Table;
-
-	cgi.env.resize(table.cap);
-	for_table_begin(table, const TOML_Table, kv) {
-		const TOML_Value&	value = kv.value;
-		if (!CONTEXT_parse_expect(ctx, value, TOML_VALUE_STRING, "environment value")) {
-			continue ;
-		}
-
-		string_view	ref = string_view();
-		if (value.String != 0) {
-			ref = *value.String;
-		}
-
-		string_view	val = string_view::alloc(ref);
-		cgi.env.set(kv.key, val);
-	} for_table_end ;
-}
 /* SECTION: Route variants parsers */
 static b32				WEBSERV_route_parse_server(Parser_Context& ctx, Route& route, const TOML_Value& value) {
 	typedef void	(*Entry_Proc)(Parser_Context&, WEBSERV_Route_Server&, const TOML_Value&);
@@ -671,8 +637,6 @@ static b32				WEBSERV_route_parse_cgi(Parser_Context& ctx, Route& route, const T
 	Entry	entries[] = {
 		{ "directory",		WEBSERV_route_parse_cgi_directory,		/* required = */ 1, 0 },
 		{ "interpreters",	WEBSERV_route_parse_cgi_interpreters,	/* required = */ 1, 0 },
-
-		{ "env",			WEBSERV_route_parse_cgi_env,			/* required = */ 0, 0 },
 	};
 
 	b32	ok_old = ctx.ok;

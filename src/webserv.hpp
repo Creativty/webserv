@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/26 15:46:57 by aindjare          #+#    #+#             */
-/*   Updated: 2025/12/21 05:35:35 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/21 05:36:57 by xenobas          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -222,7 +222,6 @@ struct WEBSERV_Route_Upload {
 struct WEBSERV_Route_CGI {
 	string_view					directory;
 	hash_table<string_view>		interpreters;
-	hash_table<string_view>		env;
 };
 struct WEBSERV_Route {
 	string_view				path;
