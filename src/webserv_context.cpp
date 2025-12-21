@@ -6,7 +6,7 @@
 /*   By: xenobas <rahimos.123@gmail.com>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/17 21:32:19 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/21 05:35:01 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/21 11:39:48 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -421,6 +421,9 @@ dynamic_array<byte>	HTTP_request_body(const HTTP_Request& req) {
 }
 
 void			HTTP_response_delete(HTTP_Response& response) {
+	if (response.is_file) {
+		::close(response.content_fd);
+	}
 	response.write_str.free();
 
 	for_table_begin(response.headers, HTTP_Headers, header) {
@@ -436,6 +439,10 @@ void			HTTP_response_delete(HTTP_Response& response) {
 	}
 }
 void			HTTP_response_cors(HTTP_Response& response) {
+	if (response.headers.has("Access-Control-Allow-Origin")) {
+		string_view&	header = response.headers.get("Access-Control-Allow-Origin");
+		header.free();
+	}
 	response.headers.set("Access-Control-Allow-Origin", string_view::alloc("*"));
 }
 
@@ -1159,8 +1166,6 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 
 	CLI_debug("Client request path \"%.*s\"/\"%.*s\"", path_match.len, path_match.text, path_extra.len, path_extra.text);
 
-	/* TODO(xenobas): Protect against path traversal */
-
 	switch (route.kind) {
 		case WEBSERV_ROUTE_SERVER: {
 			b32					files_list = route.Server.directory_list;
@@ -1191,7 +1196,37 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 
 				string_view	resource_mime = HTTP_mime_from_name(resource_path);
 				if (resource_size > CONTEXT_STREAM_BASELINE) { /* Transfer-Encoding: chunked */
-					WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_IMPLEMENTED);
+					i32	fd = ::open(resource_path.text, O_RDONLY);
+					if (fd == -1) {
+						CLI_show_error_runtime("Client could not create stream at \"%.*s\"",
+									resource_path.len, resource_path.text);
+						CLI_show_extra("Reason", "%m");
+
+						WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_SERVER_ERROR);
+						return ;
+					}
+					if (!WEBSERV_filedesc_cloexec(fd)) {
+						::close(fd);
+
+						CLI_show_error_runtime("Could not set stream task file descriptor to close-on-exec");
+						CLI_show_extra("Reason", "%m");
+
+						WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_SERVER_ERROR);
+						return ;
+					}
+
+					HTTP_Response&	response = WEBSERV_context_response(context, interest, HTTP_STATUS_OK);
+					response.headers.set("Content-Type", string_view::alloc("application/octet-stream"));
+					response.headers.set("Transfer-Encoding", string_view::alloc("chunked"));
+
+					string_builder	prelude;
+					WEBSERV_response_message_write_prelude(response, prelude);
+
+					response.write_idx = 0;
+					response.write_str = prelude.to_string();
+
+					response.is_file = 1;
+					response.content_fd = fd;
 					return ;
 				}
 
@@ -1392,7 +1427,7 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 			if (!WEBSERV_filedesc_cloexec(fd)) {
 				::close(fd);
 
-				CLI_show_error_runtime("Could not set task file descriptor to close-on-exec");
+				CLI_show_error_runtime("Could not set upload task file descriptor to close-on-exec");
 				CLI_show_extra("Reason", "%m");
 
 				WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_SERVER_ERROR);
@@ -1402,7 +1437,7 @@ void			WEBSERV_context_response_make(WEBSERV_Context& context, WEBSERV_Interest&
 			i64	id = WEBSERV_context_task_make_upload(context, req, fd);
 			WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_CREATED);
 
-			CLI_debug("Client has initiated POST task with id %ld", id);
+			CLI_debug("Client has initiated Upload task with id %ld", id);
 			return ;
 		} break ;
 		case WEBSERV_ROUTE_REDIRECT: {
@@ -1591,7 +1626,7 @@ CGI_label_cleanup:
 		} break ;
 	}
 
-	WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_IMPLEMENTED);
+	WEBSERV_context_response_from_status(context, interest, HTTP_STATUS_NOT_FOUND);
 }
 b32				WEBSERV_context_response_write(WEBSERV_Context& context, WEBSERV_Interest& interest) {
 	i32					fd = interest.fd;
@@ -1600,7 +1635,7 @@ b32				WEBSERV_context_response_write(WEBSERV_Context& context, WEBSERV_Interest
 		return (0);
 	}
 
-	const i32	chunk_cap = 1024 * 8;
+	const i32	chunk_cap = CONTEXT_BUFFER_CAPACITY;
 	i32			chunk_idx = res.write_idx;
 	if (chunk_idx < res.write_str.len) {
 		byte*		write_arr = cast(byte*)(&res.write_str[chunk_idx]);
@@ -1615,6 +1650,52 @@ b32				WEBSERV_context_response_write(WEBSERV_Context& context, WEBSERV_Interest
 		}
 		else if (write_ret >= 0) {
 			res.write_idx += cast(i32)write_ret;
+		}
+
+		interest.timestamp = OS_timestamp_now();
+		return (0);
+	}
+
+	if (res.is_file) {
+		i32			file_fd = res.content_fd;
+		if (file_fd == -1) {
+			WEBSERV_context_interest_delete(context, interest);
+			return (1);
+		}
+
+		byte			chunk_arr[chunk_cap] = { 0 };
+		i64				chunk_len = ::read(file_fd, chunk_arr, cast(u32)chunk_cap);
+		if (chunk_len == -1) {
+			CLI_show_error_runtime("Could not read file stream to write for client");
+			CLI_show_extra("Reason", "%m");
+
+			WEBSERV_context_interest_delete(context, interest);
+			return (1);
+		}
+		string_builder	chunk_builder;
+
+		if (chunk_len == 0) {
+			chunk_builder.write("0\r\n\r\n");
+		} else {
+			string_view		chunk_view(cast(char*)chunk_arr, cast(i32)chunk_len);
+
+			chunk_builder.write_hex(cast(u64)chunk_len); chunk_builder.write("\r\n");
+			chunk_builder.write(chunk_view); chunk_builder.write("\r\n");
+		}
+
+		string_view	chunk_data = chunk_builder.to_view();
+		i64			chunk_ret = ::write(interest.fd, chunk_data.text, cast(u32)chunk_data.len);
+		if (chunk_ret == -1) {
+			CLI_show_error_runtime("Could not write file stream chunk to client");
+			CLI_show_extra("Reason", "%m");
+
+			WEBSERV_context_interest_delete(context, interest);
+			return (1);
+		}
+
+		if (chunk_len == 0) {
+			WEBSERV_context_interest_delete(context, interest);
+			return (1);
 		}
 
 		interest.timestamp = OS_timestamp_now();

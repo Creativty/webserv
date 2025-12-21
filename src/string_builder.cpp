@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 13:58:18 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/20 14:41:06 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/21 11:36:25 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -54,10 +54,10 @@ char		string_builder::pop(void) {
 	return (this->data.pop());
 }
 
-static void	write_number(string_builder& builder, i64 n) {
+static void	write_decimal(string_builder& builder, i64 n) {
 	if (n == 0)
 		return ;
-	write_number(builder, n / 10);
+	write_decimal(builder, n / 10);
 	builder.write(cast(char)('0' + cast(char)(n % 10)));
 }
 void		string_builder::write(i64 n) {
@@ -69,8 +69,24 @@ void		string_builder::write(i64 n) {
 		this->data.push('-');
 		this->write(-n);
 	} else {
-		write_number(*this, n);
+		write_decimal(*this, n);
 	}
+}
+
+static void	write_hexadecimal(string_builder& builder, u64 n) {
+	static const char*	charset = "0123456789abcdef";
+
+	if (n == 0)
+		return ;
+	write_hexadecimal(builder, n / 16);
+	builder.write(charset[n % 16]);
+}
+void		string_builder::write_hex(u64 n) {
+	if (n == 0) {
+		this->data.push('0');
+		return ;
+	}
+	write_hexadecimal(*this, n);
 }
 
 string_view	string_builder::to_string(void) const {

@@ -6,7 +6,7 @@
 /*   By: xenobas <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/01 13:55:48 by xenobas           #+#    #+#             */
-/*   Updated: 2025/12/20 13:36:40 by aindjare         ###   ########.fr       */
+/*   Updated: 2025/12/21 11:04:33 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,6 +28,7 @@ struct string_builder {
 	void		write(const string_view& str);
 	void		write_uppercase(const string_view& str);
 	void		write(i64 n);
+	void		write_hex(u64 n);
 
 	char		pop(void);
 

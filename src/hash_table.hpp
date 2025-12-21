@@ -6,7 +6,7 @@
 /*   By: aindjare <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/16 17:16:15 by aindjare          #+#    #+#             */
-/*   Updated: 2025/11/11 13:09:16 by xenobas          ###   ########.fr       */
+/*   Updated: 2025/12/21 11:12:02 by aindjare         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -125,7 +125,7 @@ struct hash_table {
 		if (!(bool)key)
 			throw std::runtime_error("Cannot set an empty key to a value");
 		if (this->count >= this->cap / 2)
-			this->resize(this->cap == 0 ? 8 : this->cap * 2);
+			this->resize(this->cap == 0 ? 128 : this->cap * 2);
 		size_t	index = this->hash(key, (size_t)this->cap);
 		while (this->items[index].used()) {
 			if (this->items[index].key == key) {
